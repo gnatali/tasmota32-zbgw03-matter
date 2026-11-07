@@ -15,7 +15,7 @@ Tuya Wi-Fi et les sous-appareils Zigbee de la passerelle Tuya, et les présenter
 | Crypto Berry : `USE_BERRY_CRYPTO_AES_CBC` + correctif `berry-aes-gcm-128-aad.patch` | ✅ compilé, en service sur la passerelle |
 | Driver `berry/tuya_local.be` : protocoles 3.3 / 3.4 / 3.5, passerelle Tuya (`cid`) | ✅ **testé sur les vrais appareils** : 5 appareils Wi-Fi et 7 sous-appareils connectés, valeurs correctes |
 | Banc de test (18 scénarios) dans le workflow | ✅ passe en local (source et solidifié) |
-| **Configuration simplifiée** : page web `/tuya`, recherche UDP, import `devices.json` et cloud, types déduits des DP, API (`TuyaConfig`, `TuyaAdd`, `TuyaDel`, `TuyaScan`, `TuyaImport`, `TuyaCloud`, `TuyaMatter`) | ✅ banc de test ; ⏳ build, essai sur la passerelle (dont HTTPS vers le cloud Tuya) |
+| **Configuration simplifiée** : page web `/tuya`, recherche UDP, import `devices.json` et cloud, types déduits des DP, API (`TuyaConfig`, `TuyaAdd`, `TuyaDel`, `TuyaScan`, `TuyaImport`, `TuyaCloud`, `TuyaMatter`) | ✅ banc de test ; ✅ build (exécution 13, 2050 Ko) ; ⏳ essai sur la passerelle (dont HTTPS vers le cloud Tuya) |
 | **Solidification du driver** (`custom_berry_solidify`, correctif `berry-solidify-all-classes.patch`) | ✅ banc de test : 12/12 sur le driver source **et** sur le driver solidifié ; ✅ build du firmware (2015 Ko) ; ✅ sur la passerelle : **48 Ko libres avec les 12 appareils connectés** (34 Ko avant), le driver consomme ~23 Ko au lieu de ~40 |
 | Documentation utilisateur `docs/tuya-local.fr.md` | ✅ |
 | Chargement différé dans `autoexec.be` (plantage au démarrage) | ✅ corrigé et documenté |
@@ -78,6 +78,9 @@ Tuya Wi-Fi et les sous-appareils Zigbee de la passerelle Tuya, et les présenter
    Banc de test : 18 scénarios, 18/18 en source et en solidifié. Mesure sur le banc (64 bits,
    à diviser par environ 2 pour l'ESP32) : +0,7 à +1,3 Ko au repos, +4,5 Ko pendant une
    recherche qui trouve 10 appareils. Driver : ~1700 lignes de code, C solidifié de 507 Ko.
+   **Build** (exécution 13, commit `df91caf`) : firmware de 2 099 167 octets (2050 Ko,
+   **+34,2 Ko**, dans l'estimation de 25 à 35 Ko), `.rodata` 735 056 octets ; RAM statique
+   +96 octets (DRAM 65 980 → 66 076). Il reste ~830 Ko en flash.
 
 ## Mesures sur la passerelle
 
