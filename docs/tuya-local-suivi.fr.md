@@ -57,7 +57,7 @@ Tuya Wi-Fi et les sous-appareils Zigbee de la passerelle Tuya, et les présenter
    - le banc de test solidifie le driver comme le build (`berry_port`, `coc`) et rejoue les
      12 scénarios sur les classes natives. Le C généré fait ~206 Ko de source.
    - **Build** (exécution 11, commit `df4ed7d`) : firmware de 2 063 295 octets (2015 Ko,
-     +22,8 Ko), soit exactement la hausse de `.rodata` (676 464 → 699 280 octets). La RAM
+     +22,3 Ko), soit la hausse de `.rodata` (676 464 → 699 280 octets, +22,3 Ko). La RAM
      statique ne bouge pas (DRAM 65 948 → 65 980 octets, +32). Il reste ~865 Ko en flash.
 
 8. **Configuration simplifiée** (7 novembre), d'après une évaluation chiffrée faite au
@@ -88,6 +88,11 @@ Tuya Wi-Fi et les sous-appareils Zigbee de la passerelle Tuya, et les présenter
    `docs/tuya-local.fr.md`. La recherche a trouvé les 3 appareils sur la passerelle.
    Build : exécution 15 (commit `6b51e4a`), 19/19 dans les deux modes, firmware de
    2 099 471 octets ; à flasher.
+
+10. **Documentation** (7 novembre) : `docs/tuya-local-dev.fr.md` / `.en.md` (documentation
+    technique de la session : architecture, solidification, Matter, API, recherche, imports, page
+    web, banc de test, mesures) et `docs/tuya-local-examples.fr.md` / `.en.md` (commandes,
+    réponses, événements, règles, scripts Berry), liés depuis les README et la doc d'utilisation.
 
 ## Mesures sur la passerelle
 

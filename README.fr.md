@@ -187,7 +187,10 @@ est intégré au firmware (solidifié : son code reste en flash au lieu d'être 
 démarré par `autoexec.be`. La page **Configuration → Tuya local** recherche les appareils sur le
 réseau, importe leurs clés locales (depuis le `devices.json` de tinytuya ou le cloud Tuya), crée
 leurs endpoints Matter et modifie la configuration ; les mêmes fonctions existent en commandes
-(HTTP, MQTT). Voir [docs/tuya-local.fr.md](docs/tuya-local.fr.md).
+(HTTP, MQTT). Voir [docs/tuya-local.fr.md](docs/tuya-local.fr.md) (utilisation),
+[docs/tuya-local-examples.fr.md](docs/tuya-local-examples.fr.md) (exemples de commandes,
+d'événements, de règles et de scripts) et [docs/tuya-local-dev.fr.md](docs/tuya-local-dev.fr.md)
+(documentation technique).
 
 ### Bouton Zigbee dans Google Home
 

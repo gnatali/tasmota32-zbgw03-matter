@@ -4,6 +4,10 @@ Le driver Berry `berry/tuya_local.be` pilote les appareils Tuya **sans les flash
 cloud**, directement sur le réseau local, et les présente à **Matter** (Google Home, Apple
 Maison...) à travers la passerelle.
 
+Exemples de commandes, d'événements, de règles et de scripts :
+[tuya-local-examples.fr.md](tuya-local-examples.fr.md) ; fonctionnement interne :
+[tuya-local-dev.fr.md](tuya-local-dev.fr.md).
+
 - Protocoles locaux Tuya **3.3, 3.4 et 3.5** (TCP 6668, chiffrement par la clé locale).
 - **Sous-appareils Zigbee d'une passerelle Tuya** (prises, interrupteurs, capteurs restés
   appairés à la passerelle Tuya).
