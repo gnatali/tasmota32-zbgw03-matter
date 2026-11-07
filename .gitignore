@@ -2,3 +2,7 @@
 *.log
 .pio/
 __pycache__/
+
+# configuration Tuya reelle (cles locales) : uniquement sur la passerelle
+/tuya.json
+berry/tuya.json

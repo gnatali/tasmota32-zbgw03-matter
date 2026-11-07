@@ -1,0 +1,557 @@
+"""Tests de bout en bout du driver tuya_local.be contre de faux appareils Tuya (fake_tuya.py).
+
+Lancement : python3 test_tuya_local.py [chemin de l'interpreteur berry de test]
+Le fichier /tuya.json est ecrit pour le test (configuration fictive).
+"""
+import json
+import os
+import subprocess
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+from fake_tuya import FakeDevice  # noqa: E402
+
+BERRY = sys.argv[1] if len(sys.argv) > 1 else "berry"
+
+K = {n: ("%016d" % i)[:16].replace("0", "k") for i, n in enumerate(
+    ["fan", "clamp", "porch", "radio", "pergola", "gw"], start=1)}
+K["fan"] = "Zq!(4.P;n+x-T]w~"   # caracteres speciaux, comme les vraies cles (cle fictive)
+
+CONFIG = {"devices": [
+    {"name": "Ventilateur", "id": "fan000000000000000000", "key": K["fan"], "ip": "10.0.0.18", "version": "3.5",
+     "matter": [{"ep": "Ventilateur", "type": "fan", "dp": 60, "dp_speed": 62, "speed_max": 6},
+                {"ep": "Lumiere ventilateur", "type": "light0", "dp": 20}]},
+    {"name": "Pince", "id": "clamp0000000000000000", "key": K["clamp"], "ip": "10.0.0.80", "version": "3.5",
+     "sensors": {"Energie": [131, 100, "kWh"], "Puissance": [133, 1, "W"], "Tension A": [101, 10, "V"]}},
+    {"name": "Entree-Porche", "id": "porch0000000000000000", "key": K["porch"], "ip": "10.0.0.174", "version": "3.3",
+     "matter": [{"ep": "Porche", "type": "light2"}]},
+    {"name": "Recepteur radio", "id": "radio0000000000000000", "key": K["radio"], "ip": "10.0.0.15", "version": "3.5",
+     "matter": [{"ep": "Radio 1", "type": "relay", "dp": 1}, {"ep": "Radio 2", "type": "relay", "dp": 2}]},
+    {"name": "Pergola 1", "id": "perg00000000000000000", "key": K["pergola"], "ip": "10.0.0.31", "version": "3.4",
+     "matter": [{"ep": "Pergola 1", "type": "light3"}]},
+    {"name": "Gateway", "id": "gw0000000000000000000", "key": K["gw"], "ip": "10.0.0.180", "version": "3.3",
+     "children": [
+         {"name": "Prise Lisseur", "id": "plug00000000000000000", "cid": "00158d0000000001",
+          "matter": [{"ep": "Prise Lisseur", "type": "relay_power", "dp": 1,
+                      "dp_power": 19, "div_power": 10, "dp_voltage": 20, "div_voltage": 10,
+                      "dp_current": 18, "div_current": 1000}]},
+         {"name": "Temperature SdB", "id": "temp00000000000000000", "cid": "00158d0000000002",
+          "matter": [{"ep": "Temperature SdB", "type": "temp", "dp": 1, "div": 10},
+                     {"ep": "Humidite SdB", "type": "humidity", "dp": 2, "div": 10}]}]},
+]}
+
+DEVS = {
+    "10.0.0.18": FakeDevice("fan000000000000000000", K["fan"], 3.5,
+                            {"20": True, "23": 0, "60": False, "62": 2, "63": "forward"}),
+    "10.0.0.80": FakeDevice("clamp0000000000000000", K["clamp"], 3.5,
+                            {"101": 2350, "131": 2268703, "133": 592}),
+    "10.0.0.174": FakeDevice("porch0000000000000000", K["porch"], 3.3,
+                             {"20": False, "21": "white", "22": 1000, "23": 0}),
+    "10.0.0.15": FakeDevice("radio0000000000000000", K["radio"], 3.5,
+                            {"1": False, "2": False, "3": False, "4": False}),
+    "10.0.0.31": FakeDevice("perg00000000000000000", K["pergola"], 3.4,
+                            {"20": True, "21": "white", "22": 500, "24": "000003e803e8"}),
+    "10.0.0.180": FakeDevice("gw0000000000000000000", K["gw"], 3.3, children={
+        "00158d0000000001": {"1": False, "18": 0, "19": 0, "20": 2310},
+        "00158d0000000002": {"1": 215, "2": 560, "4": 100}}),
+}
+
+
+class Harness:
+    def __init__(self):
+        self.p = subprocess.Popen(["stdbuf", "-oL", BERRY, "harness.be"], cwd=HERE, stdin=subprocess.PIPE,
+                                  stdout=subprocess.PIPE, text=True, bufsize=1)
+        self.out = []
+        self.read()   # sortie du chargement
+
+    def read(self):
+        lines = []
+        while True:
+            l = self.p.stdout.readline()
+            if not l:
+                raise RuntimeError("berry s'est arrete :\n" + "\n".join(self.out[-30:] + lines))
+            l = l.rstrip("\n")
+            if l == "READY":
+                break
+            lines.append(l)
+        self.out += lines
+        return lines
+
+    def send(self, line):
+        self.p.stdin.write(line + "\n")
+        self.p.stdin.flush()
+        return self.read()
+
+    def pump(self, lines, rounds=6):
+        """Transmet les TX aux faux appareils et renvoie leurs reponses, jusqu'a stabilisation."""
+        allout = list(lines)
+        pending = list(lines)
+        for _ in range(rounds):
+            new = []
+            for l in pending:
+                if l.startswith("CONNECT "):
+                    ip = l.split()[1]
+                    DEVS[ip].reset_session()
+                    new += self.send("OPEN " + ip)
+                elif l.startswith("TX "):
+                    _, ip, hx = l.split(" ", 2)
+                    for r in DEVS[ip].feed(bytes.fromhex(hx)):
+                        new += self.send("RX %s %s" % (ip, r.hex()))
+            if not new:
+                # vider les ecritures partielles en attente
+                new = self.send("ADV 50")
+                if not any(x.startswith("TX ") for x in new):
+                    allout += new
+                    break
+            allout += new
+            pending = new
+        return allout
+
+    def close(self):
+        self.p.stdin.write("END\n")
+        self.p.stdin.flush()
+        self.p.wait(5)
+
+
+def struct_cmd(pkt):
+    """Commande d'une trame 55AA ou 6699."""
+    return int.from_bytes(pkt[10:14] if pkt[:4] == b"\0\0\x66\x99" else pkt[8:12], "big")
+
+
+def tinytuya_sign(creds, url, hdr):
+    """Signature calculee par tinytuya.Cloud (requests et time simules) pour la meme requete."""
+    import sys
+    import tinytuya
+    mod = sys.modules["tinytuya.Cloud"]
+    seen = {}
+
+    class R:
+        status_code = 200
+        content = b'{"success": true, "result": {"access_token": "tok123"}}'
+        text = content.decode()
+        def json(self):
+            return {"success": True, "result": {"access_token": "tok123"}}
+
+    class FakeRequests:
+        @staticmethod
+        def get(u, headers=None):
+            seen["sign"] = headers["sign"]
+            return R()
+        Request = mod.requests.Request
+
+    class FakeTime:
+        @staticmethod
+        def time():
+            return int(hdr["t"]) / 1000.0
+    real_req, real_time = mod.requests, mod.time
+    mod.requests, mod.time = FakeRequests, FakeTime
+    try:
+        token = hdr.get("access_token")
+        c = tinytuya.Cloud(apiRegion=creds["region"], apiKey=creds["id"], apiSecret=creds["secret"],
+                           initial_token=token or "x")
+        if token is None:
+            c.token = None
+            c._gettoken()
+        else:
+            path = url.split("/", 3)[3]
+            c._tuyaplatform(path.split("/", 1)[1], ver=path.split("/", 1)[0])
+    finally:
+        mod.requests, mod.time = real_req, real_time
+    return seen["sign"]
+
+
+def page_btn(h):
+    out = h.send("WEBBTN")
+    return json.loads([l for l in out if l.startswith("PAGE ")][-1][5:]), out
+
+
+def mtr_updates(lines):
+    return [json.loads(l[len("CMD MtrUpdate "):]) for l in lines if l.startswith("CMD MtrUpdate ")]
+
+
+def find(updates, name):
+    r = {}
+    for u in updates:
+        if u.get("Name") == name:
+            r.update(u)
+    return r
+
+
+def main():
+    with open("/tuya.json", "w") as f:
+        json.dump(CONFIG, f)
+    h = Harness()
+    ok = 0
+
+    # 1. connexion, negociation et etat initial de tous les appareils
+    out = h.pump(h.send("ADV 50"))
+    errs = [l for l in out if l.startswith("LOG 1") or "erreur" in l]
+    assert not errs, errs
+    up = mtr_updates(out)
+    assert find(up, "Ventilateur") == {"Name": "Ventilateur", "FanSpeed": 0}, find(up, "Ventilateur")
+    assert find(up, "Lumiere ventilateur")["Power"] == 1
+    assert find(up, "Porche") == {"Name": "Porche", "Power": 0, "Bri": 254, "CT": 500}, find(up, "Porche")
+    assert find(up, "Radio 1")["Power"] == 0 and find(up, "Radio 2")["Power"] == 0
+    p1 = find(up, "Pergola 1")
+    assert p1["Power"] == 1 and p1["Sat"] == 0 and p1["Bri"] == 126, p1
+    pl = find(up, "Prise Lisseur")
+    assert pl["Power"] == 0 and abs(pl["Voltage"] - 231.0) < 0.01, pl
+    t = find(up, "Temperature SdB")
+    assert abs(t["Temperature"] - 21.5) < 0.01, t
+    assert abs(find(up, "Humidite SdB")["Humidity"] - 56.0) < 0.01
+    for ip in ("10.0.0.18", "10.0.0.80", "10.0.0.15", "10.0.0.31"):
+        assert any(e[0] == "session" for e in DEVS[ip].log), ip    # negociation 3.4/3.5 faite
+    ok += 1
+    print("OK 1 connexion + negociation + etat initial (6 appareils, 3.3/3.4/3.5, passerelle)")
+
+    # 2. Matter -> ventilateur 3.5 : vitesse 50 % puis arret
+    out = h.pump(h.send('MTR {"ep1":{"Ep":1,"Name":"Ventilateur","FanMode":2,"FanSpeed":50,"FanSpeed255":128}}'))
+    fan = DEVS["10.0.0.18"]
+    assert fan.dps["60"] is True and fan.dps["62"] == 3, fan.dps
+    assert find(mtr_updates(out), "Ventilateur")["FanSpeed"] == 50
+    out = h.pump(h.send('MTR {"ep1":{"Ep":1,"Name":"ventilateur","FanMode":0,"FanSpeed":0,"FanSpeed255":0}}'))
+    assert fan.dps["60"] is False, fan.dps
+    ok += 1
+    print("OK 2 Matter -> ventilateur (3.5) : vitesse et arret, retour d'etat")
+
+    # 3. Matter -> ampoule CCT 3.3 : allumage, luminosite, temperature de couleur
+    porch = DEVS["10.0.0.174"]
+    h.pump(h.send('MTR {"ep3":{"Ep":3,"Name":"Porche","Power":1}}'))
+    assert porch.dps["20"] is True
+    h.pump(h.send('MTR {"ep3":{"Ep":3,"Name":"Porche","Bri":127,"Dimmer":50}}'))
+    assert porch.dps["22"] == 10 + (126 * 990 + 126) // 253, porch.dps
+    out = h.pump(h.send('MTR {"ep3":{"Ep":3,"Name":"Porche","CT":153}}'))
+    assert porch.dps["23"] == 1000, porch.dps
+    assert find(mtr_updates(out), "Porche")["CT"] == 153
+    ok += 1
+    print("OK 3 Matter -> ampoule CCT (3.3) : on, luminosite, temperature")
+
+    # 4. Matter -> projecteur RGB 3.4 : teinte/saturation puis luminosite en mode couleur
+    perg = DEVS["10.0.0.31"]
+    out = h.pump(h.send('MTR {"ep5":{"Ep":5,"Name":"Pergola 1","Hue":85,"Sat":254}}'))
+    assert perg.dps["21"] == "colour", perg.dps
+    assert perg.dps["24"][:8] == "%04x%04x" % ((85 * 360 + 127) // 254, 1000), perg.dps
+    u = find(mtr_updates(out), "Pergola 1")
+    assert u["Hue"] == 85 and u["Sat"] == 254, u
+    h.pump(h.send('MTR {"ep5":{"Ep":5,"Name":"Pergola 1","Bri":254,"Dimmer":100}}'))
+    assert perg.dps["24"][8:] == "03e8" and perg.dps["21"] == "colour", perg.dps
+    ok += 1
+    print("OK 4 Matter -> projecteur RGB (3.4) : couleur et luminosite")
+
+    # 5. passerelle 3.3 : prise Zigbee (cid) commandee depuis Matter, mesures remontees
+    gw = DEVS["10.0.0.180"]
+    out = h.pump(h.send('MTR {"ep7":{"Ep":7,"Name":"Prise Lisseur","Power":1}}'))
+    assert gw.children["00158d0000000001"]["1"] is True
+    assert find(mtr_updates(out), "Prise Lisseur")["Power"] == 1
+    # mise a jour spontanee de mesures par la passerelle
+    push = gw.push({"cid": "00158d0000000001", "dps": {"19": 1234, "18": 5300}, "t": 2})
+    out = h.pump(h.send("RX 10.0.0.180 " + push.hex()))
+    u = find(mtr_updates(out), "Prise Lisseur")
+    assert abs(u["ActivePower"] - 123.4) < 0.01 and abs(u["Current"] - 5.3) < 0.01, u
+    ok += 1
+    print("OK 5 passerelle Zigbee (3.3, cid) : commande et mesures")
+
+    # 6. releves Tasmota de la pince amperemetrique
+    out = h.send("SENSOR")
+    app = [l for l in out if l.startswith("APPEND ")][0][len("APPEND "):]
+    tele = json.loads("{" + app[1:] + "}")["Tuya"]["Pince"]
+    assert abs(tele["Energie"] - 22687.03) < 0.01 and tele["Puissance"] == 592, tele
+    assert any("Pince Tension A" in l and "235.0 V" in l for l in out if l.startswith("WEB ")), out
+    ok += 1
+    print("OK 6 releves SENSOR et page web (pince 3.5)")
+
+    # 7. commande TuyaSend et TuyaStatus
+    out = h.pump(h.send("CMD TuyaSend Recepteur radio,3,true"))
+    assert DEVS["10.0.0.15"].dps["3"] is True
+    out = h.send("CMD TuyaStatus")
+    st = json.loads([l for l in out if l.startswith("RESP ")][0][5:])["TuyaStatus"]
+    assert st["Recepteur radio"]["Connected"] and st["Recepteur radio"]["Dps"]["3"] is True, st
+    assert st["Prise Lisseur"]["Dps"]["19"] == 1234
+    ok += 1
+    print("OK 7 TuyaSend / TuyaStatus")
+
+    # 8. heartbeat toutes les 10 s, coupure, reconnexion avec nouvelle negociation
+    hb0 = fan.hb
+    out = h.pump(h.send("ADV 10500"))
+    assert fan.hb > hb0, (fan.hb, hb0)
+    out = h.send("DROP 10.0.0.18")
+    out += h.send("ADV 100")
+    assert any(l.startswith("CLOSE 10.0.0.18") for l in out), out
+    out = h.pump(h.send("ADV 6000"))
+    assert any(l.startswith("CONNECT 10.0.0.18") for l in out), out
+    sessions = [e for e in fan.log if e[0] == "session"]
+    assert len(sessions) >= 2, sessions
+    h.pump(h.send('MTR {"ep1":{"Ep":1,"Name":"Ventilateur","FanMode":3,"FanSpeed":100,"FanSpeed255":255}}'))
+    assert fan.dps["60"] is True and fan.dps["62"] == 6, fan.dps
+    ok += 1
+    print("OK 8 heartbeat, coupure et reconnexion (nouvelle cle de session)")
+
+    # 9. appareil muet : deconnexion apres 35 s sans reponse
+    radio_ip = "10.0.0.15"
+    saved = DEVS[radio_ip].feed
+    DEVS[radio_ip].feed = lambda d: []
+    out = []
+    for _ in range(8):
+        out += h.pump(h.send("ADV 5000"))
+    assert any("Recepteur radio" in l and "plus de reponse" in l for l in out), [l for l in out if "LOG" in l][-5:]
+    DEVS[radio_ip].feed = saved
+    ok += 1
+    print("OK 9 detection d'un appareil muet")
+
+    # 10. trame corrompue : rejetee sans planter
+    bad = bytearray(gw.push({"cid": "00158d0000000002", "dps": {"1": 300}}))
+    bad[-10] ^= 0xFF
+    out = h.send("RX 10.0.0.180 " + bytes(bad).hex())
+    assert any("CRC invalide" in l for l in out), out
+    good = gw.push({"cid": "00158d0000000002", "dps": {"1": 199}})
+    out = h.pump(h.send("RX 10.0.0.180 " + good.hex()))
+    assert abs(find(mtr_updates(out), "Temperature SdB")["Temperature"] - 19.9) < 0.01
+    ok += 1
+    print("OK 10 trame corrompue rejetee, la suivante est traitee")
+
+    # 11. trame recue en deux morceaux, puis deux trames dans le meme paquet (3.5)
+    f1 = DEVS["10.0.0.18"].push({"protocol": 4, "t": 3, "data": {"dps": {"20": False}}})
+    f2 = DEVS["10.0.0.18"].push({"protocol": 4, "t": 4, "data": {"dps": {"62": 4}}})
+    out = h.send("RX 10.0.0.18 " + f1[:23].hex())
+    assert not mtr_updates(out), out
+    out = h.send("RX 10.0.0.18 " + f1[23:].hex())
+    assert find(mtr_updates(out), "Lumiere ventilateur")["Power"] == 0, out
+    out = h.send("RX 10.0.0.18 " + (f2 + f1).hex())
+    assert find(mtr_updates(out), "Ventilateur")["FanSpeed"] == 67, mtr_updates(out)
+    ok += 1
+    print("OK 11 trame fragmentee et trames groupees")
+
+    # 12. endpoint Matter absent : le refus de MtrUpdate est signale dans le journal
+    h.close()
+    cfg = json.loads(json.dumps(CONFIG))
+    cfg["devices"][3]["matter"][0]["ep"] = "Inconnu"
+    with open("/tuya.json", "w") as f:
+        json.dump(cfg, f)
+    h = Harness()
+    out = h.pump(h.send("ADV 50"))
+    assert any("endpoint Matter 'Inconnu' : Invalid Device" in l for l in out), [l for l in out if "LOG" in l]
+    ok += 1
+    print("OK 12 endpoint Matter absent signale")
+
+    # 13. endpoint Matter cree apres le demarrage du driver : renvoi de l'etat complet toutes
+    # les 30 s tant qu'il est refuse, signale une seule fois, puis plus rien une fois accepte
+    def adv(ms):
+        out = []
+        for _ in range(ms // 10000):
+            out += h.pump(h.send("ADV 10000"))
+        return out
+    out = adv(30000)
+    assert find(mtr_updates(out), "Inconnu") == {"Name": "Inconnu", "Power": 0}, mtr_updates(out)
+    assert not any("'Inconnu'" in l for l in out if l.startswith("LOG")), "refus signale deux fois"
+    h.send("EPADD Inconnu")                       # l'endpoint est cree dans Configuration -> Matter
+    out = adv(30000)
+    assert find(mtr_updates(out), "Inconnu") == {"Name": "Inconnu", "Power": 0}, mtr_updates(out)
+    assert any("endpoint Matter 'Inconnu' disponible" in l for l in out), [l for l in out if "LOG" in l]
+    out = adv(30000)
+    assert find(mtr_updates(out), "Inconnu") == {}, "endpoint accepte : plus de renvoi"
+    push = DEVS["10.0.0.15"].push({"protocol": 4, "t": 5, "data": {"dps": {"1": True}}})
+    out = h.pump(h.send("RX 10.0.0.15 " + push.hex()))
+    assert find(mtr_updates(out), "Inconnu") == {"Name": "Inconnu", "Power": 1}, mtr_updates(out)
+    ok += 1
+    print("OK 13 endpoint Matter cree apres coup : etat envoye sans redemarrage")
+
+    # 14. API : configuration sans les cles, ajout, cle conservee, TuyaSend par code, suppression
+    def resp(out, name):
+        r = [l for l in out if l.startswith("RESP ")]
+        assert r, out
+        return json.loads(r[-1][5:])[name]
+    out = h.send("CMD TuyaConfig")
+    conf = resp(out, "TuyaConfig")
+    assert len(conf["devices"]) == 6 and all(d["key"] == "***" for d in conf["devices"]), conf
+    assert resp(h.send("CMD TuyaConfig Pince"), "TuyaConfig")["name"] == "Pince"
+    st = json.loads([l for l in h.send("CMD TuyaStatus pince") if l.startswith("RESP ")][0][5:])["TuyaStatus"]
+    assert list(st) == ["Pince"], st
+    K["plug"] = "pLuG-kEy-0123456"
+    DEVS["10.0.0.99"] = FakeDevice("plugtest0000000000000", K["plug"], 3.3, {"1": False})
+    plug = {"name": "Prise test", "id": "plugtest0000000000000", "key": K["plug"], "ip": "10.0.0.99", "version": "3.3"}
+    out = h.pump(h.send("CMD TuyaAdd " + json.dumps(plug)))
+    assert resp(out, "TuyaAdd") == "Prise test", out
+    plug.update({"key": "***", "codes": {"switch": 1}, "matter": [{"ep": "Prise test", "type": "relay", "dp": 1}]})
+    out = h.pump(h.send("CMD TuyaAdd " + json.dumps(plug)))
+    saved = [d for d in json.load(open("/tuya.json"))["devices"] if d["id"] == plug["id"]][0]
+    assert saved["key"] == K["plug"] and saved["codes"] == {"switch": 1}, saved
+    out = h.pump(h.send("CMD TuyaSend Prise test,switch,true"))
+    assert DEVS["10.0.0.99"].dps["1"] is True, DEVS["10.0.0.99"].dps
+    assert "DP inconnu" in h.send("CMD TuyaSend Prise test,inexistant,1")[-1]
+    assert "Error" in resp(h.send("CMD TuyaAdd {pas du json"), "TuyaAdd")
+    out = h.pump(h.send("CMD TuyaDel Prise test"))
+    assert resp(out, "TuyaDel") == "Prise test"
+    assert all(d["id"] != plug["id"] for d in json.load(open("/tuya.json"))["devices"])
+    assert any(d["id"] == plug["id"] for d in json.load(open("/tuya.json.bak"))["devices"])
+    ok += 1
+    print("OK 14 API : TuyaConfig sans cles, TuyaAdd (cle conservee), TuyaSend par code, TuyaDel")
+
+    # 15. recherche sur le reseau : annonces 3.1 / 3.3 / 3.5, demande 3.5 diffusee, fin publiee
+    from fake_tuya import udp_broadcast, decrypt_udp
+    out = h.send("CMD TuyaScan 5")
+    assert "5 s" in resp(out, "TuyaScan"), out
+    assert sum(l.startswith("UDPBIND ") for l in out) == 3, out
+    req = [l for l in out if l.startswith("UDPTX 255.255.255.255 7000 ")]
+    assert req, out
+    req_pkt = bytes.fromhex(req[0].split()[3])
+    assert json.loads(decrypt_udp(req_pkt)) == {"from": "app", "ip": "10.0.0.2"}
+    assert struct_cmd(req_pkt) == 0x25
+    LAMP = {"ip": "10.0.0.50", "gwId": "lamp330000000000000aa", "active": 2, "ability": 0, "mode": 0,
+            "encrypt": True, "productKey": "keylamp", "version": "3.3"}
+    MPLUG = {"ip": "10.0.0.51", "gwId": "mplug35000000000000bb", "uuid": "u1", "active": 2, "ablilty": 0,
+             "encrypt": True, "productKey": "keyplug", "version": "3.5", "token": True, "wf_cfg": True}
+    OLD = {"ip": "10.0.0.52", "gwId": "old31000000000000000cc", "active": 2, "ability": 0, "mode": 0,
+           "encrypt": False, "productKey": "keyold", "version": "3.1"}
+    h.send("UDP 6667 10.0.0.50 " + udp_broadcast(3.3, LAMP).hex())
+    h.send("UDP 7000 10.0.0.51 " + udp_broadcast(3.5, MPLUG).hex())
+    h.send("UDP 6666 10.0.0.52 " + udp_broadcast(3.1, OLD).hex())
+    h.send("UDP 7000 10.0.0.2 " + req_pkt.hex())                     # notre propre demande : ignoree
+    h.send("UDP 6667 10.0.0.53 " + "00" * 40)                          # paquet invalide : ignore
+    out = h.send("ADV 6000")
+    pub = [json.loads(l[4:]) for l in out if l.startswith("PUB ") and "TuyaScan" in l]
+    assert pub, out
+    found = {d["id"]: d for d in pub[0]["TuyaScan"]["Devices"]}
+    assert set(found) == {"lamp330000000000000aa", "mplug35000000000000bb", "old31000000000000000cc"}, found
+    assert found["mplug35000000000000bb"]["version"] == "3.5" and found["lamp330000000000000aa"]["ip"] == "10.0.0.50"
+    assert sum(l.startswith("UDPCLOSE ") for l in out) == 3
+    h.send("HEAP 10")
+    assert "memoire" in resp(h.send("CMD TuyaScan"), "TuyaScan")["Error"]
+    h.send("HEAP 60")
+    ok += 1
+    print("OK 15 recherche : annonces 3.1/3.3/3.5 (format TinyTuya), demande 3.5, resultat publie")
+
+    # 16. import du devices.json de tinytuya : seulement les appareils trouves ou connus,
+    #     types deduits des codes de DP, sous-appareil rattache, lecture par morceaux
+    K["lamp"] = "LaMp-KeY-0000001"
+    K["mplug"] = "MpLuG-KeY-000002"
+    DEVS["10.0.0.50"] = FakeDevice("lamp330000000000000aa", K["lamp"], 3.3, {"20": False, "21": "white", "22": 500, "23": 0})
+    DEVS["10.0.0.51"] = FakeDevice("mplug35000000000000bb", K["mplug"], 3.5, {"1": False, "18": 0, "19": 0, "20": 2300})
+    DEVS["10.0.0.180"].children["00158d00000000ff"] = {"1": False}         # sous-appareil Zigbee de la passerelle
+    def mp(*items):
+        return {str(dp): {"code": code, "type": typ, "values": vals} for dp, code, typ, vals in items}
+    devices_json = [
+        {"name": "Lampe test", "id": "lamp330000000000000aa", "key": K["lamp"], "category": "dj", "icon": "x" * 600,
+         "mapping": mp((20, "switch_led", "Boolean", {}), (21, "work_mode", "Enum", {"range": ["white", "colour"]}),
+                       (22, "bright_value_v2", "Integer", {"min": 10, "max": 1000, "scale": 0, "step": 1}),
+                       (23, "temp_value_v2", "Integer", {"min": 0, "max": 1000, "scale": 0, "step": 1}))},
+        {"name": "Prise mesure", "id": "mplug35000000000000bb", "key": K["mplug"], "category": "cz", "ip": "10.0.0.51",
+         "version": "3.5",
+         "mapping": mp((1, "switch", "Boolean", {}), (18, "cur_current", "Integer", {"unit": "mA", "scale": 0}),
+                       (19, "cur_power", "Integer", {"unit": "W", "scale": 1}),
+                       (20, "cur_voltage", "Integer", {"unit": "V", "scale": 1}))},
+        {"name": "Ventilateur", "id": "fan000000000000000000", "key": K["fan"], "category": "fs", "mapping": {}},
+        {"name": "Ailleurs", "id": "remote000000000000000", "key": "rEmOtE-kEy-00003", "category": "kg",
+         "mapping": mp((1, "switch_1", "Boolean", {}), (2, "switch_2", "Boolean", {}))},
+        {"name": "Enorme", "id": "huge00000000000000000", "key": "x", "icon": "y" * 9000},
+        {"name": "Prise Z", "id": "zsub00000000000000000", "key": K["gw"], "sub": True, "node_id": "00158d00000000ff",
+         "parent": "gw0000000000000000000", "category": "cz", "mapping": mp((1, "switch", "Boolean", {}))},
+    ]
+    with open("/devices.json", "w") as f:
+        json.dump(devices_json, f, indent=1)
+    out = h.pump(h.send("CMD TuyaImport"))
+    r = resp(out, "TuyaImport")
+    assert sorted(r["Added"]) == ["Lampe test", "Prise Z", "Prise mesure"] and r["Updated"] == ["Ventilateur"], r
+    devs = {d["id"]: d for d in json.load(open("/tuya.json"))["devices"]}
+    lamp = devs["lamp330000000000000aa"]
+    assert lamp["ip"] == "10.0.0.50" and lamp["version"] == "3.3", lamp
+    assert lamp["matter"] == [{"ep": "Lampe test", "type": "light2", "dp": 20, "dp_bri": 22, "bri_min": 10,
+                               "bri_max": 1000, "dp_mode": 21, "dp_ct": 23}], lamp["matter"]
+    pm = devs["mplug35000000000000bb"]["matter"][0]
+    assert pm["type"] == "relay_power" and pm["div_power"] == 10 and pm["div_voltage"] == 10 and pm["div_current"] == 1000, pm
+    assert devs["fan000000000000000000"]["matter"][0]["type"] == "fan"          # liaisons existantes gardees
+    gwc = [c for c in devs["gw0000000000000000000"]["children"] if c.get("cid") == "00158d00000000ff"]
+    assert gwc and gwc[0]["matter"][0]["type"] == "relay" and "key" not in gwc[0], gwc
+    assert "remote000000000000000" not in devs
+    up = mtr_updates(out)
+    assert find(up, "Lampe test")["Power"] == 0 and abs(find(up, "Prise mesure")["Voltage"] - 230.0) < 0.01, up
+    h.pump(h.send("CMD TuyaSend Lampe test,switch_led,true"))
+    assert DEVS["10.0.0.50"].dps["20"] is True
+    out = h.pump(h.send("CMD TuyaImport /devices.json all"))
+    r = resp(out, "TuyaImport")
+    assert "Ailleurs" in r["Added"] and "Enorme" not in r["Added"] + r["Updated"], r
+    assert any("trop gros" in l for l in out), [l for l in out if l.startswith("LOG")]
+    remote = [d for d in json.load(open("/tuya.json"))["devices"] if d["id"] == "remote000000000000000"][0]
+    assert remote["enabled"] is False and [b["ep"] for b in remote["matter"]] == ["Ailleurs 1", "Ailleurs 2"], remote
+    ok += 1
+    print("OK 16 import devices.json : filtre, types deduits, sous-appareil, lecture par morceaux")
+
+    # 17. import par le cloud Tuya : signature identique a TinyTuya, cle et DP recuperes, garde memoire
+    cloud_id = "cloudsw0000000000000"
+    h.send('HTTPSRESP /v1.0/token?grant_type=1 200 {"success":true,"result":{"access_token":"tok123","expire_time":7200}}')
+    h.send('HTTPSRESP /v1.0/devices/%s 200 {"success":true,"result":{"id":"%s","name":"Cloud double",'
+           '"local_key":"cLoUd-KeY-000004","category":"kg"}}' % (cloud_id, cloud_id))
+    h.send('HTTPSRESP /v1.1/devices/%s/specifications 200 {"success":true,"result":{"category":"kg","functions":'
+           '[{"code":"switch_1","dp_id":1,"type":"Boolean","values":"{}"},{"code":"switch_2","dp_id":2,'
+           '"type":"Boolean","values":"{}"}],"status":[]}}' % cloud_id)
+    creds = {"region": "eu", "id": "AcCeSsId0123", "secret": "s3cr3t-s3cr3t", "devices": [cloud_id]}
+    h.send("HEAP 30")
+    assert "memoire" in resp(h.send("CMD TuyaCloud " + json.dumps(creds)), "TuyaCloud")["Error"]
+    h.send("HEAP 60")
+    out = h.send("CMD TuyaCloud " + json.dumps(creds))
+    assert "1 appareil" in resp(out, "TuyaCloud")
+    for _ in range(5):
+        out += h.pump(h.send("ADV 1000"))
+    reqs = [l for l in out if l.startswith("HTTPS ")]
+    assert len(reqs) == 3, reqs
+    for l in reqs:
+        _, url, hdr = l.split(" ", 2)
+        hdr = json.loads(hdr)
+        assert hdr["sign"] == tinytuya_sign(creds, url, hdr), (url, hdr)
+    assert json.loads(reqs[0].split(" ", 2)[2])["secret"] == creds["secret"]       # comme tinytuya
+    assert json.loads(reqs[1].split(" ", 2)[2])["access_token"] == "tok123"
+    pub = [json.loads(l[4:])["TuyaCloud"] for l in out if l.startswith("PUB ") and "TuyaCloud" in l]
+    assert pub and pub[-1]["Added"] == ["Cloud double"], pub
+    cd = [d for d in json.load(open("/tuya.json"))["devices"] if d["id"] == cloud_id][0]
+    assert cd["key"] == "cLoUd-KeY-000004" and cd["enabled"] is False and len(cd["matter"]) == 2, cd
+    h.send('HTTPSRESP /v1.0/token?grant_type=1 200 {"success":false,"code":1004,"msg":"sign invalid"}')
+    out = h.send("CMD TuyaCloud " + json.dumps(creds))
+    out += h.pump(h.send("ADV 1000"))
+    err = [json.loads(l[4:])["TuyaCloud"] for l in out if l.startswith("PUB ") and "TuyaCloud" in l]
+    assert err and "sign invalid" in err[-1]["Error"], out
+    ok += 1
+    print("OK 17 import cloud : signature conforme a TinyTuya, cle et DP, erreurs et garde memoire")
+
+    # 18. page web : liste, edition (cle masquee puis conservee), suppression, endpoints Matter
+    def page(method, args):
+        out = h.pump(h.send("HTTP %s /tuya %s" % (method, json.dumps(args))))
+        return json.loads([l for l in out if l.startswith("PAGE ")][-1][5:]), out
+    btn, _ = page_btn(h)
+    assert "action='tuya'" in btn
+    html, _ = page("GET", {})
+    assert "Lampe test" in html and "Prise mesure" in html and "Rechercher" in html, html[:300]
+    assert K["clamp"] not in html and K["lamp"] not in html
+    assert "Sans endpoint Matter" in html and "Lampe test <small>(v_light2)" in html, html
+    html, _ = page("GET", {"edit": "Pince"})
+    assert "&quot;key&quot;: &quot;***&quot;" in html and K["clamp"] not in html, html
+    pince = [d for d in json.load(open("/tuya.json"))["devices"] if d["name"] == "Pince"][0]
+    pince["key"] = "***"
+    pince["sensors"]["Puissance B"] = [134, 1, "W"]
+    html, _ = page("POST", {"save": "", "ref": "Pince", "json": json.dumps(pince)})
+    assert html.endswith("REDIRECT /tuya"), html
+    pince = [d for d in json.load(open("/tuya.json"))["devices"] if d["name"] == "Pince"][0]
+    assert pince["key"] == K["clamp"] and "Puissance B" in pince["sensors"], pince
+    html, _ = page("GET", {})
+    assert "Enregistré : Pince" in html
+    page("POST", {"del": "", "ref": "Cloud double"})
+    assert all(d["name"] != "Cloud double" for d in json.load(open("/tuya.json"))["devices"])
+    html, out = page("POST", {"matter": ""})
+    added = [json.loads(l[10:]) for l in out if l.startswith("MATTERADD ")]
+    names = {a["name"]: a["type"] for a in added}
+    assert names.get("Lampe test") == "v_light2" and names.get("Ventilateur") == "v_fan", names
+    assert names.get("Prise mesure") == "v_relay_power" and "Porche" not in names, names
+    assert html.endswith("REDIRECT /?rst="), html
+    html, _ = page("GET", {})
+    assert "Chaque liaison du driver a son endpoint Matter" in html, html
+    html, _ = page("POST", {"scan": ""})
+    html, _ = page("GET", {})
+    assert "Recherche en cours" in html
+    ok += 1
+    print("OK 18 page web : liste, edition (cle masquee), suppression, endpoints Matter, recherche")
+
+    h.close()
+    print("%d/18 scenarios OK" % ok)
+
+
+if __name__ == "__main__":
+    main()

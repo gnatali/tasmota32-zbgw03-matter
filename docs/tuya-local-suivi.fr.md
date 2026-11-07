@@ -1,0 +1,224 @@
+# Suivi du chantier : appareils Tuya en local
+
+Dernière mise à jour : **6 novembre 2026**. Branche `tuya-local-crypto`, PR #7 (non fusionnée).
+
+## Objectif
+
+Piloter depuis la ZB-GW03, **sans le cloud Tuya et sans flasher les appareils**, les appareils
+Tuya Wi-Fi et les sous-appareils Zigbee de la passerelle Tuya, et les présenter à **Matter**
+(Google Home). C'est l'équivalent de LocalTuya pour Home Assistant, mais sur la passerelle.
+
+## État
+
+| Étape | État |
+|---|---|
+| Crypto Berry : `USE_BERRY_CRYPTO_AES_CBC` + correctif `berry-aes-gcm-128-aad.patch` | ✅ compilé, en service sur la passerelle |
+| Driver `berry/tuya_local.be` : protocoles 3.3 / 3.4 / 3.5, passerelle Tuya (`cid`) | ✅ **testé sur les vrais appareils** : 5 appareils Wi-Fi et 7 sous-appareils connectés, valeurs correctes |
+| Banc de test (18 scénarios) dans le workflow | ✅ passe en local (source et solidifié) |
+| **Configuration simplifiée** : page web `/tuya`, recherche UDP, import `devices.json` et cloud, types déduits des DP, API (`TuyaConfig`, `TuyaAdd`, `TuyaDel`, `TuyaScan`, `TuyaImport`, `TuyaCloud`, `TuyaMatter`) | ✅ banc de test ; ⏳ build, essai sur la passerelle (dont HTTPS vers le cloud Tuya) |
+| **Solidification du driver** (`custom_berry_solidify`, correctif `berry-solidify-all-classes.patch`) | ✅ banc de test : 12/12 sur le driver source **et** sur le driver solidifié ; ✅ build du firmware (2015 Ko) ; ✅ sur la passerelle : **48 Ko libres avec les 12 appareils connectés** (34 Ko avant), le driver consomme ~23 Ko au lieu de ~40 |
+| Documentation utilisateur `docs/tuya-local.fr.md` | ✅ |
+| Chargement différé dans `autoexec.be` (plantage au démarrage) | ✅ corrigé et documenté |
+| **Mémoire** avec les 12 appareils connectés : 34 Ko libres avec le driver chargé depuis le système de fichiers, **48 Ko** avec le driver solidifié | ✅ ~14 Ko de marge en plus ; coût des endpoints Matter à mesurer |
+| Endpoints Matter et essais dans Google Home | ✅ 5 endpoints créés (`Entrée-Porche`, `Ventilateur`, `Lumière ventilateur`, `Récepteur radio 1` et `4`), dans Google Home après `Restart 1` ; 61 Ko libres |
+| Pergola 1 et 2 (projecteurs RGB) | ⏳ absentes du scan : IP et version inconnues, désactivées dans `tuya.json` |
+| Migration des contrôleurs LED Zigbee Bureau et Salon sur la ZB-GW03 | ⏳ décidée, pas faite |
+
+## Historique
+
+1. **Recherche** : aucun équivalent de LocalTuya n'existe pour Tasmota. Le protocole est décrit par
+   TinyTuya (`PROTOCOL.md`). Le Berry de Tasmota avait le TCP, MD5 et HMAC-SHA256, mais ni
+   l'AES-ECB (`AES_CBC` existe, mais doit être activé à la compilation) ni l'AES-128-GCM avec
+   AAD (`AES_GCM` n'acceptait que des clés de 32 octets, sans AAD).
+2. **Scan** des appareils (`tinytuya scan`) : deux en 3.3, trois en 3.5. Il y a aussi 9
+   appareils Zigbee sur la passerelle Tuya.
+3. **Décision** : la passerelle Tuya garde ses sous-appareils, pilotés à travers elle. Seules
+   les lumières Zigbee (contrôleurs LED Bureau et Salon) seront migrées sur la ZB-GW03.
+4. **Crypto** : correctif `AES_GCM` (clés de 16 octets, 4ᵉ argument AAD optionnel), vérifié
+   contre la bibliothèque `cryptography` (40 cas), puis option `AES_CBC`.
+5. **Driver et banc de test**, puis PR #7. Le workflow (lancé à la main) passe : 12/12 tests,
+   firmware de 1992 Ko.
+6. **Sur la passerelle** : `load("tuya_local.be")` directement dans `autoexec.be` a fait
+   planter l'ESP32 au démarrage. Après 4 plantages, la protection anti-boucle a démarré sans
+   Berry (`Br` → `Unknown`, `/bc` introuvable, Matter absent) et a désactivé les règles.
+   Correction : chargement 30 s après le démarrage, s'il reste au moins 60 Ko. Depuis, tout
+   fonctionne.
+7. **Solidification** (étape 1 ci-dessous) : le driver est intégré au firmware par
+   `custom_berry_solidify = ../berry/tuya_local.be`. Ce qu'il a fallu changer :
+   - le script de Tasmota (`pio-tools/solidify-from-url.py`) n'enregistrait dans
+     `be_modtab.c` que la **première** classe d'un fichier : correctif
+     `berry-solidify-all-classes.patch`, pour les cinq classes du driver ;
+   - une classe solidifiée est en lecture seule : la table CRC, calculée au premier appel
+     dans une `static var`, est remplacée par une table constante de 16 entrées (CRC par
+     quartet, vérifiée contre `zlib.crc32` et la valeur de référence `0xCBF43926`) ;
+   - plus de code au premier niveau : imports dans les méthodes, instanciation dans
+     `autoexec.be` (`global.tuya_local = TuyaLocal()`), qui charge encore `tuya_local.be`
+     si le firmware ne contient pas le driver ;
+   - le banc de test solidifie le driver comme le build (`berry_port`, `coc`) et rejoue les
+     12 scénarios sur les classes natives. Le C généré fait ~206 Ko de source.
+   - **Build** (exécution 11, commit `df4ed7d`) : firmware de 2 063 295 octets (2015 Ko,
+     +22,8 Ko), soit exactement la hausse de `.rodata` (676 464 → 699 280 octets). La RAM
+     statique ne bouge pas (DRAM 65 948 → 65 980 octets, +32). Il reste ~865 Ko en flash.
+
+8. **Configuration simplifiée** (7 novembre), d'après une évaluation chiffrée faite au
+   préalable (flash 25 à 35 Ko, RAM permanente 1 à 2 Ko, pic de 22 à 28 Ko pour l'import cloud) :
+   - **API** : `TuyaConfig` (sans les clés), `TuyaAdd` (clé `***` conservée), `TuyaDel`,
+     `TuyaStatus <appareil>`, `TuyaSend` par code de DP ; sauvegarde `/tuya.json.bak` ;
+   - **recherche** (`TuyaScan`, classe `TuyaScan` créée à la demande) : annonces UDP 6666 /
+     6667 / 7000 avec la clé fixe `md5("yGAdlopoPVldABfn")`, demande `REQ_DEVINFO` (0x25) pour
+     les 3.5, comme `tinytuya scan` ;
+   - **import** (`TuyaImport`) du `devices.json` de tinytuya, lu par morceaux de 512 octets
+     (objets de plus de 8 Ko ignorés) ; liaisons Matter déduites de la catégorie et des codes de
+     DP ; sous-appareils rattachés à leur passerelle ;
+   - **cloud** (`TuyaCloud`, classe créée à la demande) : signature OpenAPI comme tinytuya, une
+     requête par seconde, refus sous 35 Ko libres (le client HTTPS réserve 16 Ko) ;
+   - **page web** `/tuya` (classe `TuyaWeb`, fonctions statiques) : liste, édition JSON,
+     recherche, imports, création des endpoints Matter puis redémarrage (`bridge_add_endpoint`,
+     API interne de Matter, à surveiller à chaque `TASMOTA_REF`).
+   Banc de test : 18 scénarios, 18/18 en source et en solidifié. Mesure sur le banc (64 bits,
+   à diviser par environ 2 pour l'ESP32) : +0,7 à +1,3 Ko au repos, +4,5 Ko pendant une
+   recherche qui trouve 10 appareils. Driver : ~1700 lignes de code, C solidifié de 507 Ko.
+
+## Mesures sur la passerelle
+
+| Situation | `Heap` (`Status 4`) |
+|---|---|
+| Après mise à jour du firmware, avant le driver | 67 Ko |
+| 30 s après le démarrage, juste avant de charger le driver | 74 Ko |
+| Driver chargé, 12 appareils connectés, aucun endpoint Matter Tuya | **34 Ko** |
+| **Driver solidifié** (firmware 2015 Ko, 6 novembre) : juste avant de démarrer le driver | 71 Ko |
+| **Driver solidifié** : driver démarré, 3 appareils connectés | 61 Ko |
+| **Driver solidifié** : driver démarré, **12 appareils connectés** (endpoint Matter `Entrée-Porche` créé) | **48 Ko** |
+| Périmètre réduit (3 appareils), endpoint `Entrée-Porche` seul, 7 novembre | 62 Ko |
+| + `Ventilateur` (v.Fan), après `Restart 1` | 58 Ko |
+| + `Lumière ventilateur` (v.Light 0 OnOff), après `Restart 1` | 61 Ko |
+| + `Récepteur radio 1` et `Récepteur radio 4` (v.Relay), après `Restart 1` : **5 endpoints** | **61 Ko** |
+
+Avec les 12 appareils connectés, le driver consommait environ **40 Ko** chargé depuis le
+système de fichiers (74 − 34 : code compilé en RAM, état des appareils, tampons), et environ
+**23 Ko** solidifié (71 − 48 : état et tampons seulement). La solidification a donc retiré
+**~17 Ko** de code de la RAM ; il reste **48 Ko libres au lieu de 34** (+14 Ko, le heap de
+départ étant 3 Ko plus bas : 71 contre 74 Ko). L'état seul coûte ~23 Ko pour 12 appareils,
+soit ~2 Ko par appareil en moyenne : il croît avec le nombre d'appareils connectés et de DP
+reçus (pince : 22 DP, passerelle : 7 sous-appareils). Avec 3 appareils, 10 Ko (71 → 61).
+Les 48 Ko incluent l'endpoint Matter `Entrée-Porche`. Il n'y a pas eu de mesure après
+`Br tasmota.gc()`.
+
+**Coût des endpoints Matter** : de 62 Ko (1 endpoint) à 61 Ko (5 endpoints), soit **~1 Ko pour
+4 endpoints**, dans le bruit de mesure (le 58 Ko intermédiaire en fait partie : le heap varie
+de quelques Ko d'un relevé à l'autre). La marge de ~60 Ko est donc confortable.
+
+**Répartition sur le banc de test** (driver solidifié, interpréteur 64 bits : sur l'ESP32,
+les objets Berry font à peu près la moitié) : driver sans appareil ~3,7 Ko ; premier appareil
+~8 Ko (dont le module `crypto` de test) ; chaque nœud de plus ~2,6 Ko (état `dps`, configuration
+gardée en map, tampons `rx`/`tx`, objets de connexion). Stable sur 3 min de fonctionnement :
+pas de fuite.
+
+**Réécrire le driver en C ?** Étudié le 6 novembre, écarté pour l'instant. Le gain se limiterait
+à l'état Berry des appareils (de l'ordre de 1 Ko par appareil sur l'ESP32, à confirmer) : les
+connexions TCP coûtent autant en C, et les endpoints Matter (Berry) ne changent pas. Coûts : un
+gros correctif de Tasmota à maintenir à chaque `TASMOTA_REF`, le banc de test à réécrire, et
+une erreur en C fait planter l'ESP32 (boucle de redémarrage, Matter désactivé). D'abord :
+réduire l'état Berry (étape 3) et mesurer le coût des endpoints Matter.
+
+## Inventaire (sans clés ni identifiants : voir `tuya.json` sur la passerelle)
+
+**Périmètre retenu (7 novembre)** : seuls le Ventilateur, le Récepteur radio et Entrée-Porche
+sont actifs dans `tuya.json`, plus Pergola 1 et 2 désactivées (`"enabled": false`, IP
+inconnue, version 3.3 supposée). La pince et la passerelle Tuya (avec ses sous-appareils) ne
+sont **pas** dans `tuya.json` : hors périmètre. Soit **7 endpoints Matter** (9 avec les
+Pergola), au lieu de 16. Avec 3 appareils connectés, le driver consomme ~10 Ko (71 → 61 Ko).
+
+**Appareils Wi-Fi**
+
+| Appareil | Protocole | Rôle dans `tuya.json` |
+|---|---|---|
+| Ventilateur | 3.5 | `fan` (DP 60/62, vitesses 1-6) + `light0` (DP 20) |
+| Récepteur radio (4 canaux 433 MHz) | 3.5 | 4 × `relay` (DP 1 à 4) |
+| Entrée-Porche (ampoule LSC CCT) | 3.3 | `light2` (DP 20/21/22/23) |
+| A:Eau B:Chfg C:Cuisine (pince 3 circuits) | 3.5 | hors périmètre (pas dans `tuya.json`) |
+| Gateway (passerelle Zigbee Tuya) | 3.3 | hors périmètre (pas dans `tuya.json`), avec ses sous-appareils |
+| Pergola 1, Pergola 2 (projecteurs LSC RGB) | ? | `light3` (DP 20/21/22/24), `"enabled": false` |
+
+**Sous-appareils Zigbee de la passerelle Tuya** (hors périmètre) : luminaires terrasse, Prise Lisseur et Relais
+zigbee Cuisine (`relay_power`, DP 1/18/19/20) ; Interrupteur Terrasse et Chauffage
+(`relay`) ; Temperature SdB (`temp` DP 1 et `humidity` DP 2, diviseur 10) ; Capteur de
+température et d'humidité (`temp` DP 103 et `humidity` DP 101, diviseur 100).
+
+**À migrer sur la ZB-GW03** : contrôleurs LED Bureau et Salon (E2-ZR), qui passeront en
+endpoints Matter `z_light2` ou `z_light1`.
+
+## Prochaines étapes (par priorité)
+
+1. ~~**Solidifier le driver**~~ : fait et mesuré, 48 Ko libres avec les 12 appareils au lieu
+   de 34 (voir les mesures). Le seuil de 60 Ko d'`autoexec.be` reste adapté (71 Ko avant le
+   démarrage du driver, ~23 Ko consommés ensuite).
+2. **Matter** : créer les endpoints un par un, avec **exactement** le nom de `ep` (accents
+   compris), et tester les deux sens avec Google Home en relevant `Heap` après chacun :
+   - ✅ `Entrée-Porche` : v.Light 2 CT ;
+   - ✅ `Ventilateur` : v.Fan ; ✅ `Lumière ventilateur` : v.Light 0 OnOff ;
+   - ✅ `Récepteur radio 1` et `Récepteur radio 4` : v.Relay. Les canaux 2 et 3 n'ont pas
+     d'endpoint : les retirer de `tuya.json` s'ils ne servent pas (sinon, le driver tente de
+     les mettre à jour toutes les 30 s, sans effet).
+   **`Restart 1` obligatoire** après la création : sans lui, Google Home affiche les nouveaux
+   appareils hors ligne. Reste à tester les deux sens (Google Home → appareil, et appareil
+   → Google Home : bouton, Smart Life, télécommande) pour chaque endpoint.
+3. **Réduire la RAM du driver** si les endpoints Matter ne laissent pas assez de marge (peu
+   probable avec 3 appareils, ~10 Ko) :
+   - ne garder dans `dps` que les DP utilisés par une liaison ou un capteur (la pince en
+     envoie 22, les prises 11) ;
+   - limiter `publish_result` (un message MQTT par changement, la pince en envoie souvent).
+4. **Valider la configuration simplifiée** sur la passerelle (après flash) : page
+   Configuration → Tuya local, recherche (les 3 appareils doivent apparaître), `Heap` pendant
+   et après, import du `devices.json` (puis import cloud, qui exerce le HTTPS vers Tuya : à
+   tester avec au moins 35 Ko libres), création des endpoints Matter depuis la page.
+5. **Pergola 1 et 2** : les allumer, lancer la recherche de la page Tuya local (ou `tinytuya scan`),
+   renseigner `ip` et `version`,
+   puis retirer `"enabled": false`.
+6. **Migrer Bureau et Salon** sur la ZB-GW03 (procédure dans `docs/tuya-local.fr.md`).
+7. **Fusionner la PR #7** une fois Matter validé, puis créer un tag `v*` pour publier la
+   release.
+
+## À vérifier côté passerelle
+
+- **Premier endpoint Matter (`Entrée-Porche`, v.Light 2 CT)** : créé, il est resté « non
+  connecté » dans Google Home jusqu'à un `MtrUpdate {"Name":"Entrée-Porche","Power":1}` fait à
+  la main ; depuis, tout fonctionne, y compris après `Restart 1`. Première hypothèse : le driver
+  n'envoie à Matter que les **changements** d'état. S'il a reçu l'état de l'ampoule avant la
+  création de l'endpoint, son `MtrUpdate` a échoué (`Invalid Device`) et n'a jamais été
+  renvoyé : l'endpoint gardait ses valeurs par défaut. Correctif envisagé : renvoyer l'état
+  complet d'une liaison tant que son `MtrUpdate` échoue (toutes les 30 s), pour qu'un endpoint
+  créé à chaud reçoive son état sans redémarrage. **Fait** : `TuyaBinding.push()` met la
+  liaison en attente au premier refus (signalé une seule fois), `TuyaLocal.sync_pending()` lui
+  renvoie l'état complet toutes les 30 s, et toute mise à jour de l'appareil le renvoie aussi.
+  Scénario 13 du banc de test (il échoue sur l'ancien driver). Build : exécution 12, firmware
+  de 2 064 191 octets (+0,9 Ko). **Flashé le 7 novembre** : le premier flash a échoué (passerelle
+  restée en safeboot), le second a fonctionné.
+  **Hypothèse infirmée le 7 novembre** : avec ce firmware, les endpoints suivants apparaissent
+  dans Google Home mais restent **hors ligne jusqu'au `Restart 1` de Tasmota**, alors que le
+  driver leur envoie bien leur état. La vraie cause est côté Matter : Google Home ne s'abonne
+  aux nouveaux endpoints qu'à la reconnexion. Pour `Entrée-Porche`, c'est donc sans doute un
+  redémarrage, et non le `MtrUpdate` manuel, qui a tout débloqué. Conclusion : **`Restart 1`
+  après la création des endpoints, toujours** (une seule fois pour plusieurs). Le renvoi
+  d'état reste en place : sans effet visible, mais il évite qu'un endpoint garde des valeurs
+  par défaut si Matter le crée après le driver.
+
+- `Rule1` : la protection anti-boucle a désactivé les règles. Vérifier que `Rule1 1` a été
+  refait (bouton Zigbee « Perron » dans Google Home).
+- **Flash resté en safeboot** (7 novembre, exécution 12) : refaire le flash depuis la page
+  safeboot a suffi, avec le `.bin` décompressé de l'artefact. Tasmota ne passe de lui-même en
+  safeboot qu'après 10 redémarrages de suite dans les 10 premières secondes : le driver, démarré
+  à 30 s, ne peut pas en être la cause.
+- La cause exacte du plantage n'a pas été relevée (`Status 12` non collecté). Le chargement
+  différé suffit, mais si un plantage revient, `Status 12` est la première chose à demander.
+
+## Fichiers hors dépôt
+
+| Fichier | Où | Contenu |
+|---|---|---|
+| `devices.json`, `snapshot.json` | PC de Guillaume (sortie de `tinytuya wizard` / `scan`) | clés locales, identifiants, IP, versions |
+| `/tuya.json` | système de fichiers de la passerelle | configuration réelle, **avec les clés** |
+| `/autoexec.be` | système de fichiers de la passerelle | démarrage différé du driver (`/tuya_local.be` n'est plus nécessaire avec le driver solidifié) |
+
+Pour reprendre le développement, demander à Guillaume les fichiers dont la tâche a besoin.
+Ne jamais les committer.

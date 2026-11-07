@@ -1,0 +1,49 @@
+# Berry : custom_berry_solidify enregistre toutes les classes d'un fichier, et pas seulement
+# la premiere. pio-tools/solidify-from-url.py ne retenait que la premiere directive
+# `#@ solidify:` d'un fichier de classes : les autres classes etaient solidifiees, mais
+# absentes de be_modtab.c, donc introuvables par leur nom a l'execution. Le driver
+# berry/tuya_local.be en a cinq (TuyaCodec, TuyaBinding, TuyaNode, TuyaDevice, TuyaLocal),
+# qui s'appellent entre elles par leur nom global.
+diff --git a/pio-tools/solidify-from-url.py b/pio-tools/solidify-from-url.py
+index cda0a56c0..89c995a17 100644
+--- a/pio-tools/solidify-from-url.py
++++ b/pio-tools/solidify-from-url.py
+@@ -42,8 +42,10 @@ def addEntryToModtab(source):
+     else: # just a class
+         pattern = (r'(?<=#@ solidify:).*')
+         result =  re.findall(pattern,code)
+-        if len(result) > 0:
+-            class_name = result[0].split(",")[0]
++        # every class with a `#@ solidify:` directive is registered, not only the first one
++        class_names = [r.split(",")[0].strip() for r in result]
++        if len(class_names) > 0:
++            class_name = class_names[0]
+         if class_name == None:
+             print("Could not find class name - is '#@ solidify:' used in Berry file??")
+             print(Fore.RED + "Aborting build process!!")
+@@ -62,15 +64,16 @@ def addEntryToModtab(source):
+         if code.find(enmodule) == -1:
+             code += f'\n{enmodule}'
+     else:
+-        nclass = f"&be_native_class({class_name}),"
+-        if code.find(nclass) == -1:
+-            code = code.replace(
+-                "CUSTOM_NATIVE_CLASSES",
+-                f'CUSTOM_NATIVE_CLASSES {nclass}'
+-            )
+-        enclass = f"be_extern_native_class({class_name});"
+-        if code.find(enclass) == -1:
+-            code += f'\n{enclass}'
++        for class_name in class_names:
++            nclass = f"&be_native_class({class_name}),"
++            if code.find(nclass) == -1:
++                code = code.replace(
++                    "CUSTOM_NATIVE_CLASSES",
++                    f'CUSTOM_NATIVE_CLASSES {nclass}'
++                )
++            enclass = f"be_extern_native_class({class_name});"
++            if code.find(enclass) == -1:
++                code += f'\n{enclass}'
+ 
+     with open(HEADER_FILE_PATH, 'w') as file:
+         file.write(code)

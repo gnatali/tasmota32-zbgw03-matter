@@ -1,0 +1,307 @@
+{
+ "devices": [
+  {
+   "name": "Ventilateur",
+   "id": "xxxxxx...",
+   "key": "cle_locale_16car",
+   "ip": "192.168.1.18",
+   "version": "3.5",
+   "matter": [
+    {
+     "ep": "Ventilateur",
+     "type": "fan",
+     "dp": 60,
+     "dp_speed": 62,
+     "speed_min": 1,
+     "speed_max": 6
+    },
+    {
+     "ep": "Lumière ventilateur",
+     "type": "light0",
+     "dp": 20
+    }
+   ]
+  },
+  {
+   "name": "Récepteur radio",
+   "id": "xxxxxx...",
+   "key": "cle_locale_16car",
+   "ip": "192.168.1.15",
+   "version": "3.5",
+   "matter": [
+    {
+     "ep": "Récepteur radio 1",
+     "type": "relay",
+     "dp": 1
+    },
+    {
+     "ep": "Récepteur radio 2",
+     "type": "relay",
+     "dp": 2
+    },
+    {
+     "ep": "Récepteur radio 3",
+     "type": "relay",
+     "dp": 3
+    },
+    {
+     "ep": "Récepteur radio 4",
+     "type": "relay",
+     "dp": 4
+    }
+   ]
+  },
+  {
+   "name": "Entrée-Porche",
+   "id": "xxxxxx...",
+   "key": "cle_locale_16car",
+   "ip": "192.168.1.174",
+   "version": "3.3",
+   "matter": [
+    {
+     "ep": "Entrée-Porche",
+     "type": "light2",
+     "dp": 20,
+     "dp_mode": 21,
+     "dp_bri": 22,
+     "dp_ct": 23
+    }
+   ]
+  },
+  {
+   "name": "Pergola 2",
+   "id": "xxxxxx...",
+   "key": "cle_locale_16car",
+   "ip": "",
+   "version": "3.3",
+   "enabled": false,
+   "matter": [
+    {
+     "ep": "Pergola 2",
+     "type": "light3",
+     "dp": 20,
+     "dp_mode": 21,
+     "dp_bri": 22,
+     "dp_colour": 24
+    }
+   ]
+  },
+  {
+   "name": "Pergola 1",
+   "id": "xxxxxx...",
+   "key": "cle_locale_16car",
+   "ip": "",
+   "version": "3.3",
+   "enabled": false,
+   "matter": [
+    {
+     "ep": "Pergola 1",
+     "type": "light3",
+     "dp": 20,
+     "dp_mode": 21,
+     "dp_bri": 22,
+     "dp_colour": 24
+    }
+   ]
+  },
+  {
+   "name": "A:Eau B:Chfg C:Cuisine",
+   "id": "xxxxxx...",
+   "key": "cle_locale_16car",
+   "ip": "192.168.1.80",
+   "version": "3.5",
+   "sensors": {
+    "Tension": [
+     101,
+     10,
+     "V"
+    ],
+    "Eau courant": [
+     102,
+     1000,
+     "A"
+    ],
+    "Eau puissance": [
+     103,
+     1,
+     "W"
+    ],
+    "Eau energie": [
+     106,
+     100,
+     "kWh"
+    ],
+    "Chauffage courant": [
+     112,
+     1000,
+     "A"
+    ],
+    "Chauffage puissance": [
+     113,
+     1,
+     "W"
+    ],
+    "Chauffage energie": [
+     116,
+     100,
+     "kWh"
+    ],
+    "Cuisine courant": [
+     122,
+     1000,
+     "A"
+    ],
+    "Cuisine puissance": [
+     123,
+     1,
+     "W"
+    ],
+    "Cuisine energie": [
+     126,
+     100,
+     "kWh"
+    ],
+    "Total courant": [
+     132,
+     1000,
+     "A"
+    ],
+    "Total puissance": [
+     133,
+     1,
+     "W"
+    ],
+    "Total energie": [
+     131,
+     100,
+     "kWh"
+    ]
+   }
+  },
+  {
+   "name": "Gateway",
+   "id": "xxxxxx...",
+   "key": "cle_locale_16car",
+   "ip": "192.168.1.180",
+   "version": "3.3",
+   "children": [
+    {
+     "name": "luminaires terrasse",
+     "id": "xxxxxx...",
+     "cid": "a4c138xxxxxxxxxx",
+     "matter": [
+      {
+       "ep": "Luminaires terrasse",
+       "type": "relay_power",
+       "dp": 1,
+       "dp_power": 19,
+       "div_power": 10,
+       "dp_voltage": 20,
+       "div_voltage": 10,
+       "dp_current": 18,
+       "div_current": 1000
+      }
+     ]
+    },
+    {
+     "name": "Prise Lisseur",
+     "id": "xxxxxx...",
+     "cid": "a4c138xxxxxxxxxx",
+     "matter": [
+      {
+       "ep": "Prise Lisseur",
+       "type": "relay_power",
+       "dp": 1,
+       "dp_power": 19,
+       "div_power": 10,
+       "dp_voltage": 20,
+       "div_voltage": 10,
+       "dp_current": 18,
+       "div_current": 1000
+      }
+     ]
+    },
+    {
+     "name": "Relais zigbee Cuisine",
+     "id": "xxxxxx...",
+     "cid": "a4c138xxxxxxxxxx",
+     "matter": [
+      {
+       "ep": "Relais Cuisine",
+       "type": "relay_power",
+       "dp": 1,
+       "dp_power": 19,
+       "div_power": 10,
+       "dp_voltage": 20,
+       "div_voltage": 10,
+       "dp_current": 18,
+       "div_current": 1000
+      }
+     ]
+    },
+    {
+     "name": "Interrupteur Terrasse",
+     "id": "xxxxxx...",
+     "cid": "a4c138xxxxxxxxxx",
+     "matter": [
+      {
+       "ep": "Interrupteur Terrasse",
+       "type": "relay",
+       "dp": 1
+      }
+     ]
+    },
+    {
+     "name": "Chauffage",
+     "id": "xxxxxx...",
+     "cid": "a4c138xxxxxxxxxx",
+     "matter": [
+      {
+       "ep": "Chauffage",
+       "type": "relay",
+       "dp": 1
+      }
+     ]
+    },
+    {
+     "name": "Temperature SdB",
+     "id": "xxxxxx...",
+     "cid": "a4c138xxxxxxxxxx",
+     "matter": [
+      {
+       "ep": "Température SdB",
+       "type": "temp",
+       "dp": 1,
+       "div": 10
+      },
+      {
+       "ep": "Humidité SdB",
+       "type": "humidity",
+       "dp": 2,
+       "div": 10
+      }
+     ]
+    },
+    {
+     "name": "Capteur de température et d'humidité",
+     "id": "xxxxxx...",
+     "cid": "a4c138xxxxxxxxxx",
+     "matter": [
+      {
+       "ep": "Température capteur",
+       "type": "temp",
+       "dp": 103,
+       "div": 100
+      },
+      {
+       "ep": "Humidité capteur",
+       "type": "humidity",
+       "dp": 101,
+       "div": 100
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

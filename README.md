@@ -53,6 +53,7 @@ This build starts from the official `tasmota32-zbbrdgpro` environment and change
 | `OTA_URL` | official firmware | latest release of this repository |
 | CC2652P firmware and flasher in the file system | yes | no (useless on the EFR32) |
 | Matter event timestamps (button presses) | seconds, 32 bits | milliseconds, 64 bits, as Matter requires (see [Zigbee button in Google Home](#zigbee-button-in-google-home)) |
+| Berry `AES_CBC` and 128-bit `AES_GCM` with AAD | no | yes, for [local Tuya devices](docs/tuya-local.fr.md) |
 
 With Matter, the image is about 2 MB (about 1990 KB). It does not fit in the 1856 KB slot of
 the official layout, hence the **safeboot** layout: `safeboot` 832 KB, `app0` 2880 KB,
@@ -174,6 +175,16 @@ ESPHome configuration for v1.4 uses the clock output on GPIO17 and PHY address 1
 
 Without PSRAM, Zigbee and Matter leave about 70 to 100 KB of free heap: watch `Heap` in
 `Status 4`.
+
+### Local Tuya devices
+
+The Berry driver `berry/tuya_local.be` controls Tuya Wi-Fi devices (protocols 3.3, 3.4 and
+3.5) and Tuya gateway sub-devices locally, without the cloud, and exposes them to Matter. It
+is built into the firmware (solidified: its code stays in flash instead of being compiled into
+RAM) and started from `autoexec.be`. The **Configuration → Tuya local** page discovers devices on
+the network, imports their local keys (from tinytuya's `devices.json` or the Tuya cloud), creates
+their Matter endpoints and edits the configuration; the same features are available as commands
+(HTTP, MQTT). See [docs/tuya-local.fr.md](docs/tuya-local.fr.md) (French).
 
 ### Zigbee button in Google Home
 

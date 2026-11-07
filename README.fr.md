@@ -53,6 +53,7 @@ Ce build part de l'environnement officiel `tasmota32-zbbrdgpro` et modifie :
 | `OTA_URL` | firmware officiel | dernière release de ce dépôt |
 | Firmware et flasheur du CC2652P dans le système de fichiers | oui | non (inutiles sur l'EFR32) |
 | Date des événements Matter (appuis de bouton) | secondes sur 32 bits | millisecondes sur 64 bits, comme le veut Matter (voir [Bouton Zigbee dans Google Home](#bouton-zigbee-dans-google-home)) |
+| Chiffrement Berry `AES_CBC` et `AES_GCM` 128 bits avec AAD | non | oui, pour les [appareils Tuya en local](docs/tuya-local.fr.md) |
 
 Avec Matter, l'image fait environ 2 Mo (environ 1990 Ko). Elle ne tient pas dans les 1856 Ko
 de la disposition officielle, d'où la disposition **safeboot** : `safeboot` 832 Ko, `app0`
@@ -177,6 +178,16 @@ l'adresse PHY 1, soit `Backlog EthType 0; EthAddress 1; EthClockMode 3`.
 
 Sans PSRAM, Zigbee et Matter laissent environ 70 à 100 Ko de mémoire libre : surveiller
 `Heap` dans `Status 4`.
+
+### Appareils Tuya en local
+
+Le driver Berry `berry/tuya_local.be` pilote les appareils Tuya Wi-Fi (protocoles 3.3, 3.4 et
+3.5) et les sous-appareils d'une passerelle Tuya, sans le cloud, et les présente à Matter. Il
+est intégré au firmware (solidifié : son code reste en flash au lieu d'être compilé en RAM) et
+démarré par `autoexec.be`. La page **Configuration → Tuya local** recherche les appareils sur le
+réseau, importe leurs clés locales (depuis le `devices.json` de tinytuya ou le cloud Tuya), crée
+leurs endpoints Matter et modifie la configuration ; les mêmes fonctions existent en commandes
+(HTTP, MQTT). Voir [docs/tuya-local.fr.md](docs/tuya-local.fr.md).
 
 ### Bouton Zigbee dans Google Home
 

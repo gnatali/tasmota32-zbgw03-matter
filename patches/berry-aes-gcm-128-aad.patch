@@ -1,0 +1,58 @@
+# Berry : AES_GCM accepte les cles de 16 octets (AES-128) en plus des cles de 32 octets,
+# et des donnees authentifiees optionnelles (AAD) : AES_GCM(cle, iv [, aad]).
+# Necessaire au protocole local Tuya 3.5 (AES-128-GCM, en-tete du paquet en AAD).
+# Compatible avec l'existant : sans 4e argument, le comportement est inchange.
+diff --git a/tasmota/tasmota_xdrv_driver/xdrv_52_3_berry_crypto.ino b/tasmota/tasmota_xdrv_driver/xdrv_52_3_berry_crypto.ino
+index 3c4cffab4..cd966c66a 100644
+--- a/tasmota/tasmota_xdrv_driver/xdrv_52_3_berry_crypto.ino
++++ b/tasmota/tasmota_xdrv_driver/xdrv_52_3_berry_crypto.ino
+@@ -123,7 +123,9 @@ extern "C" {
+ \*********************************************************************************************/
+ extern "C" {
+ 
+-  // `AES_GCM.init(secret_key:bytes(32), iv:bytes(12)) -> instance`
++  // `AES_GCM.init(secret_key:bytes(16 or 32), iv:bytes(12) [, aad:bytes()]) -> instance`
++  // The optional `aad` (additional authenticated data) is authenticated but not encrypted;
++  // it is covered by the tag (used for example by the Tuya local protocol 3.5, AES-128-GCM)
+   int32_t m_aes_gcm_init(struct bvm *vm);
+   int32_t m_aes_gcm_init(struct bvm *vm) {
+     int32_t argc = be_top(vm); // Get the number of arguments
+@@ -134,8 +136,8 @@ extern "C" {
+         size_t length = 0;
+         const void * bytes = be_tobytes(vm, 2, &length);
+         if (!bytes) break;
+-        if (length != 32) {
+-          be_raise(vm, "value_error", "Key size must be 32 bytes");
++        if (length != 32 && length != 16) {
++          be_raise(vm, "value_error", "Key size must be 16 or 32 bytes");
+         }
+ 
+         be_getglobal(vm, "bytes"); /* get the bytes class */ /* TODO eventually replace with be_getbuiltin */
+@@ -144,6 +146,15 @@ extern "C" {
+         const void * iv_bytes = be_tobytes(vm, 3, &iv_length);
+         if (!iv_bytes) break;
+ 
++        // optional additional authenticated data
++        size_t aad_length = 0;
++        const void * aad_bytes = nullptr;
++        if (argc >= 4 && be_isinstance(vm, 4)) {
++          be_getglobal(vm, "bytes");
++          if (!be_isderived(vm, 4)) break;
++          aad_bytes = be_tobytes(vm, 4, &aad_length);
++        }
++
+         // Initialize an AES CTR structure with the secret key
+         br_aes_small_ctr_keys * ctr_ctx = (br_aes_small_ctr_keys *) be_os_malloc(sizeof(br_aes_small_ctr_keys));
+         if (!ctr_ctx) { be_throw(vm, BE_MALLOC_FAIL); }
+@@ -161,7 +172,10 @@ extern "C" {
+         // Reset GCM context with provided IV
+         br_gcm_reset(gcm_ctx, iv_bytes, iv_length);
+ 
+-        // We don't have any additional authenticated data so we flip instantly
++        // Inject the additional authenticated data if any, then switch to data mode
++        if (aad_bytes && aad_length > 0) {
++          br_gcm_aad_inject(gcm_ctx, aad_bytes, aad_length);
++        }
+         br_gcm_flip(gcm_ctx);
+ 
+         be_return_nil(vm);

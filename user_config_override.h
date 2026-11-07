@@ -9,4 +9,9 @@
 #undef  USE_ZIGBEE_ZNP
 #define USE_ZIGBEE_EZSP
 
+// Berry : AES-CBC, qui sert aussi a l'AES-ECB (bloc par bloc, IV nul) des protocoles
+// locaux Tuya 3.3 et 3.4
+#undef  USE_BERRY_CRYPTO_AES_CBC
+#define USE_BERRY_CRYPTO_AES_CBC
+
 #endif  // _USER_CONFIG_OVERRIDE_H_
