@@ -96,6 +96,7 @@ Tuya Wi-Fi et les sous-appareils Zigbee de la passerelle Tuya, et les présenter
 | + `Ventilateur` (v.Fan), après `Restart 1` | 58 Ko |
 | + `Lumière ventilateur` (v.Light 0 OnOff), après `Restart 1` | 61 Ko |
 | + `Récepteur radio 1` et `Récepteur radio 4` (v.Relay), après `Restart 1` : **5 endpoints** | **61 Ko** |
+| Firmware de l'exécution 13 (page web, recherche, import), après une recherche, 7 novembre | **55 Ko** (avant la recherche et après `Br tasmota.gc()` : à relever) |
 
 Avec les 12 appareils connectés, le driver consommait environ **40 Ko** chargé depuis le
 système de fichiers (74 − 34 : code compilé en RAM, état des appareils, tampons), et environ
