@@ -96,7 +96,9 @@ Tuya Wi-Fi et les sous-appareils Zigbee de la passerelle Tuya, et les présenter
 | + `Ventilateur` (v.Fan), après `Restart 1` | 58 Ko |
 | + `Lumière ventilateur` (v.Light 0 OnOff), après `Restart 1` | 61 Ko |
 | + `Récepteur radio 1` et `Récepteur radio 4` (v.Relay), après `Restart 1` : **5 endpoints** | **61 Ko** |
-| Firmware de l'exécution 13 (page web, recherche, import), après une recherche, 7 novembre | **55 Ko** (avant la recherche et après `Br tasmota.gc()` : à relever) |
+| Firmware de l'exécution 13 (page web, recherche, import), driver démarré, sans recherche | **55 Ko** |
+| … juste après une recherche | 53 Ko |
+| … après une recherche puis `Br tasmota.gc()` | 55 Ko |
 
 Avec les 12 appareils connectés, le driver consommait environ **40 Ko** chargé depuis le
 système de fichiers (74 − 34 : code compilé en RAM, état des appareils, tampons), et environ
@@ -107,6 +109,13 @@ soit ~2 Ko par appareil en moyenne : il croît avec le nombre d'appareils connec
 reçus (pince : 22 DP, passerelle : 7 sous-appareils). Avec 3 appareils, 10 Ko (71 → 61).
 Les 48 Ko incluent l'endpoint Matter `Entrée-Porche`. Il n'y a pas eu de mesure après
 `Br tasmota.gc()`.
+
+**Firmware de l'exécution 13** : la recherche coûte ~2 Ko le temps qu'elle dure, entièrement
+rendus après `Br tasmota.gc()` (pas de fuite). Au repos, 55 Ko au lieu de 61 : écart de 6 Ko
+inexpliqué par le driver (banc de test : +0,7 Ko sur 64 bits pour l'initialisation, soit moins
+de 1 Ko sur l'ESP32 avec les 7 commandes et les 2 routes web ajoutées). À départager avec la
+ligne `TUY: demarrage du driver, memoire libre … Ko` d'`autoexec.be` (heap juste avant le
+driver, 71 Ko avec l'exécution 12).
 
 **Coût des endpoints Matter** : de 62 Ko (1 endpoint) à 61 Ko (5 endpoints), soit **~1 Ko pour
 4 endpoints**, dans le bruit de mesure (le 58 Ko intermédiaire en fait partie : le heap varie
