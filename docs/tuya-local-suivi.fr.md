@@ -199,7 +199,8 @@ endpoints Matter `z_light2` ou `z_light1`.
   le prenait pour un refus (`TUY: endpoint Matter 'Ventilateur' : Done (nouvel essai toutes les
   30 s)`) et renvoyait l'état du ventilateur toutes les 30 s. Corrigé (réponses de
   `Matter_zz_Device.MtrUpdate` : l'état, ou `Done`, sinon un message d'erreur), scénario 1
-  complété ; à flasher.
+  complété. Build : exécution 14 (commit `b8b2789`), 18/18 dans les deux modes, firmware de
+  2 099 215 octets ; à flasher.
 - **Trace Berry** relevée 14 s après le démarrage du driver (`stack traceback: <native>: in
   native function`, `BRY: stack[2] = type='function' ()`), sans la ligne d'erreur qui la
   précède : origine inconnue (driver, Matter ou autre). À relever en entier si elle revient.
