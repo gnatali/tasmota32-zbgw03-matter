@@ -103,7 +103,8 @@ Tuya Wi-Fi et les sous-appareils Zigbee de la passerelle Tuya, et les présenter
     9 chiffres avant `json.load`. Vérifié dans le conteneur avec le compte de Guillaume :
     signature acceptée, 33 vraies réponses lues (16 appareils, 16 clés, 150 DP ; la passerelle
     Tuya répond `not support this device` aux spécifications, ce qui est normal). Scénario 17
-    complété (il échoue sans le correctif). Build : à lancer, puis à flasher.
+    complété (il échoue sans le correctif). Build : exécution 16 (commit `1171ed1`), 19/19 dans
+    les deux modes, firmware de 2 099 967 octets (+0,5 Ko) ; à flasher.
 
 ## Mesures sur la passerelle
 
