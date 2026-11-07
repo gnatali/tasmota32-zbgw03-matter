@@ -280,14 +280,15 @@ class TuyaBinding
     r["Name"] = self.ep
     var res = tasmota.cmd("MtrUpdate " + json.dump(r), true)
     var v = (type(res) == 'instance') ? res.find("MtrUpdate") : nil
-    if type(v) == 'instance'
+    # accepte : l'etat de l'endpoint, ou "Done" pour un endpoint qui n'en publie pas (v_fan)
+    if type(v) == 'instance' || v == "Done"
       if self.pending
         tasmota.log(f"TUY: endpoint Matter '{self.ep}' disponible, etat envoye", 2)
         self.pending = false
       end
       return true
     end
-    if !self.pending                  # {"MtrUpdate":"Invalid Device"} ou rien : signale une fois
+    if !self.pending                  # "Invalid Device", "Invalid attribute '...'" ou rien : signale une fois
       var why = (v != nil) ? v : res
       tasmota.log(f"TUY: endpoint Matter '{self.ep}' : {why} (nouvel essai toutes les 30 s)", 2)
       self.pending = true
@@ -822,9 +823,9 @@ class TuyaScan
     end
     self.t_end = tasmota.millis() + ms
     self.t_req = 0
-    var e = tasmota.eth()
-    self.ip = (e != nil) ? e.find("ip") : nil
-    if self.ip == nil || self.ip == ""
+    var e = tasmota.eth()                     # Ethernet, sinon Wi-Fi
+    self.ip = (e != nil) ? e.find("ip", "") : ""
+    if self.ip == "" || self.ip == "0.0.0.0"
       var w = tasmota.wifi()
       self.ip = (w != nil) ? w.find("ip", "") : ""
     end

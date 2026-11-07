@@ -190,6 +190,7 @@ def main():
     assert not errs, errs
     up = mtr_updates(out)
     assert find(up, "Ventilateur") == {"Name": "Ventilateur", "FanSpeed": 0}, find(up, "Ventilateur")
+    assert not any("'Ventilateur'" in l for l in out if l.startswith("LOG")), "reponse Done prise pour un refus"
     assert find(up, "Lumiere ventilateur")["Power"] == 1
     assert find(up, "Porche") == {"Name": "Porche", "Power": 0, "Bri": 254, "CT": 500}, find(up, "Porche")
     assert find(up, "Radio 1")["Power"] == 0 and find(up, "Radio 2")["Power"] == 0
@@ -344,6 +345,7 @@ def main():
     out = adv(30000)
     assert find(mtr_updates(out), "Inconnu") == {"Name": "Inconnu", "Power": 0}, mtr_updates(out)
     assert not any("'Inconnu'" in l for l in out if l.startswith("LOG")), "refus signale deux fois"
+    assert find(mtr_updates(out), "Ventilateur") == {}, "Done : l'endpoint ne doit pas etre renvoye"
     h.send("EPADD Inconnu")                       # l'endpoint est cree dans Configuration -> Matter
     out = adv(30000)
     assert find(mtr_updates(out), "Inconnu") == {"Name": "Inconnu", "Power": 0}, mtr_updates(out)

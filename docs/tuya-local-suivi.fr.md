@@ -99,6 +99,8 @@ Tuya Wi-Fi et les sous-appareils Zigbee de la passerelle Tuya, et les présenter
 | Firmware de l'exécution 13 (page web, recherche, import), driver démarré, sans recherche | **55 Ko** |
 | … juste après une recherche | 53 Ko |
 | … après une recherche puis `Br tasmota.gc()` | 55 Ko |
+| Exécution 13, juste avant le démarrage du driver (`autoexec.be`) | 73 Ko |
+| … driver démarré, 3 appareils connectés, relevés à 5, 10 et 12 min (`STATE`, `Status 4`) | 56, 62, 60 Ko |
 
 Avec les 12 appareils connectés, le driver consommait environ **40 Ko** chargé depuis le
 système de fichiers (74 − 34 : code compilé en RAM, état des appareils, tampons), et environ
@@ -111,11 +113,10 @@ Les 48 Ko incluent l'endpoint Matter `Entrée-Porche`. Il n'y a pas eu de mesure
 `Br tasmota.gc()`.
 
 **Firmware de l'exécution 13** : la recherche coûte ~2 Ko le temps qu'elle dure, entièrement
-rendus après `Br tasmota.gc()` (pas de fuite). Au repos, 55 Ko au lieu de 61 : écart de 6 Ko
-inexpliqué par le driver (banc de test : +0,7 Ko sur 64 bits pour l'initialisation, soit moins
-de 1 Ko sur l'ESP32 avec les 7 commandes et les 2 routes web ajoutées). À départager avec la
-ligne `TUY: demarrage du driver, memoire libre … Ko` d'`autoexec.be` (heap juste avant le
-driver, 71 Ko avec l'exécution 12).
+rendus après `Br tasmota.gc()` (pas de fuite). Au repos, le heap **varie de 56 à 62 Ko**
+d'un relevé à l'autre ; avec 73 Ko juste avant le driver, celui-ci consomme **11 à 17 Ko**
+(10 Ko avec l'exécution 12, mesure unique). Le surcoût est donc de l'ordre du bruit de mesure,
+cohérent avec le banc de test (+0,7 Ko sur 64 bits). Le heap de Berry est de 51 Ko (`STATE`).
 
 **Coût des endpoints Matter** : de 62 Ko (1 endpoint) à 61 Ko (5 endpoints), soit **~1 Ko pour
 4 endpoints**, dans le bruit de mesure (le 58 Ko intermédiaire en fait partie : le heap varie
@@ -193,6 +194,17 @@ endpoints Matter `z_light2` ou `z_light1`.
    release.
 
 ## À vérifier côté passerelle
+
+- **`MtrUpdate` répond `Done`** pour un endpoint qui ne publie pas d'état (`v_fan`) : le driver
+  le prenait pour un refus (`TUY: endpoint Matter 'Ventilateur' : Done (nouvel essai toutes les
+  30 s)`) et renvoyait l'état du ventilateur toutes les 30 s. Corrigé (réponses de
+  `Matter_zz_Device.MtrUpdate` : l'état, ou `Done`, sinon un message d'erreur), scénario 1
+  complété ; à flasher.
+- **Trace Berry** relevée 14 s après le démarrage du driver (`stack traceback: <native>: in
+  native function`, `BRY: stack[2] = type='function' ()`), sans la ligne d'erreur qui la
+  précède : origine inconnue (driver, Matter ou autre). À relever en entier si elle revient.
+- La passerelle est connectée en **Wi-Fi** (192.168.100.13), sur le même réseau que les
+  appareils : la recherche s'en sert (adresse Wi-Fi si l'Ethernet n'en a pas).
 
 - **Premier endpoint Matter (`Entrée-Porche`, v.Light 2 CT)** : créé, il est resté « non
   connecté » dans Google Home jusqu'à un `MtrUpdate {"Name":"Entrée-Porche","Power":1}` fait à

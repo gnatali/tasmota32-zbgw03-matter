@@ -32,6 +32,7 @@ class MockTasmota
     print("CMD " + c)
     var p = json.load(c[10 ..])
     if self.missing.contains(p["Name"])  return {"MtrUpdate": "Invalid Device"}  end
+    if p["Name"] == "Ventilateur"  return {"MtrUpdate": "Done"}  end     # v_fan : pas d'etat publie
     return {"MtrUpdate": p}
   end
   def resp_cmnd(s)  print("RESP " + s)  end
