@@ -86,6 +86,8 @@ Tuya Wi-Fi et les sous-appareils Zigbee de la passerelle Tuya, et les présenter
    un DP booléen d'après l'état connu (scénario 19). Règle proposée pour le bouton SNZB-01P
    `0x922D` (déjà relié au bouton virtuel Matter « Perron » par `Rule1`) : `Rule2`, voir
    `docs/tuya-local.fr.md`. La recherche a trouvé les 3 appareils sur la passerelle.
+   Build : exécution 15 (commit `6b51e4a`), 19/19 dans les deux modes, firmware de
+   2 099 471 octets ; à flasher.
 
 ## Mesures sur la passerelle
 
