@@ -19,7 +19,7 @@ Tuya Wi-Fi et les sous-appareils Zigbee de la passerelle Tuya, et les présenter
 | Documentation utilisateur `docs/tuya-local.fr.md` | ✅ |
 | Chargement différé dans `autoexec.be` (plantage au démarrage) | ✅ corrigé et documenté |
 | **Mémoire** avec les 12 appareils connectés : 34 Ko libres avec le driver chargé depuis le système de fichiers, **48 Ko** avec le driver solidifié | ✅ ~14 Ko de marge en plus ; coût des endpoints Matter à mesurer |
-| Endpoints Matter et essais dans Google Home | ✅ 7 endpoints créés (`Entrée-Porche`, `Ventilateur`, `Lumière ventilateur`, `Récepteur radio`), dans Google Home après `Restart 1` ; 61 Ko libres |
+| Endpoints Matter et essais dans Google Home | ✅ 5 endpoints créés (`Entrée-Porche`, `Ventilateur`, `Lumière ventilateur`, `Récepteur radio 1` et `4`), dans Google Home après `Restart 1` ; 61 Ko libres |
 | Pergola 1 et 2 (projecteurs RGB) | ⏳ absentes du scan : IP et version inconnues, désactivées dans `tuya.json` |
 | Migration des contrôleurs LED Zigbee Bureau et Salon sur la ZB-GW03 | ⏳ décidée, pas faite |
 
@@ -72,7 +72,7 @@ Tuya Wi-Fi et les sous-appareils Zigbee de la passerelle Tuya, et les présenter
 | Périmètre réduit (3 appareils), endpoint `Entrée-Porche` seul, 7 novembre | 62 Ko |
 | + `Ventilateur` (v.Fan), après `Restart 1` | 58 Ko |
 | + `Lumière ventilateur` (v.Light 0 OnOff), après `Restart 1` | 61 Ko |
-| + `Récepteur radio` (v.Relay), après `Restart 1` : **7 endpoints** | **61 Ko** |
+| + `Récepteur radio 1` et `Récepteur radio 4` (v.Relay), après `Restart 1` : **5 endpoints** | **61 Ko** |
 
 Avec les 12 appareils connectés, le driver consommait environ **40 Ko** chargé depuis le
 système de fichiers (74 − 34 : code compilé en RAM, état des appareils, tampons), et environ
@@ -84,8 +84,8 @@ reçus (pince : 22 DP, passerelle : 7 sous-appareils). Avec 3 appareils, 10 Ko (
 Les 48 Ko incluent l'endpoint Matter `Entrée-Porche`. Il n'y a pas eu de mesure après
 `Br tasmota.gc()`.
 
-**Coût des endpoints Matter** : de 62 Ko (1 endpoint) à 61 Ko (7 endpoints), soit **~1 Ko pour
-6 endpoints**, dans le bruit de mesure (le 58 Ko intermédiaire en fait partie : le heap varie
+**Coût des endpoints Matter** : de 62 Ko (1 endpoint) à 61 Ko (5 endpoints), soit **~1 Ko pour
+4 endpoints**, dans le bruit de mesure (le 58 Ko intermédiaire en fait partie : le heap varie
 de quelques Ko d'un relevé à l'autre). La marge de ~60 Ko est donc confortable.
 
 **Répartition sur le banc de test** (driver solidifié, interpréteur 64 bits : sur l'ESP32,
@@ -137,7 +137,9 @@ endpoints Matter `z_light2` ou `z_light1`.
    compris), et tester les deux sens avec Google Home en relevant `Heap` après chacun :
    - ✅ `Entrée-Porche` : v.Light 2 CT ;
    - ✅ `Ventilateur` : v.Fan ; ✅ `Lumière ventilateur` : v.Light 0 OnOff ;
-   - ✅ `Récepteur radio 1` à `Récepteur radio 4` : v.Relay.
+   - ✅ `Récepteur radio 1` et `Récepteur radio 4` : v.Relay. Les canaux 2 et 3 n'ont pas
+     d'endpoint : les retirer de `tuya.json` s'ils ne servent pas (sinon, le driver tente de
+     les mettre à jour toutes les 30 s, sans effet).
    **`Restart 1` obligatoire** après la création : sans lui, Google Home affiche les nouveaux
    appareils hors ligne. Reste à tester les deux sens (Google Home → appareil, et appareil
    → Google Home : bouton, Smart Life, télécommande) pour chaque endpoint.
