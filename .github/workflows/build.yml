@@ -36,10 +36,12 @@ jobs:
       - run: pip install platformio tinytuya
 
       # Tests du driver Berry tuya_local.be : interpreteur Berry et BearSSL de Tasmota,
-      # faux appareils Tuya construits sur TinyTuya (le test ecrit /tuya.json). Joues sur le
+      # faux appareils Tuya construits sur TinyTuya (le test ecrit /tuya.json, /tuya.json.bak et
+      # /devices.json). Joues sur le
       # driver source puis sur le driver solidifie comme au build (custom_berry_solidify)
       - run: |
-          sudo touch /tuya.json && sudo chmod 666 /tuya.json
+          sudo touch /tuya.json /tuya.json.bak /devices.json
+          sudo chmod 666 /tuya.json /tuya.json.bak /devices.json
           bash berry/test/run_tests.sh tasmota
 
       - run: |

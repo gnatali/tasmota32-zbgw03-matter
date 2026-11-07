@@ -21,6 +21,7 @@ le protocole 3.5).
 
 - [Préparer les appareils](#préparer-les-appareils)
 - [Installer le driver](#installer-le-driver)
+- [Page web : ajouter et gérer les appareils](#page-web--ajouter-et-gérer-les-appareils)
 - [Créer les endpoints Matter](#créer-les-endpoints-matter)
 - [Fichier de configuration](#fichier-de-configuration)
 - [Commandes](#commandes)
@@ -29,6 +30,10 @@ le protocole 3.5).
 - [Tests](#tests)
 
 ## Préparer les appareils
+
+Les appareils peuvent maintenant être trouvés et importés **depuis la passerelle** (voir
+[Page web](#page-web--ajouter-et-gérer-les-appareils)) : seule la clé locale demande le cloud
+Tuya, une fois. Avec TinyTuya sur un PC, la démarche reste possible :
 
 1. **Clés locales** : sur un PC, `py -m pip install tinytuya` puis `py -m tinytuya wizard`
    (compte développeur Tuya IoT lié à l'application Smart Life). Le fichier `devices.json`
@@ -92,7 +97,43 @@ et mettre à jour `tuya.json`.
    mémoire libre (`Heap` dans `Status 4`) une fois tous les appareils connectés : la
    ZB-GW03 n'a pas de PSRAM.
 
+## Page web : ajouter et gérer les appareils
+
+**Configuration → Tuya local** (`/tuya`) :
+
+- **Appareils** : nom, IP, version et état (connecté, déconnecté, désactivé) de chaque entrée de
+  `tuya.json`. **Modifier** ouvre l'entrée en JSON (même format que le fichier) : la clé y est
+  remplacée par `***`, et une clé laissée à `***` est conservée à l'enregistrement.
+  **Ajouter un appareil** propose un modèle. Chaque enregistrement garde l'ancienne version
+  dans `/tuya.json.bak`, puis recharge la configuration.
+- **Rechercher les appareils (20 s)** : écoute les annonces des appareils Wi-Fi sur le réseau
+  local (ports UDP 6666, 6667, 7000) et demande aux appareils 3.5 de s'annoncer, comme
+  `tinytuya scan`. Donne l'identifiant, l'IP et la version de chacun. La passerelle et les
+  appareils doivent être sur le **même réseau local** (les annonces ne traversent pas un routeur).
+- **Importer les clés locales**, deux possibilités :
+  - le `devices.json` de `tinytuya wizard`, envoyé par **Outils → Gestion des fichiers**. Il est
+    lu par morceaux : sa taille n'est pas limitée par la mémoire. Sont importés les appareils
+    trouvés par la recherche ou déjà configurés (ou tous, case « tous »), avec leurs
+    sous-appareils Zigbee ;
+  - **le cloud Tuya directement**, pour les appareils trouvés par la recherche : choisir la
+    région et saisir l'**Access ID** et l'**Access Secret** du projet Tuya IoT (le même compte
+    développeur que pour `tinytuya wizard`). Ils ne sont pas enregistrés. Il faut l'heure à jour
+    (NTP) et **35 Ko de mémoire libre** (le client HTTPS de Tasmota en réserve 16) ; l'import
+    fait une requête par seconde, le résultat s'affiche sur la page.
+
+  L'import complète `tuya.json` : un nouvel appareil reçoit sa clé, son IP et sa version (de la
+  recherche), ses **liaisons Matter déduites de ses DP** (lumière, ventilateur, prise avec ou sans
+  mesures, interrupteurs multiples, capteur de température et d'humidité, compteur d'énergie) et
+  la table `codes` de ses DP. Un appareil déjà configuré garde ses liaisons : seules sa clé, son
+  IP et sa version sont mises à jour. Un appareil sans IP connue est ajouté avec
+  `"enabled": false`.
+- **Endpoints Matter** : liste les liaisons sans endpoint Matter du même nom. **Créer les
+  endpoints et redémarrer** les crée (types du tableau ci-dessous) puis redémarre Tasmota, ce qui
+  est nécessaire pour Google Home.
+
 ## Créer les endpoints Matter
+
+La page **Tuya local** les crée en un clic (voir ci-dessus). À la main :
 
 Dans **Configuration → Matter**, ajouter un endpoint par entrée `matter` de `tuya.json`, du
 type ci-dessous et avec **exactement** le nom donné dans `ep` (32 octets au plus ; une lettre
@@ -169,9 +210,21 @@ La signification des DP de chaque appareil se trouve dans `mapping` de `devices.
 
 | Commande | Effet |
 |---|---|
-| `TuyaStatus` | État des connexions et dernières valeurs de chaque appareil |
-| `TuyaSend <appareil>,<dp>,<valeur>` | Envoie une valeur, par exemple `TuyaSend Ventilateur,60,true` ou `TuyaSend Ventilateur,62,3` |
+| `TuyaStatus [appareil]` | État des connexions et dernières valeurs de chaque appareil (ou d'un seul) |
+| `TuyaSend <appareil>,<dp>,<valeur>` | Envoie une valeur, par exemple `TuyaSend Ventilateur,60,true` ou `TuyaSend Ventilateur,62,3`. Le DP peut aussi être un code (`TuyaSend Lampe,switch_led,true`) si l'appareil a une table `codes` (import) |
 | `TuyaReload` | Relit `tuya.json` et reconnecte les appareils |
+| `TuyaConfig [appareil]` | Configuration (`tuya.json`) **sans les clés**, ou celle d'un appareil |
+| `TuyaAdd <json>` | Ajoute ou remplace un appareil (même format qu'une entrée de `devices`) ; `"key":"***"` ou sans clé : clé conservée |
+| `TuyaDel <appareil>` | Supprime un appareil |
+| `TuyaScan [secondes]` | Recherche sur le réseau (20 s par défaut, 60 au plus) ; résultat publié à la fin : `{"TuyaScan":{"Devices":[...]}}` |
+| `TuyaImport [fichier] [all\|id,id]` | Importe le `devices.json` de tinytuya (`/devices.json` par défaut) |
+| `TuyaCloud <json>` | Import depuis le cloud : `{"region":"eu","id":"<Access ID>","secret":"<Access Secret>"}` (et `"devices":[...]` pour choisir les identifiants) ; résultat publié à la fin. **La console web journalise la commande, secret compris** : préférer la page web |
+| `TuyaMatter` | Crée les endpoints Matter manquants (puis `Restart 1`) |
+
+Ces commandes forment l'**API de pilotage à distance** : en HTTP
+(`http://<passerelle>/cm?cmnd=TuyaSend%20Ventilateur,60,true`, avec `&user=admin&password=...`
+si un mot de passe web est défini) ou en MQTT (`cmnd/<topic>/TuyaSend`). Les réponses sont en
+JSON (`{"TuyaAdd":"Lampe"}`, ou `{"TuyaAdd":{"Error":"..."}}`).
 
 Chaque changement d'état est publié sur `stat/<topic>/RESULT` :
 `{"Tuya":{"Name":"Ventilateur","Dps":{"62":3}}}`. Les règles peuvent s'en servir.
@@ -198,6 +251,10 @@ Il n'apparaît plus dans Smart Life, et le retirer de `tuya.json` s'il y figurai
   tuya-local ou TinyTuya sur les mêmes appareils. L'application Smart Life continue de
   fonctionner (par le cloud).
 - Couleurs : seul le format `colour_data_v2` (12 caractères hexadécimaux) est géré.
+- Import : une température de couleur `temp_value` (ancien format, 0 à 255) n'est pas reprise
+  (la lumière devient un variateur), une vitesse de ventilateur en énumération non plus (le
+  ventilateur devient un simple marche/arrêt). L'import cloud ne traite pas les sous-appareils
+  Zigbee (ils ne s'annoncent pas sur le réseau) : passer par le `devices.json` de tinytuya.
 - Les commandes passent quand l'appareil est connecté ; sinon elles sont ignorées (journal :
   `non connecte, commande ignoree`), et le driver se reconnecte tout seul (5 s, puis jusqu'à
   60 s entre deux essais).
@@ -206,8 +263,10 @@ Il n'apparaît plus dans Smart Life, et le retirer de `tuya.json` s'il y figurai
 ## Tests
 
 `berry/test/run_tests.sh <dépôt Tasmota>` compile l'interpréteur Berry de Tasmota avec le
-chiffrement BearSSL de Tasmota, et joue 13 scénarios contre de faux appareils Tuya construits
+chiffrement BearSSL de Tasmota, et joue 18 scénarios contre de faux appareils Tuya construits
 sur [TinyTuya](https://github.com/jasonacox/tinytuya) (3.3, 3.4, 3.5, passerelle Zigbee) :
 négociation de clé, commandes Matter, retours d'état, mesures, coupure et reconnexion, trames
-corrompues ou fragmentées, endpoint Matter créé à chaud. Le workflow **Build firmware** les lance
+corrompues ou fragmentées, endpoint Matter créé à chaud, API, recherche (annonces au format
+TinyTuya), import `devices.json`, import cloud (signature comparée à celle de TinyTuya) et page
+web. Le workflow **Build firmware** les lance
 avant chaque compilation, sur le driver source puis sur le driver solidifié.

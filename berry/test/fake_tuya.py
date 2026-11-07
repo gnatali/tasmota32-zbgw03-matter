@@ -155,3 +155,22 @@ class FakeDevice:
             self.key = c.encrypt(x, use_base64=False, pad=False, iv=self.client_nonce[:12])[12:28]
         self.log.append(("session", self.key.hex()))
         return []
+
+
+# ---- annonces UDP (decouverte), comme les envoient les appareils -----------------------------
+from tinytuya.core.udp_helper import udpkey, decrypt_udp  # noqa: E402
+
+
+def udp_broadcast(version, info):
+    """Annonce UDP d'un appareil : 3.1 en clair (port 6666), 3.3 en AES-ECB (6667),
+    3.5 en trame 6699 AES-GCM (7000). Verifiee avec decrypt_udp() de TinyTuya."""
+    js = json.dumps(info).encode()
+    if version == 3.1:
+        pkt = pack_message(TuyaMessage(0, 0, None, b"\0\0\0\0" + js, 0, True, H.PREFIX_55AA_VALUE, None))
+    elif version == 3.3:
+        enc = AESCipher(udpkey).encrypt(js, use_base64=False, pad=True)
+        pkt = pack_message(TuyaMessage(0, 0x13, None, b"\0\0\0\0" + enc, 0, True, H.PREFIX_55AA_VALUE, None))
+    else:
+        pkt = pack_message(TuyaMessage(0, 0x23, 0, js, 0, True, H.PREFIX_6699_VALUE, True), hmac_key=udpkey)
+    assert json.loads(decrypt_udp(pkt)) == info, "annonce UDP non reconnue par TinyTuya"
+    return pkt

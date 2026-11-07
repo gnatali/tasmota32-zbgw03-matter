@@ -114,6 +114,58 @@ class Harness:
         self.p.wait(5)
 
 
+def struct_cmd(pkt):
+    """Commande d'une trame 55AA ou 6699."""
+    return int.from_bytes(pkt[10:14] if pkt[:4] == b"\0\0\x66\x99" else pkt[8:12], "big")
+
+
+def tinytuya_sign(creds, url, hdr):
+    """Signature calculee par tinytuya.Cloud (requests et time simules) pour la meme requete."""
+    import sys
+    import tinytuya
+    mod = sys.modules["tinytuya.Cloud"]
+    seen = {}
+
+    class R:
+        status_code = 200
+        content = b'{"success": true, "result": {"access_token": "tok123"}}'
+        text = content.decode()
+        def json(self):
+            return {"success": True, "result": {"access_token": "tok123"}}
+
+    class FakeRequests:
+        @staticmethod
+        def get(u, headers=None):
+            seen["sign"] = headers["sign"]
+            return R()
+        Request = mod.requests.Request
+
+    class FakeTime:
+        @staticmethod
+        def time():
+            return int(hdr["t"]) / 1000.0
+    real_req, real_time = mod.requests, mod.time
+    mod.requests, mod.time = FakeRequests, FakeTime
+    try:
+        token = hdr.get("access_token")
+        c = tinytuya.Cloud(apiRegion=creds["region"], apiKey=creds["id"], apiSecret=creds["secret"],
+                           initial_token=token or "x")
+        if token is None:
+            c.token = None
+            c._gettoken()
+        else:
+            path = url.split("/", 3)[3]
+            c._tuyaplatform(path.split("/", 1)[1], ver=path.split("/", 1)[0])
+    finally:
+        mod.requests, mod.time = real_req, real_time
+    return seen["sign"]
+
+
+def page_btn(h):
+    out = h.send("WEBBTN")
+    return json.loads([l for l in out if l.startswith("PAGE ")][-1][5:]), out
+
+
 def mtr_updates(lines):
     return [json.loads(l[len("CMD MtrUpdate "):]) for l in lines if l.startswith("CMD MtrUpdate ")]
 
@@ -304,8 +356,201 @@ def main():
     ok += 1
     print("OK 13 endpoint Matter cree apres coup : etat envoye sans redemarrage")
 
+    # 14. API : configuration sans les cles, ajout, cle conservee, TuyaSend par code, suppression
+    def resp(out, name):
+        r = [l for l in out if l.startswith("RESP ")]
+        assert r, out
+        return json.loads(r[-1][5:])[name]
+    out = h.send("CMD TuyaConfig")
+    conf = resp(out, "TuyaConfig")
+    assert len(conf["devices"]) == 6 and all(d["key"] == "***" for d in conf["devices"]), conf
+    assert resp(h.send("CMD TuyaConfig Pince"), "TuyaConfig")["name"] == "Pince"
+    st = json.loads([l for l in h.send("CMD TuyaStatus pince") if l.startswith("RESP ")][0][5:])["TuyaStatus"]
+    assert list(st) == ["Pince"], st
+    K["plug"] = "pLuG-kEy-0123456"
+    DEVS["10.0.0.99"] = FakeDevice("plugtest0000000000000", K["plug"], 3.3, {"1": False})
+    plug = {"name": "Prise test", "id": "plugtest0000000000000", "key": K["plug"], "ip": "10.0.0.99", "version": "3.3"}
+    out = h.pump(h.send("CMD TuyaAdd " + json.dumps(plug)))
+    assert resp(out, "TuyaAdd") == "Prise test", out
+    plug.update({"key": "***", "codes": {"switch": 1}, "matter": [{"ep": "Prise test", "type": "relay", "dp": 1}]})
+    out = h.pump(h.send("CMD TuyaAdd " + json.dumps(plug)))
+    saved = [d for d in json.load(open("/tuya.json"))["devices"] if d["id"] == plug["id"]][0]
+    assert saved["key"] == K["plug"] and saved["codes"] == {"switch": 1}, saved
+    out = h.pump(h.send("CMD TuyaSend Prise test,switch,true"))
+    assert DEVS["10.0.0.99"].dps["1"] is True, DEVS["10.0.0.99"].dps
+    assert "DP inconnu" in h.send("CMD TuyaSend Prise test,inexistant,1")[-1]
+    assert "Error" in resp(h.send("CMD TuyaAdd {pas du json"), "TuyaAdd")
+    out = h.pump(h.send("CMD TuyaDel Prise test"))
+    assert resp(out, "TuyaDel") == "Prise test"
+    assert all(d["id"] != plug["id"] for d in json.load(open("/tuya.json"))["devices"])
+    assert any(d["id"] == plug["id"] for d in json.load(open("/tuya.json.bak"))["devices"])
+    ok += 1
+    print("OK 14 API : TuyaConfig sans cles, TuyaAdd (cle conservee), TuyaSend par code, TuyaDel")
+
+    # 15. recherche sur le reseau : annonces 3.1 / 3.3 / 3.5, demande 3.5 diffusee, fin publiee
+    from fake_tuya import udp_broadcast, decrypt_udp
+    out = h.send("CMD TuyaScan 5")
+    assert "5 s" in resp(out, "TuyaScan"), out
+    assert sum(l.startswith("UDPBIND ") for l in out) == 3, out
+    req = [l for l in out if l.startswith("UDPTX 255.255.255.255 7000 ")]
+    assert req, out
+    req_pkt = bytes.fromhex(req[0].split()[3])
+    assert json.loads(decrypt_udp(req_pkt)) == {"from": "app", "ip": "10.0.0.2"}
+    assert struct_cmd(req_pkt) == 0x25
+    LAMP = {"ip": "10.0.0.50", "gwId": "lamp330000000000000aa", "active": 2, "ability": 0, "mode": 0,
+            "encrypt": True, "productKey": "keylamp", "version": "3.3"}
+    MPLUG = {"ip": "10.0.0.51", "gwId": "mplug35000000000000bb", "uuid": "u1", "active": 2, "ablilty": 0,
+             "encrypt": True, "productKey": "keyplug", "version": "3.5", "token": True, "wf_cfg": True}
+    OLD = {"ip": "10.0.0.52", "gwId": "old31000000000000000cc", "active": 2, "ability": 0, "mode": 0,
+           "encrypt": False, "productKey": "keyold", "version": "3.1"}
+    h.send("UDP 6667 10.0.0.50 " + udp_broadcast(3.3, LAMP).hex())
+    h.send("UDP 7000 10.0.0.51 " + udp_broadcast(3.5, MPLUG).hex())
+    h.send("UDP 6666 10.0.0.52 " + udp_broadcast(3.1, OLD).hex())
+    h.send("UDP 7000 10.0.0.2 " + req_pkt.hex())                     # notre propre demande : ignoree
+    h.send("UDP 6667 10.0.0.53 " + "00" * 40)                          # paquet invalide : ignore
+    out = h.send("ADV 6000")
+    pub = [json.loads(l[4:]) for l in out if l.startswith("PUB ") and "TuyaScan" in l]
+    assert pub, out
+    found = {d["id"]: d for d in pub[0]["TuyaScan"]["Devices"]}
+    assert set(found) == {"lamp330000000000000aa", "mplug35000000000000bb", "old31000000000000000cc"}, found
+    assert found["mplug35000000000000bb"]["version"] == "3.5" and found["lamp330000000000000aa"]["ip"] == "10.0.0.50"
+    assert sum(l.startswith("UDPCLOSE ") for l in out) == 3
+    h.send("HEAP 10")
+    assert "memoire" in resp(h.send("CMD TuyaScan"), "TuyaScan")["Error"]
+    h.send("HEAP 60")
+    ok += 1
+    print("OK 15 recherche : annonces 3.1/3.3/3.5 (format TinyTuya), demande 3.5, resultat publie")
+
+    # 16. import du devices.json de tinytuya : seulement les appareils trouves ou connus,
+    #     types deduits des codes de DP, sous-appareil rattache, lecture par morceaux
+    K["lamp"] = "LaMp-KeY-0000001"
+    K["mplug"] = "MpLuG-KeY-000002"
+    DEVS["10.0.0.50"] = FakeDevice("lamp330000000000000aa", K["lamp"], 3.3, {"20": False, "21": "white", "22": 500, "23": 0})
+    DEVS["10.0.0.51"] = FakeDevice("mplug35000000000000bb", K["mplug"], 3.5, {"1": False, "18": 0, "19": 0, "20": 2300})
+    DEVS["10.0.0.180"].children["00158d00000000ff"] = {"1": False}         # sous-appareil Zigbee de la passerelle
+    def mp(*items):
+        return {str(dp): {"code": code, "type": typ, "values": vals} for dp, code, typ, vals in items}
+    devices_json = [
+        {"name": "Lampe test", "id": "lamp330000000000000aa", "key": K["lamp"], "category": "dj", "icon": "x" * 600,
+         "mapping": mp((20, "switch_led", "Boolean", {}), (21, "work_mode", "Enum", {"range": ["white", "colour"]}),
+                       (22, "bright_value_v2", "Integer", {"min": 10, "max": 1000, "scale": 0, "step": 1}),
+                       (23, "temp_value_v2", "Integer", {"min": 0, "max": 1000, "scale": 0, "step": 1}))},
+        {"name": "Prise mesure", "id": "mplug35000000000000bb", "key": K["mplug"], "category": "cz", "ip": "10.0.0.51",
+         "version": "3.5",
+         "mapping": mp((1, "switch", "Boolean", {}), (18, "cur_current", "Integer", {"unit": "mA", "scale": 0}),
+                       (19, "cur_power", "Integer", {"unit": "W", "scale": 1}),
+                       (20, "cur_voltage", "Integer", {"unit": "V", "scale": 1}))},
+        {"name": "Ventilateur", "id": "fan000000000000000000", "key": K["fan"], "category": "fs", "mapping": {}},
+        {"name": "Ailleurs", "id": "remote000000000000000", "key": "rEmOtE-kEy-00003", "category": "kg",
+         "mapping": mp((1, "switch_1", "Boolean", {}), (2, "switch_2", "Boolean", {}))},
+        {"name": "Enorme", "id": "huge00000000000000000", "key": "x", "icon": "y" * 9000},
+        {"name": "Prise Z", "id": "zsub00000000000000000", "key": K["gw"], "sub": True, "node_id": "00158d00000000ff",
+         "parent": "gw0000000000000000000", "category": "cz", "mapping": mp((1, "switch", "Boolean", {}))},
+    ]
+    with open("/devices.json", "w") as f:
+        json.dump(devices_json, f, indent=1)
+    out = h.pump(h.send("CMD TuyaImport"))
+    r = resp(out, "TuyaImport")
+    assert sorted(r["Added"]) == ["Lampe test", "Prise Z", "Prise mesure"] and r["Updated"] == ["Ventilateur"], r
+    devs = {d["id"]: d for d in json.load(open("/tuya.json"))["devices"]}
+    lamp = devs["lamp330000000000000aa"]
+    assert lamp["ip"] == "10.0.0.50" and lamp["version"] == "3.3", lamp
+    assert lamp["matter"] == [{"ep": "Lampe test", "type": "light2", "dp": 20, "dp_bri": 22, "bri_min": 10,
+                               "bri_max": 1000, "dp_mode": 21, "dp_ct": 23}], lamp["matter"]
+    pm = devs["mplug35000000000000bb"]["matter"][0]
+    assert pm["type"] == "relay_power" and pm["div_power"] == 10 and pm["div_voltage"] == 10 and pm["div_current"] == 1000, pm
+    assert devs["fan000000000000000000"]["matter"][0]["type"] == "fan"          # liaisons existantes gardees
+    gwc = [c for c in devs["gw0000000000000000000"]["children"] if c.get("cid") == "00158d00000000ff"]
+    assert gwc and gwc[0]["matter"][0]["type"] == "relay" and "key" not in gwc[0], gwc
+    assert "remote000000000000000" not in devs
+    up = mtr_updates(out)
+    assert find(up, "Lampe test")["Power"] == 0 and abs(find(up, "Prise mesure")["Voltage"] - 230.0) < 0.01, up
+    h.pump(h.send("CMD TuyaSend Lampe test,switch_led,true"))
+    assert DEVS["10.0.0.50"].dps["20"] is True
+    out = h.pump(h.send("CMD TuyaImport /devices.json all"))
+    r = resp(out, "TuyaImport")
+    assert "Ailleurs" in r["Added"] and "Enorme" not in r["Added"] + r["Updated"], r
+    assert any("trop gros" in l for l in out), [l for l in out if l.startswith("LOG")]
+    remote = [d for d in json.load(open("/tuya.json"))["devices"] if d["id"] == "remote000000000000000"][0]
+    assert remote["enabled"] is False and [b["ep"] for b in remote["matter"]] == ["Ailleurs 1", "Ailleurs 2"], remote
+    ok += 1
+    print("OK 16 import devices.json : filtre, types deduits, sous-appareil, lecture par morceaux")
+
+    # 17. import par le cloud Tuya : signature identique a TinyTuya, cle et DP recuperes, garde memoire
+    cloud_id = "cloudsw0000000000000"
+    h.send('HTTPSRESP /v1.0/token?grant_type=1 200 {"success":true,"result":{"access_token":"tok123","expire_time":7200}}')
+    h.send('HTTPSRESP /v1.0/devices/%s 200 {"success":true,"result":{"id":"%s","name":"Cloud double",'
+           '"local_key":"cLoUd-KeY-000004","category":"kg"}}' % (cloud_id, cloud_id))
+    h.send('HTTPSRESP /v1.1/devices/%s/specifications 200 {"success":true,"result":{"category":"kg","functions":'
+           '[{"code":"switch_1","dp_id":1,"type":"Boolean","values":"{}"},{"code":"switch_2","dp_id":2,'
+           '"type":"Boolean","values":"{}"}],"status":[]}}' % cloud_id)
+    creds = {"region": "eu", "id": "AcCeSsId0123", "secret": "s3cr3t-s3cr3t", "devices": [cloud_id]}
+    h.send("HEAP 30")
+    assert "memoire" in resp(h.send("CMD TuyaCloud " + json.dumps(creds)), "TuyaCloud")["Error"]
+    h.send("HEAP 60")
+    out = h.send("CMD TuyaCloud " + json.dumps(creds))
+    assert "1 appareil" in resp(out, "TuyaCloud")
+    for _ in range(5):
+        out += h.pump(h.send("ADV 1000"))
+    reqs = [l for l in out if l.startswith("HTTPS ")]
+    assert len(reqs) == 3, reqs
+    for l in reqs:
+        _, url, hdr = l.split(" ", 2)
+        hdr = json.loads(hdr)
+        assert hdr["sign"] == tinytuya_sign(creds, url, hdr), (url, hdr)
+    assert json.loads(reqs[0].split(" ", 2)[2])["secret"] == creds["secret"]       # comme tinytuya
+    assert json.loads(reqs[1].split(" ", 2)[2])["access_token"] == "tok123"
+    pub = [json.loads(l[4:])["TuyaCloud"] for l in out if l.startswith("PUB ") and "TuyaCloud" in l]
+    assert pub and pub[-1]["Added"] == ["Cloud double"], pub
+    cd = [d for d in json.load(open("/tuya.json"))["devices"] if d["id"] == cloud_id][0]
+    assert cd["key"] == "cLoUd-KeY-000004" and cd["enabled"] is False and len(cd["matter"]) == 2, cd
+    h.send('HTTPSRESP /v1.0/token?grant_type=1 200 {"success":false,"code":1004,"msg":"sign invalid"}')
+    out = h.send("CMD TuyaCloud " + json.dumps(creds))
+    out += h.pump(h.send("ADV 1000"))
+    err = [json.loads(l[4:])["TuyaCloud"] for l in out if l.startswith("PUB ") and "TuyaCloud" in l]
+    assert err and "sign invalid" in err[-1]["Error"], out
+    ok += 1
+    print("OK 17 import cloud : signature conforme a TinyTuya, cle et DP, erreurs et garde memoire")
+
+    # 18. page web : liste, edition (cle masquee puis conservee), suppression, endpoints Matter
+    def page(method, args):
+        out = h.pump(h.send("HTTP %s /tuya %s" % (method, json.dumps(args))))
+        return json.loads([l for l in out if l.startswith("PAGE ")][-1][5:]), out
+    btn, _ = page_btn(h)
+    assert "action='tuya'" in btn
+    html, _ = page("GET", {})
+    assert "Lampe test" in html and "Prise mesure" in html and "Rechercher" in html, html[:300]
+    assert K["clamp"] not in html and K["lamp"] not in html
+    assert "Sans endpoint Matter" in html and "Lampe test <small>(v_light2)" in html, html
+    html, _ = page("GET", {"edit": "Pince"})
+    assert "&quot;key&quot;: &quot;***&quot;" in html and K["clamp"] not in html, html
+    pince = [d for d in json.load(open("/tuya.json"))["devices"] if d["name"] == "Pince"][0]
+    pince["key"] = "***"
+    pince["sensors"]["Puissance B"] = [134, 1, "W"]
+    html, _ = page("POST", {"save": "", "ref": "Pince", "json": json.dumps(pince)})
+    assert html.endswith("REDIRECT /tuya"), html
+    pince = [d for d in json.load(open("/tuya.json"))["devices"] if d["name"] == "Pince"][0]
+    assert pince["key"] == K["clamp"] and "Puissance B" in pince["sensors"], pince
+    html, _ = page("GET", {})
+    assert "Enregistré : Pince" in html
+    page("POST", {"del": "", "ref": "Cloud double"})
+    assert all(d["name"] != "Cloud double" for d in json.load(open("/tuya.json"))["devices"])
+    html, out = page("POST", {"matter": ""})
+    added = [json.loads(l[10:]) for l in out if l.startswith("MATTERADD ")]
+    names = {a["name"]: a["type"] for a in added}
+    assert names.get("Lampe test") == "v_light2" and names.get("Ventilateur") == "v_fan", names
+    assert names.get("Prise mesure") == "v_relay_power" and "Porche" not in names, names
+    assert html.endswith("REDIRECT /?rst="), html
+    html, _ = page("GET", {})
+    assert "Chaque liaison du driver a son endpoint Matter" in html, html
+    html, _ = page("POST", {"scan": ""})
+    html, _ = page("GET", {})
+    assert "Recherche en cours" in html
+    ok += 1
+    print("OK 18 page web : liste, edition (cle masquee), suppression, endpoints Matter, recherche")
+
     h.close()
-    print("%d/13 scenarios OK" % ok)
+    print("%d/18 scenarios OK" % ok)
 
 
 if __name__ == "__main__":

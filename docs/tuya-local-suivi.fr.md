@@ -14,7 +14,8 @@ Tuya Wi-Fi et les sous-appareils Zigbee de la passerelle Tuya, et les présenter
 |---|---|
 | Crypto Berry : `USE_BERRY_CRYPTO_AES_CBC` + correctif `berry-aes-gcm-128-aad.patch` | ✅ compilé, en service sur la passerelle |
 | Driver `berry/tuya_local.be` : protocoles 3.3 / 3.4 / 3.5, passerelle Tuya (`cid`) | ✅ **testé sur les vrais appareils** : 5 appareils Wi-Fi et 7 sous-appareils connectés, valeurs correctes |
-| Banc de test (13 scénarios) dans le workflow | ✅ passe en CI |
+| Banc de test (18 scénarios) dans le workflow | ✅ passe en local (source et solidifié) |
+| **Configuration simplifiée** : page web `/tuya`, recherche UDP, import `devices.json` et cloud, types déduits des DP, API (`TuyaConfig`, `TuyaAdd`, `TuyaDel`, `TuyaScan`, `TuyaImport`, `TuyaCloud`, `TuyaMatter`) | ✅ banc de test ; ⏳ build, essai sur la passerelle (dont HTTPS vers le cloud Tuya) |
 | **Solidification du driver** (`custom_berry_solidify`, correctif `berry-solidify-all-classes.patch`) | ✅ banc de test : 12/12 sur le driver source **et** sur le driver solidifié ; ✅ build du firmware (2015 Ko) ; ✅ sur la passerelle : **48 Ko libres avec les 12 appareils connectés** (34 Ko avant), le driver consomme ~23 Ko au lieu de ~40 |
 | Documentation utilisateur `docs/tuya-local.fr.md` | ✅ |
 | Chargement différé dans `autoexec.be` (plantage au démarrage) | ✅ corrigé et documenté |
@@ -58,6 +59,25 @@ Tuya Wi-Fi et les sous-appareils Zigbee de la passerelle Tuya, et les présenter
    - **Build** (exécution 11, commit `df4ed7d`) : firmware de 2 063 295 octets (2015 Ko,
      +22,8 Ko), soit exactement la hausse de `.rodata` (676 464 → 699 280 octets). La RAM
      statique ne bouge pas (DRAM 65 948 → 65 980 octets, +32). Il reste ~865 Ko en flash.
+
+8. **Configuration simplifiée** (7 novembre), d'après une évaluation chiffrée faite au
+   préalable (flash 25 à 35 Ko, RAM permanente 1 à 2 Ko, pic de 22 à 28 Ko pour l'import cloud) :
+   - **API** : `TuyaConfig` (sans les clés), `TuyaAdd` (clé `***` conservée), `TuyaDel`,
+     `TuyaStatus <appareil>`, `TuyaSend` par code de DP ; sauvegarde `/tuya.json.bak` ;
+   - **recherche** (`TuyaScan`, classe `TuyaScan` créée à la demande) : annonces UDP 6666 /
+     6667 / 7000 avec la clé fixe `md5("yGAdlopoPVldABfn")`, demande `REQ_DEVINFO` (0x25) pour
+     les 3.5, comme `tinytuya scan` ;
+   - **import** (`TuyaImport`) du `devices.json` de tinytuya, lu par morceaux de 512 octets
+     (objets de plus de 8 Ko ignorés) ; liaisons Matter déduites de la catégorie et des codes de
+     DP ; sous-appareils rattachés à leur passerelle ;
+   - **cloud** (`TuyaCloud`, classe créée à la demande) : signature OpenAPI comme tinytuya, une
+     requête par seconde, refus sous 35 Ko libres (le client HTTPS réserve 16 Ko) ;
+   - **page web** `/tuya` (classe `TuyaWeb`, fonctions statiques) : liste, édition JSON,
+     recherche, imports, création des endpoints Matter puis redémarrage (`bridge_add_endpoint`,
+     API interne de Matter, à surveiller à chaque `TASMOTA_REF`).
+   Banc de test : 18 scénarios, 18/18 en source et en solidifié. Mesure sur le banc (64 bits,
+   à diviser par environ 2 pour l'ESP32) : +0,7 à +1,3 Ko au repos, +4,5 Ko pendant une
+   recherche qui trouve 10 appareils. Driver : ~1700 lignes de code, C solidifié de 507 Ko.
 
 ## Mesures sur la passerelle
 
@@ -148,10 +168,15 @@ endpoints Matter `z_light2` ou `z_light1`.
    - ne garder dans `dps` que les DP utilisés par une liaison ou un capteur (la pince en
      envoie 22, les prises 11) ;
    - limiter `publish_result` (un message MQTT par changement, la pince en envoie souvent).
-4. **Pergola 1 et 2** : les allumer, refaire `tinytuya scan`, renseigner `ip` et `version`,
+4. **Valider la configuration simplifiée** sur la passerelle (après flash) : page
+   Configuration → Tuya local, recherche (les 3 appareils doivent apparaître), `Heap` pendant
+   et après, import du `devices.json` (puis import cloud, qui exerce le HTTPS vers Tuya : à
+   tester avec au moins 35 Ko libres), création des endpoints Matter depuis la page.
+5. **Pergola 1 et 2** : les allumer, lancer la recherche de la page Tuya local (ou `tinytuya scan`),
+   renseigner `ip` et `version`,
    puis retirer `"enabled": false`.
-5. **Migrer Bureau et Salon** sur la ZB-GW03 (procédure dans `docs/tuya-local.fr.md`).
-6. **Fusionner la PR #7** une fois Matter validé, puis créer un tag `v*` pour publier la
+6. **Migrer Bureau et Salon** sur la ZB-GW03 (procédure dans `docs/tuya-local.fr.md`).
+7. **Fusionner la PR #7** une fois Matter validé, puis créer un tag `v*` pour publier la
    release.
 
 ## À vérifier côté passerelle

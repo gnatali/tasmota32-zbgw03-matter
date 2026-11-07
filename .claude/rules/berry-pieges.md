@@ -30,6 +30,11 @@ paths:
   - une directive `#@ solidify:Classe,weak` par classe (`weak` : chaînes hors table globale).
     Le script de Tasmota n'enregistrait que la première : correctif
     `patches/berry-solidify-all-classes.patch`.
+- `webserver.on()` **fait planter l'ESP32** si le serveur web n'est pas encore démarré : le
+  driver ne l'appelle lui-même que si `webserver.state() > 0` (Tasmota n'appelle pas
+  `web_add_handler()` pour un driver ajouté après le démarrage du serveur).
+- Fichier plus gros que la RAM libre (`devices.json` de tinytuya) : le lire par morceaux
+  (`readbytes(512)`, `TuyaImport.each_object`), jamais `read()` d'un bloc.
 - **Ne jamais démarrer le driver directement dans `autoexec.be`** : sans PSRAM, le charger
   pendant le démarrage de Zigbee et Matter fait planter l'ESP32. Après 4 plantages rapides,
   la protection anti-boucle démarre **sans Berry, donc sans Matter**, et **désactive toutes
