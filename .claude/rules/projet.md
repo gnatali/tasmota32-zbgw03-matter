@@ -35,7 +35,7 @@ les mesures faites sur la passerelle et les prochaines étapes sont dans
 | `berry/tuya_local.be` | driver Tuya local (protocoles 3.3/3.4/3.5, passerelle Tuya, pont Matter), solidifié dans le firmware (`custom_berry_solidify`) |
 | `berry/tuya.example.json` | exemple de configuration, **sans clés** |
 | `berry/test/` | banc de test du driver (voir `tests-tuya.md`) |
-| `docs/tuya-local.fr.md` | doc utilisateur du driver |
+| `docs/tuya-local.{fr,en}.md` | doc utilisateur du driver |
 | `docs/tuya-local-examples.{fr,en}.md` | exemples de commandes, événements, règles, scripts Berry |
 | `docs/tuya-local-dev.{fr,en}.md` | documentation technique (architecture, solidification, banc de test, mesures) |
 | `docs/tuya-local-suivi.fr.md` | suivi du chantier Tuya |

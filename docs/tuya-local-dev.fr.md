@@ -304,6 +304,6 @@ la configuration simplifiée ajoute 0,7 à 1,3 Ko au repos.
 | `berry/test/harness.be`, `webserver.be`, `crypto.be` | simulations de Tasmota |
 | `berry/test/fake_tuya.py`, `test_tuya_local.py` | faux appareils, annonces UDP, 19 scénarios |
 | `.github/workflows/build.yml` | fichiers écrits par les tests |
-| `docs/tuya-local.fr.md` | documentation d'utilisation |
+| `docs/tuya-local.fr.md` / `.en.md` | documentation d'utilisation |
 | `docs/tuya-local-examples.fr.md` / `.en.md` | exemples de commandes et d'événements |
 | `docs/tuya-local-suivi.fr.md` | suivi du chantier, mesures |

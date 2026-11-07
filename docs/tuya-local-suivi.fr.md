@@ -92,7 +92,8 @@ Tuya Wi-Fi et les sous-appareils Zigbee de la passerelle Tuya, et les présenter
 10. **Documentation** (7 novembre) : `docs/tuya-local-dev.fr.md` / `.en.md` (documentation
     technique de la session : architecture, solidification, Matter, API, recherche, imports, page
     web, banc de test, mesures) et `docs/tuya-local-examples.fr.md` / `.en.md` (commandes,
-    réponses, événements, règles, scripts Berry), liés depuis les README et la doc d'utilisation.
+    réponses, événements, règles, scripts Berry), liés depuis les README et la doc d'utilisation,
+    elle-même traduite en anglais (`docs/tuya-local.en.md`).
 
 ## Mesures sur la passerelle
 

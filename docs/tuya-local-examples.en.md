@@ -4,8 +4,8 @@
 
 Usage examples for the ZB-GW03 local Tuya driver: commands, responses, events, rules and Berry
 scripts. Ids, addresses and responses are made up but use the driver's exact format; no key
-appears (the driver replaces them with `***`). Details: [tuya-local.fr.md](tuya-local.fr.md)
-(French) and [tuya-local-dev.en.md](tuya-local-dev.en.md).
+appears (the driver replaces them with `***`). Details: [tuya-local.en.md](tuya-local.en.md)
+and [tuya-local-dev.en.md](tuya-local-dev.en.md).
 
 The driver's messages are in French; their meaning is given in the tables below. Device names
 are those of the example installation (they are user-defined).

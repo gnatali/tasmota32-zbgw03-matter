@@ -6,7 +6,7 @@ This document describes what was developed on 6 and 7 November 2026 on the
 `tuya-local-crypto` branch (PR #7): solidification of the driver into the firmware,
 synchronisation with Matter, configuration from the gateway (API, discovery, key import, web
 page), direct links with Zigbee, and the test bench that covers all of it. The user guide is
-[tuya-local.fr.md](tuya-local.fr.md) (French); command and event examples are in
+[tuya-local.en.md](tuya-local.en.md); command and event examples are in
 [tuya-local-examples.en.md](tuya-local-examples.en.md).
 
 The driver's console messages and error messages are in French; their meaning is given in
@@ -301,6 +301,6 @@ simplified configuration adds 0.7 to 1.3 KB at rest.
 | `berry/test/harness.be`, `webserver.be`, `crypto.be` | Tasmota mocks |
 | `berry/test/fake_tuya.py`, `test_tuya_local.py` | fake devices, UDP announcements, 19 scenarios |
 | `.github/workflows/build.yml` | files written by the tests |
-| `docs/tuya-local.fr.md` | user guide (French) |
+| `docs/tuya-local.en.md` / `.fr.md` | user guide |
 | `docs/tuya-local-examples.fr.md` / `.en.md` | command and event examples |
 | `docs/tuya-local-suivi.fr.md` | project tracking, measurements (French) |

@@ -53,7 +53,7 @@ This build starts from the official `tasmota32-zbbrdgpro` environment and change
 | `OTA_URL` | official firmware | latest release of this repository |
 | CC2652P firmware and flasher in the file system | yes | no (useless on the EFR32) |
 | Matter event timestamps (button presses) | seconds, 32 bits | milliseconds, 64 bits, as Matter requires (see [Zigbee button in Google Home](#zigbee-button-in-google-home)) |
-| Berry `AES_CBC` and 128-bit `AES_GCM` with AAD | no | yes, for [local Tuya devices](docs/tuya-local.fr.md) |
+| Berry `AES_CBC` and 128-bit `AES_GCM` with AAD | no | yes, for [local Tuya devices](docs/tuya-local.en.md) |
 
 With Matter, the image is about 2 MB (about 1990 KB). It does not fit in the 1856 KB slot of
 the official layout, hence the **safeboot** layout: `safeboot` 832 KB, `app0` 2880 KB,
@@ -184,7 +184,7 @@ is built into the firmware (solidified: its code stays in flash instead of being
 RAM) and started from `autoexec.be`. The **Configuration → Tuya local** page discovers devices on
 the network, imports their local keys (from tinytuya's `devices.json` or the Tuya cloud), creates
 their Matter endpoints and edits the configuration; the same features are available as commands
-(HTTP, MQTT). See [docs/tuya-local.fr.md](docs/tuya-local.fr.md) (user guide, French),
+(HTTP, MQTT). See [docs/tuya-local.en.md](docs/tuya-local.en.md) (user guide),
 [docs/tuya-local-examples.en.md](docs/tuya-local-examples.en.md) (command, event, rule and script
 examples) and [docs/tuya-local-dev.en.md](docs/tuya-local-dev.en.md) (technical documentation).
 
