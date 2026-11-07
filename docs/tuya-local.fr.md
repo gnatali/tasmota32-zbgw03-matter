@@ -25,6 +25,7 @@ le protocole 3.5).
 - [Créer les endpoints Matter](#créer-les-endpoints-matter)
 - [Fichier de configuration](#fichier-de-configuration)
 - [Commandes](#commandes)
+- [Liens directs avec un bouton Zigbee](#liens-directs-avec-un-bouton-zigbee)
 - [Déplacer des appareils Zigbee sur la ZB-GW03](#déplacer-des-appareils-zigbee-sur-la-zb-gw03)
 - [Limites](#limites)
 - [Tests](#tests)
@@ -211,7 +212,7 @@ La signification des DP de chaque appareil se trouve dans `mapping` de `devices.
 | Commande | Effet |
 |---|---|
 | `TuyaStatus [appareil]` | État des connexions et dernières valeurs de chaque appareil (ou d'un seul) |
-| `TuyaSend <appareil>,<dp>,<valeur>` | Envoie une valeur, par exemple `TuyaSend Ventilateur,60,true` ou `TuyaSend Ventilateur,62,3`. Le DP peut aussi être un code (`TuyaSend Lampe,switch_led,true`) si l'appareil a une table `codes` (import) |
+| `TuyaSend <appareil>,<dp>,<valeur>` | Envoie une valeur, par exemple `TuyaSend Ventilateur,60,true` ou `TuyaSend Ventilateur,62,3`. Le DP peut aussi être un code (`TuyaSend Lampe,switch_led,true`) si l'appareil a une table `codes` (import). `toggle` inverse un DP booléen : `TuyaSend Entrée-Porche,20,toggle` |
 | `TuyaReload` | Relit `tuya.json` et reconnecte les appareils |
 | `TuyaConfig [appareil]` | Configuration (`tuya.json`) **sans les clés**, ou celle d'un appareil |
 | `TuyaAdd <json>` | Ajoute ou remplace un appareil (même format qu'une entrée de `devices`) ; `"key":"***"` ou sans clé : clé conservée |
@@ -228,6 +229,32 @@ JSON (`{"TuyaAdd":"Lampe"}`, ou `{"TuyaAdd":{"Error":"..."}}`).
 
 Chaque changement d'état est publié sur `stat/<topic>/RESULT` :
 `{"Tuya":{"Name":"Ventilateur","Dps":{"62":3}}}`. Les règles peuvent s'en servir.
+
+## Liens directs avec un bouton Zigbee
+
+Une règle Tasmota relie un appareil Zigbee de la ZB-GW03 à un appareil Tuya, **localement** :
+sans Google Home, sans cloud ni internet. Exemple avec le bouton Sonoff SNZB-01P `0x922D`
+(`Power` 2 : appui simple, 1 : double appui, 0 : appui long) :
+
+```
+Rule2 on ZbReceived#0x922D#Power=2 do TuyaSend Entrée-Porche,20,toggle endon on ZbReceived#0x922D#Power=1 do TuyaSend Ventilateur,20,toggle endon on ZbReceived#0x922D#Power=0 do TuyaSend Récepteur radio,1,toggle endon
+Rule2 1
+```
+
+- Appui simple : lumière Entrée-Porche ; double appui : lumière du ventilateur ; appui long :
+  canal 1 du récepteur radio. Le nom est celui de l'appareil dans `tuya.json` (pas celui de
+  l'endpoint Matter), le numéro celui du DP.
+- `toggle` part de l'état connu du driver : il faut que l'appareil soit connecté et ait déjà
+  envoyé cet état (`TuyaStatus <appareil>`).
+- Un même bouton peut servir à plusieurs règles : `Rule1` (bouton virtuel Matter « Perron »
+  pour Google Home) et `Rule2` se déclenchent toutes les deux. Attention à ne pas créer aussi,
+  dans Google Home, une automatisation qui agit sur la même lumière : les deux actions
+  s'annuleraient.
+- Interrupteur à deux positions : `TuyaSend <appareil>,<dp>,true` et `false` au lieu de `toggle`.
+
+Dans l'autre sens, chaque changement d'état d'un appareil Tuya déclenche les règles
+(`{"Tuya":{"Name":...,"Dps":{...}}}`) ; pour filtrer sur le nom de l'appareil, une règle Berry
+(`tasmota.add_rule("Tuya", ...)` dans `autoexec.be`) est plus sûre qu'une règle Tasmota.
 
 ## Déplacer des appareils Zigbee sur la ZB-GW03
 
@@ -263,10 +290,10 @@ Il n'apparaît plus dans Smart Life, et le retirer de `tuya.json` s'il y figurai
 ## Tests
 
 `berry/test/run_tests.sh <dépôt Tasmota>` compile l'interpréteur Berry de Tasmota avec le
-chiffrement BearSSL de Tasmota, et joue 18 scénarios contre de faux appareils Tuya construits
+chiffrement BearSSL de Tasmota, et joue 19 scénarios contre de faux appareils Tuya construits
 sur [TinyTuya](https://github.com/jasonacox/tinytuya) (3.3, 3.4, 3.5, passerelle Zigbee) :
 négociation de clé, commandes Matter, retours d'état, mesures, coupure et reconnexion, trames
 corrompues ou fragmentées, endpoint Matter créé à chaud, API, recherche (annonces au format
 TinyTuya), import `devices.json`, import cloud (signature comparée à celle de TinyTuya) et page
-web. Le workflow **Build firmware** les lance
+web, `toggle`. Le workflow **Build firmware** les lance
 avant chaque compilation, sur le driver source puis sur le driver solidifié.

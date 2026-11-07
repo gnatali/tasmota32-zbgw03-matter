@@ -551,8 +551,20 @@ def main():
     ok += 1
     print("OK 18 page web : liste, edition (cle masquee), suppression, endpoints Matter, recherche")
 
+    # 19. TuyaSend toggle (bouton Zigbee -> lumiere Tuya) : inverse l'etat connu d'un DP booleen
+    lampdev = DEVS["10.0.0.50"]
+    before = lampdev.dps["20"]
+    h.pump(h.send("CMD TuyaSend Lampe test,20,toggle"))
+    assert lampdev.dps["20"] is (not before), lampdev.dps
+    h.pump(h.send("CMD TuyaSend Lampe test,switch_led,TOGGLE"))
+    assert lampdev.dps["20"] is before, lampdev.dps
+    assert "non booleen" in h.send("CMD TuyaSend Lampe test,22,toggle")[-1]
+    assert "inconnu" in h.send("CMD TuyaSend Lampe test,99,toggle")[-1]
+    ok += 1
+    print("OK 19 TuyaSend toggle : inversion d'un DP booleen, refus sinon")
+
     h.close()
-    print("%d/18 scenarios OK" % ok)
+    print("%d/19 scenarios OK" % ok)
 
 
 if __name__ == "__main__":

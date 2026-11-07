@@ -20,7 +20,7 @@ bash berry/test/run_tests.sh tasmota     # ecrit /tuya.json, /tuya.json.bak, /de
   `tcpclientasync`, `udp`, `webclient` (cloud) et `matter_device`, piloté par
   `test_tuya_local.py` ligne à ligne. Le test écrit `/tuya.json`, `/tuya.json.bak` et
   `/devices.json`.
-- Les 18 scénarios sont joués **deux fois** : driver source (compilé par le harnais en mode
+- Les 19 scénarios sont joués **deux fois** : driver source (compilé par le harnais en mode
   strict), puis driver **solidifié** comme au build (port Python de Berry `berry_port`, table
   des chaînes `coc`, classes natives en lecture seule liées dans un second interpréteur).
   Une erreur de solidification ou une écriture dans une `static var` y apparaît sans attendre

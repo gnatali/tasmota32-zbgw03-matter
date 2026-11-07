@@ -8,7 +8,7 @@
 
   Configuration : fichier /tuya.json (voir tuya.example.json et docs/tuya-local.fr.md), ou
   page web Configuration -> Tuya local (/tuya)
-  Commandes : TuyaStatus [appareil], TuyaSend <appareil>,<dp ou code>,<valeur>, TuyaReload,
+  Commandes : TuyaStatus [appareil], TuyaSend <appareil>,<dp ou code>,<valeur|toggle>, TuyaReload,
     TuyaConfig [appareil], TuyaAdd <json>, TuyaDel <appareil>, TuyaScan [s],
     TuyaImport [fichier] [all|id,...], TuyaCloud <json>, TuyaMatter
 
@@ -2010,12 +2010,12 @@ class TuyaLocal
     return nil
   end
 
-  # TuyaSend <appareil>,<dp ou code>,<valeur JSON>   ex : TuyaSend Ventilateur,60,true
+  # TuyaSend <appareil>,<dp ou code>,<valeur JSON | toggle>   ex : TuyaSend Ventilateur,60,true
   def cmd_send(payload)
     import string
     import json
     var a = string.split(payload, ",", 2)
-    if size(a) < 3  return tasmota.resp_cmnd_str("Syntaxe : TuyaSend <appareil>,<dp ou code>,<valeur>")  end
+    if size(a) < 3  return tasmota.resp_cmnd_str("Syntaxe : TuyaSend <appareil>,<dp ou code>,<valeur|toggle>")  end
     var n = self.find_node(self.trim(a[0]))
     if n == nil  return tasmota.resp_cmnd_str("Appareil inconnu")  end
     var v = json.load(a[2])
@@ -2026,6 +2026,13 @@ class TuyaLocal
       var c = (n.codes != nil) ? n.codes.find(dp) : nil
       if c == nil  return tasmota.resp_cmnd_str("DP inconnu : " + dp)  end
       num = int(c)
+    end
+    if string.tolower(self.trim(a[2])) == "toggle"   # inverse un DP booleen (bouton Zigbee...)
+      var cur = n.dps.find(str(num))
+      if type(cur) != 'bool'
+        return tasmota.resp_cmnd_str(cur == nil ? "toggle : etat du DP inconnu" : "toggle : DP non booleen")
+      end
+      v = !cur
     end
     var dps = {}
     dps[str(num)] = v
