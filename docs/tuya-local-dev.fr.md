@@ -282,8 +282,10 @@ la configuration simplifiée ajoute 0,7 à 1,3 Ko au repos.
 
 ## 12. Limites et points ouverts
 
-- **HTTPS vers le cloud Tuya** : testé seulement en simulation (signature conforme à
-  TinyTuya) ; à valider sur la passerelle avec au moins 35 Ko libres.
+- **HTTPS vers le cloud Tuya** : signature conforme à TinyTuya et vérifiée contre le vrai
+  cloud (jeton, détails, spécifications) ; les vraies réponses sont lues par `json.load` grâce
+  à `TuyaCloud.quote_big` (horodatage `"t"` en ms, trop grand pour les entiers 32 bits de
+  Berry). Reste à valider sur la passerelle (TLS, au moins 35 Ko libres).
 - `bridge_add_endpoint()` est une API interne de Matter : à vérifier à chaque changement de
   `TASMOTA_REF`.
 - La commande `TuyaCloud` est journalisée par la console web, secret compris : préférer la page.

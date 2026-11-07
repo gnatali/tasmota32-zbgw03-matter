@@ -95,6 +95,16 @@ Tuya Wi-Fi et les sous-appareils Zigbee de la passerelle Tuya, et les présenter
     réponses, événements, règles, scripts Berry), liés depuis les README et la doc d'utilisation,
     elle-même traduite en anglais (`docs/tuya-local.en.md`).
 
+11. **Import cloud : `{"Error":"cloud Tuya : reponse invalide"}`** (7 novembre, sur la
+    passerelle) : toute réponse de l'OpenAPI se termine par `"t":<heure en ms>` (13 chiffres),
+    qui dépasse les entiers 32 bits de Berry ; `json.load` renvoie alors `nil` pour tout le
+    document, dès la demande de jeton. Le banc de test ne le voyait pas (fausses réponses sans
+    `"t"`). Correctif : `TuyaCloud.quote_big` met entre guillemets les entiers de plus de
+    9 chiffres avant `json.load`. Vérifié dans le conteneur avec le compte de Guillaume :
+    signature acceptée, 33 vraies réponses lues (16 appareils, 16 clés, 150 DP ; la passerelle
+    Tuya répond `not support this device` aux spécifications, ce qui est normal). Scénario 17
+    complété (il échoue sans le correctif). Build : à lancer, puis à flasher.
+
 ## Mesures sur la passerelle
 
 | Situation | `Heap` (`Status 4`) |

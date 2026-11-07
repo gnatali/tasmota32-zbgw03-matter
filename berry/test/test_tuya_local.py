@@ -480,12 +480,14 @@ def main():
 
     # 17. import par le cloud Tuya : signature identique a TinyTuya, cle et DP recuperes, garde memoire
     cloud_id = "cloudsw0000000000000"
-    h.send('HTTPSRESP /v1.0/token?grant_type=1 200 {"success":true,"result":{"access_token":"tok123","expire_time":7200}}')
+    # vraies reponses : "t" en ms depasse les entiers 32 bits de Berry (json.load -> nil sans quote_big)
+    h.send('HTTPSRESP /v1.0/token?grant_type=1 200 {"success":true,"result":{"access_token":"tok123","expire_time":7200},'
+           '"t":1794092132086,"tid":"0123456789abcdef"}')
     h.send('HTTPSRESP /v1.0/devices/%s 200 {"success":true,"result":{"id":"%s","name":"Cloud double",'
-           '"local_key":"cLoUd-KeY-000004","category":"kg"}}' % (cloud_id, cloud_id))
+           '"local_key":"cLoUd-KeY-000004","category":"kg","update_time":1794051789},"t":1794092132587}' % (cloud_id, cloud_id))
     h.send('HTTPSRESP /v1.1/devices/%s/specifications 200 {"success":true,"result":{"category":"kg","functions":'
            '[{"code":"switch_1","dp_id":1,"type":"Boolean","values":"{}"},{"code":"switch_2","dp_id":2,'
-           '"type":"Boolean","values":"{}"}],"status":[]}}' % cloud_id)
+           '"type":"Boolean","values":"{}"}],"status":[]},"t":1794092133494}' % cloud_id)
     creds = {"region": "eu", "id": "AcCeSsId0123", "secret": "s3cr3t-s3cr3t", "devices": [cloud_id]}
     h.send("HEAP 30")
     assert "memoire" in resp(h.send("CMD TuyaCloud " + json.dumps(creds)), "TuyaCloud")["Error"]
@@ -506,13 +508,13 @@ def main():
     assert pub and pub[-1]["Added"] == ["Cloud double"], pub
     cd = [d for d in json.load(open("/tuya.json"))["devices"] if d["id"] == cloud_id][0]
     assert cd["key"] == "cLoUd-KeY-000004" and cd["enabled"] is False and len(cd["matter"]) == 2, cd
-    h.send('HTTPSRESP /v1.0/token?grant_type=1 200 {"success":false,"code":1004,"msg":"sign invalid"}')
+    h.send('HTTPSRESP /v1.0/token?grant_type=1 200 {"success":false,"code":1004,"msg":"sign invalid","t":1794092134511}')
     out = h.send("CMD TuyaCloud " + json.dumps(creds))
     out += h.pump(h.send("ADV 1000"))
     err = [json.loads(l[4:])["TuyaCloud"] for l in out if l.startswith("PUB ") and "TuyaCloud" in l]
     assert err and "sign invalid" in err[-1]["Error"], out
     ok += 1
-    print("OK 17 import cloud : signature conforme a TinyTuya, cle et DP, erreurs et garde memoire")
+    print("OK 17 import cloud : signature conforme a TinyTuya, horodatage 64 bits, cle et DP, erreurs et garde memoire")
 
     # 18. page web : liste, edition (cle masquee puis conservee), suppression, endpoints Matter
     def page(method, args):

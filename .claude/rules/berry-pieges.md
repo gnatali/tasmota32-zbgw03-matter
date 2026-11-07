@@ -12,7 +12,9 @@ paths:
   globale. Le banc de test compile le driver source en mode strict.
 - Entiers sur **32 bits** et flottants en **simple précision** : un compteur d'énergie
   divisé en flottant perd des décimales. Le driver formate les mesures en décimal exact à
-  partir de l'entier (`TuyaLocal.scaled`).
+  partir de l'entier (`TuyaLocal.scaled`). `json.load` renvoie **`nil` pour tout le
+  document** dès qu'un entier dépasse 2 147 483 647 (ex. `"t"` en ms des réponses du cloud
+  Tuya) : `TuyaCloud.quote_big` les met entre guillemets avant. Le banc de test a la même limite.
 - `bytes .. bytes` **ajoute en place** et modifie l'opérande de gauche ; `+` crée un nouvel
   objet.
 - Dans une f-string, pas d'opérateur `!=` ou `=` entre accolades (`{x=}` sert au débogage) :

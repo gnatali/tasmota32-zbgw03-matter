@@ -1235,6 +1235,31 @@ class TuyaCloud
     return str(u) + "000"
   end
 
+  # entiers de plus de 9 chiffres -> chaines. Toute reponse du cloud porte l'heure en ms
+  # ("t":1794092132086), qui depasse les entiers 32 bits de Berry : json.load renverrait nil.
+  # Seules les valeurs d'une cle ("cle":123...) sont touchees, pas le JSON echappe des "values".
+  static def quote_big(s)
+    import string
+    var out = []
+    var p = 0
+    var n = size(s)
+    var i = string.find(s, "\":")
+    while i >= 0
+      var j = i + 2
+      var k = (j < n && s[j] == "-") ? j + 1 : j
+      while k < n && s[k] >= "0" && s[k] <= "9"  k += 1  end
+      if k - j > 9 && (i == 0 || s[i - 1] != "\\")
+        out.push(s[p .. j - 1])
+        out.push("\"" + s[j .. k - 1] + "\"")
+        p = k
+      end
+      i = string.find(s, "\":", k)
+    end
+    if p == 0  return s  end
+    out.push(s[p ..])
+    return out.concat()
+  end
+
   def request(path)
     import json
     var t = TuyaCloud.now_ms()
@@ -1254,7 +1279,8 @@ class TuyaCloud
     var s = (code == 200) ? wc.get_string() : nil
     wc.close()
     if s == nil  raise "tuya_error", f"cloud Tuya : HTTP {code}"  end
-    var m = json.load(s)
+    var m = json.load(TuyaCloud.quote_big(s))
+    s = nil
     if m == nil || m.find("success") != true
       var why = (m != nil) ? m.find("msg", m.find("code")) : "reponse invalide"
       raise "tuya_error", f"cloud Tuya : {why}"

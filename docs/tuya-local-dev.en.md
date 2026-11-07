@@ -279,8 +279,10 @@ simplified configuration adds 0.7 to 1.3 KB at rest.
 
 ## 12. Limitations and open points
 
-- **HTTPS to the Tuya cloud**: only tested in simulation (signature identical to TinyTuya's);
-  to be validated on the gateway with at least 35 KB free.
+- **HTTPS to the Tuya cloud**: signature identical to TinyTuya's and checked against the real
+  cloud (token, details, specifications); real responses are read by `json.load` thanks to
+  `TuyaCloud.quote_big` (the `"t"` timestamp in ms is too large for Berry's 32-bit integers).
+  Still to be validated on the gateway (TLS, at least 35 KB free).
 - `bridge_add_endpoint()` is an internal Matter API: to be checked whenever `TASMOTA_REF`
   changes.
 - The `TuyaCloud` command is logged by the web console, secret included: prefer the web page.
