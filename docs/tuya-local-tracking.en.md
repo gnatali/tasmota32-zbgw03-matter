@@ -133,6 +133,17 @@ Wi-Fi devices and the Zigbee sub-devices of the Tuya gateway, and expose them to
     `project.md`, `berry-pitfalls.md`. No functional change (20/20 in both modes); **no
     build**.
 
+15. **Matter endpoint list with checkboxes** (8 November): on the gateway, the section listed
+    the missing endpoints as plain text, and created all of them at once. It is now a table
+    like the device list: one row per binding, ✅ and the endpoint number when it exists, a
+    checkbox when it is missing (header checkbox for all); **➕ Create and restart** creates
+    the ticked ones only (nothing ticked: refused). `TuyaMatter [name,name]` does the same by
+    command. Scenario 18 extended (20/20 in both modes), page checked at 340 px. **No build**.
+    **To check**: Guillaume's screenshot listed as missing endpoints that already existed in
+    Configuration → Matter (`Entrée-Porche`, `Ventilateur`, `Récepteur radio 1` to `4`...): the
+    new list shows each endpoint's number when it is found, which will show whether the
+    driver reads Matter's configuration correctly on the gateway.
+
 ## Measurements on the gateway
 
 | Situation | `Heap` (`Status 4`) |

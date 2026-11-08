@@ -217,8 +217,12 @@ Ported from `tinytuya.Cloud` (`Cloud.py`):
   as they are what Google Home shows.
 - `TuyaWeb.post()`: `save`, `del`, `reload`, `scan`, `import`, `cloud`, `matter` actions, then a
   redirect to `/tuya` (or `/?rst=` to restart after creating endpoints).
-- Matter endpoints: `matter_missing()` compares the binding names with those of
-  `matter_device.plugins_config`; `matter_create()` calls
+- Matter endpoints: `matter_names()` reads `matter_device.plugins_config` (lower-case name →
+  endpoint number); `matter_status()` gives each binding (one per endpoint name) with its
+  endpoint number or `nil`, which the page lists; `matter_missing()` keeps the `nil` ones. The
+  page names the missing ones' checkboxes `m0`, `m1`... (value: endpoint name), and the post
+  passes the ticked names to `matter_create(only)` (`nil`: all of them, as `TuyaMatter`
+  without argument), which calls
   `matter_device.bridge_add_endpoint(<v_... type>, {"name": <ep>})` (Matter's internal API, the
   one its own configuration page uses).
 
@@ -258,7 +262,7 @@ announcements (`udp_broadcast()`, checked with `decrypt_udp()`) are built with T
 | 15 | discovery: 3.1 / 3.3 / 3.5 announcements, 3.5 request, ignored packets, memory guard |
 | 16 | `devices.json` import: selection, deduced types, sub-device, object too big, `all` |
 | 17 | cloud import: signature identical to TinyTuya's, key and DPs, cloud error, memory guard |
-| 18 | web page: list, editing (masked key then kept), deletion, Matter endpoints, discovery |
+| 18 | web page: list, editing (masked key then kept), deletion, Matter endpoint list (✅ and number, checkboxes), creation of a selection only, none ticked refused, `TuyaMatter <names>`, discovery |
 | 19 | `TuyaSend ... toggle` |
 | 20 | saved cloud credentials: page checkbox, secret never shown, `TuyaCloud` without argument, erasing |
 

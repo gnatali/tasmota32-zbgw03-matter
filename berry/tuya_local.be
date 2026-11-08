@@ -10,7 +10,7 @@
   Configuration -> Tuya Local web page (/tuya)
   Commands: TuyaStatus [device], TuyaSend <device>,<dp or code>,<value|toggle>, TuyaReload,
     TuyaConfig [device], TuyaAdd <json>, TuyaDel <device>, TuyaScan [s],
-    TuyaImport [file] [all|id,...], TuyaCloud [json], TuyaMatter
+    TuyaImport [file] [all|id,...], TuyaCloud [json], TuyaMatter [name,...]
 
   Requires a firmware with USE_BERRY_CRYPTO_AES_CBC (3.3, 3.4) and the 128-bit AES_GCM with
   AAD patch (3.5).
@@ -1453,20 +1453,43 @@ class TuyaWeb
     webserver.content_send("<p></p><form action='/tuya' method='get'><button>&#x21A9; Back</button></form></fieldset><p></p>")
   end
 
+  # one row per binding, like the device list: created endpoint (number) or checkbox to create it
   static def matter(drv)
     import webserver
     TuyaWeb.legend("Matter endpoints")
-    var miss = drv.matter_missing()
-    if miss == nil
+    var rows = drv.matter_status()
+    if rows == nil
       TuyaWeb.p("&#x26A0; Matter is not enabled.")
-    elif size(miss) == 0
-      TuyaWeb.p("&#x2705; Every binding has its Matter endpoint.")
+    elif size(rows) == 0
+      TuyaWeb.p("No binding: add Tuya devices first.")
     else
-      var l = []
-      for b: miss  l.push(TuyaWeb.esc(b.ep) + " <small>(" + TuyaImport.MATTER_TYPES.find(b.type, "?") + ")</small>")  end
-      TuyaWeb.p("&#x26A0; Missing Matter endpoints: " + l.concat(", "))
-      webserver.content_send("<form action='/tuya' method='post' onsubmit='return confirm(\"Create the endpoints and restart?\")'>" +
-                             "<button name='matter' class='button bgrn'>&#x2795; Create endpoints and restart</button></form>")
+      var nmiss = 0
+      for r: rows
+        if r[1] == nil  nmiss += 1  end
+      end
+      var all = (nmiss > 1) ? "<input type='checkbox' title='all' onclick='for(var c of this.form.querySelectorAll(\"input[name^=m]\"))c.checked=this.checked'>" : ""
+      webserver.content_send("<form action='/tuya' method='post' onsubmit='return confirm(\"Create the selected endpoints and restart?\")'>" +
+                             "<table style='width:100%'>" + TuyaWeb.th([[all, 20], ["Endpoint", 150], ["Type", 90], ["#", 25]]))
+      var i = 0
+      for r: rows
+        var b = r[0]
+        var cell = "<span title='created'>&#x2705;</span>"
+        if r[1] == nil
+          cell = "<input type='checkbox' name='m" + str(i) + "' value='" + TuyaWeb.esc(b.ep) + "'>"
+          i += 1
+        end
+        webserver.content_send("<tr><td>" + cell + "</td><td>" + TuyaWeb.esc(b.ep) + "</td><td style='font-size:smaller;'>" +
+                               TuyaImport.MATTER_TYPES.find(b.type, "?") + "</td><td style='font-size:smaller;'>" +
+                               (r[1] != nil ? str(r[1]) : "") + "</td></tr>")
+      end
+      webserver.content_send("</table>")
+      if nmiss > 0
+        TuyaWeb.p("&#x26A0; " + str(nmiss) + " missing: tick the endpoints to create.")
+        webserver.content_send("<button name='matter' class='button bgrn'>&#x2795; Create and restart</button>")
+      else
+        TuyaWeb.p("&#x2705; Every binding has its Matter endpoint.")
+      end
+      webserver.content_send("</form>")
     end
     webserver.content_send("</fieldset><p></p>")
   end
@@ -1550,7 +1573,16 @@ class TuyaWeb
         msg = drv.cloud_start({"region": webserver.arg("region"), "id": webserver.arg("cid"),
                                "secret": webserver.arg("secret"), "save": webserver.has_arg("keep")})
       elif webserver.has_arg("matter")
-        var added = drv.matter_create()
+        var sel = []
+        var miss = drv.matter_missing()
+        var n = (miss != nil) ? size(miss) : 0
+        var i = 0
+        while i < n
+          if webserver.has_arg("m" + str(i))  sel.push(webserver.arg("m" + str(i)))  end
+          i += 1
+        end
+        if size(sel) == 0  raise "tuya_error", "no endpoint selected"  end
+        var added = drv.matter_create(sel)
         msg = "Matter endpoints created: " + str(size(added)) + ", restarting"
         rst = size(added) > 0
       end
@@ -1599,7 +1631,7 @@ class TuyaLocal
     tasmota.add_cmd("TuyaScan", /c, i, p -> self.run_cmd("TuyaScan", / -> self.start_scan(int(p) > 0 ? int(p) : 20)))
     tasmota.add_cmd("TuyaImport", /c, i, p -> self.run_cmd("TuyaImport", / -> self.import_args(p)))
     tasmota.add_cmd("TuyaCloud", /c, i, p -> self.run_cmd("TuyaCloud", / -> self.cloud_json(p)))
-    tasmota.add_cmd("TuyaMatter", /c, i, p -> self.run_cmd("TuyaMatter", / -> self.matter_cmd()))
+    tasmota.add_cmd("TuyaMatter", /c, i, p -> self.run_cmd("TuyaMatter", / -> self.matter_cmd(p)))
     # web page: the driver starts after the web server, which therefore does not call web_add_handler()
     import webserver
     if webserver.state() > 0  self.web_add_handler()  end
@@ -1974,40 +2006,70 @@ class TuyaLocal
   end
 
   ###################### Matter endpoints ######################
-  # bindings without a Matter endpoint of the same name; nil if Matter is not enabled
-  def matter_missing()
+  # Matter endpoints by name: {lower-case name: endpoint number (string)}; nil if Matter is not
+  # enabled
+  def matter_names()
     import global
     import string
     if !global.contains("matter_device")  return nil  end
     var md = global.matter_device
     if md == nil || md.plugins_config == nil  return nil  end
     var names = {}
-    for c: md.plugins_config
-      var n = c.find("name")
-      if n != nil  names[string.tolower(n)] = true  end
+    for k: md.plugins_config.keys()
+      var c = md.plugins_config[k]
+      var n = (type(c) == 'instance') ? c.find("name") : nil
+      if n != nil  names[string.tolower(str(n))] = str(k)  end
     end
-    var miss = []
+    return names
+  end
+
+  # each binding (one per endpoint name) with its Matter endpoint number, nil if missing:
+  # [[TuyaBinding, "6" or nil], ...]; nil if Matter is not enabled
+  def matter_status()
+    import string
+    var names = self.matter_names()
+    if names == nil  return nil  end
+    var seen = {}
+    var rows = []
     for d: self.devices
       for n: d.nodes()
         for b: n.bindings
           var k = string.tolower(b.ep)
-          if !names.contains(k)
-            miss.push(b)
-            names[k] = true
-          end
+          if seen.contains(k)  continue  end
+          seen[k] = true
+          rows.push([b, names.find(k)])
         end
       end
+    end
+    return rows
+  end
+
+  # bindings without a Matter endpoint of the same name; nil if Matter is not enabled
+  def matter_missing()
+    var rows = self.matter_status()
+    if rows == nil  return nil  end
+    var miss = []
+    for r: rows
+      if r[1] == nil  miss.push(r[0])  end
     end
     return miss
   end
 
-  # creates the missing virtual Matter endpoints -> created names (then Restart 1 for Google Home)
-  def matter_create()
+  # creates the missing virtual Matter endpoints, all of them or only those named in `only`
+  # (list of names, case-insensitive) -> created names (then Restart 1 for Google Home)
+  def matter_create(only)
     import global
+    import string
     var miss = self.matter_missing()
     if miss == nil  raise "tuya_error", "Matter is not enabled"  end
+    var want = nil
+    if only != nil
+      want = {}
+      for n: only  want[string.tolower(self.trim(str(n)))] = true  end
+    end
     var added = []
     for b: miss
+      if want != nil && !want.contains(string.tolower(b.ep))  continue  end
       var t = TuyaImport.MATTER_TYPES.find(b.type)
       if t == nil  continue  end
       if global.matter_device.bridge_add_endpoint(t, {"name": b.ep}) != nil  added.push(b.ep)  end
@@ -2015,8 +2077,11 @@ class TuyaLocal
     return added
   end
 
-  def matter_cmd()
-    var added = self.matter_create()
+  # TuyaMatter [name,name...]: all the missing endpoints, or only those
+  def matter_cmd(p)
+    import string
+    var s = self.trim(str(p != nil ? p : ""))
+    var added = self.matter_create(s == "" ? nil : string.split(s, ","))
     return {"Added": added, "Restart": size(added) > 0 ? "Restart 1 so that Google Home sees them" : ""}
   end
 

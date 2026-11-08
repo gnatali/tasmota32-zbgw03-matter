@@ -143,9 +143,11 @@ nouveau). La passerelle et les
   la table `codes` de ses DP. Un appareil déjà configuré garde ses liaisons : seules sa clé, son
   IP et sa version sont mises à jour. Un appareil sans IP connue est ajouté avec
   `"enabled": false`.
-- **Matter endpoints** : liste les liaisons sans endpoint Matter du même nom. **➕ Create
-  endpoints and restart** les crée (types du tableau ci-dessous) puis redémarre Tasmota, ce qui
-  est nécessaire pour Google Home.
+- **Matter endpoints** : une ligne par liaison, comme la liste des appareils : nom de
+  l'endpoint, type Matter et, si l'endpoint existe (même nom, sans tenir compte de la casse), ✅
+  et son numéro. Un endpoint manquant a une case à cocher (la case de l'en-tête les coche
+  toutes). **➕ Create and restart** crée seulement les endpoints cochés (types du tableau
+  ci-dessous), puis redémarre Tasmota, ce qui est nécessaire pour Google Home.
 
 ## Créer les endpoints Matter
 
@@ -235,7 +237,7 @@ La signification des DP de chaque appareil se trouve dans `mapping` de `devices.
 | `TuyaScan [secondes]` | Recherche sur le réseau (20 s par défaut, 60 au plus) ; résultat publié à la fin : `{"TuyaScan":{"Devices":[...]}}` |
 | `TuyaImport [fichier] [all\|id,id]` | Importe le `devices.json` de tinytuya (`/devices.json` par défaut) |
 | `TuyaCloud [json]` | Import depuis le cloud : `{"region":"eu","id":"<Access ID>","secret":"<Access Secret>"}` (et `"devices":[...]` pour choisir les identifiants, `"save":true` pour enregistrer les identifiants, `"save":false` pour les effacer) ; sans argument, identifiants enregistrés ; résultat publié à la fin. **La console web journalise la commande, secret compris** : préférer la page web, ou `TuyaCloud` sans argument une fois les identifiants enregistrés |
-| `TuyaMatter` | Crée les endpoints Matter manquants (puis `Restart 1`) |
+| `TuyaMatter [nom,nom]` | Crée les endpoints Matter manquants, tous ou seulement ceux nommés (sans tenir compte de la casse), puis `Restart 1` |
 
 Ces commandes forment l'**API de pilotage à distance** : en HTTP
 (`http://<passerelle>/cm?cmnd=TuyaSend%20Ventilateur,60,true`, avec `&user=admin&password=...`

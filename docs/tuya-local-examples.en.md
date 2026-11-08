@@ -198,10 +198,12 @@ Other errors: `"not enough free memory: 30 KB, 35 KB needed"`,
 
 ## 6. Matter
 
-**Create the missing Matter endpoints** (one per `matter` binding, of the matching type):
+**Create the missing Matter endpoints** (one per `matter` binding, of the matching type), all
+of them or only those named (case-insensitive):
 
 ```
 TuyaMatter
+TuyaMatter Lampe bureau,Ventilateur
 ```
 ```json
 {"TuyaMatter":{"Added":["Lampe bureau"],"Restart":"Restart 1 so that Google Home sees them"}}

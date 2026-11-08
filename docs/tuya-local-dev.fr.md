@@ -220,8 +220,12 @@ Reprise de `tinytuya.Cloud` (`Cloud.py`) :
   (`Lumière <nom>`, `<nom> humidité`), car ce sont ceux que Google Home affiche.
 - `TuyaWeb.post()` : actions `save`, `del`, `reload`, `scan`, `import`, `cloud`, `matter`, puis
   redirection vers `/tuya` (ou `/?rst=` pour redémarrer après la création d'endpoints).
-- Endpoints Matter : `matter_missing()` compare les noms des liaisons à ceux de
-  `matter_device.plugins_config` ; `matter_create()` appelle
+- Endpoints Matter : `matter_names()` lit `matter_device.plugins_config` (nom en minuscules →
+  numéro d'endpoint) ; `matter_status()` donne chaque liaison (une par nom d'endpoint) avec son
+  numéro d'endpoint ou `nil`, que la page liste ; `matter_missing()` garde les `nil`. La page
+  nomme les cases des manquants `m0`, `m1`... (valeur : nom de l'endpoint), et le formulaire
+  passe les noms cochés à `matter_create(only)` (`nil` : tous, comme `TuyaMatter` sans
+  argument), qui appelle
   `matter_device.bridge_add_endpoint(<type v_...>, {"name": <ep>})` (API interne de Matter, celle
   de sa propre page de configuration).
 
@@ -262,7 +266,7 @@ appareils (`fake_tuya.py`) et les annonces UDP (`udp_broadcast()`, vérifiées p
 | 15 | recherche : annonces 3.1 / 3.3 / 3.5, demande 3.5, paquets ignorés, garde mémoire |
 | 16 | import `devices.json` : sélection, types déduits, sous-appareil, objet trop gros, `all` |
 | 17 | import cloud : signature identique à TinyTuya, clé et DP, erreur du cloud, garde mémoire |
-| 18 | page web : liste, édition (clé masquée puis conservée), suppression, endpoints Matter, recherche |
+| 18 | page web : liste, édition (clé masquée puis conservée), suppression, liste des endpoints Matter (✅ et numéro, cases à cocher), création d'une sélection seulement, refus sans case cochée, `TuyaMatter <noms>`, recherche |
 | 19 | `TuyaSend ... toggle` |
 | 20 | identifiants du cloud enregistrés : case de la page, secret jamais affiché, `TuyaCloud` sans argument, effacement |
 

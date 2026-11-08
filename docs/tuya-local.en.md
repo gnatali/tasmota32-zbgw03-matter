@@ -141,9 +141,11 @@ again and update `tuya.json`.
   metering, multi-gang switches, temperature and humidity sensor, energy meter) and the `codes`
   table of its DPs. An already configured device keeps its bindings: only its key, IP and
   version are updated. A device without a known IP is added with `"enabled": false`.
-- **Matter endpoints**: lists the bindings that have no Matter endpoint with the same name.
-  **➕ Create endpoints and restart** creates them
-  (types in the table below) then restarts Tasmota, which Google Home needs.
+- **Matter endpoints**: one row per binding, like the device list: endpoint name, Matter type
+  and, when the endpoint exists (same name, case-insensitive), ✅ and its number. A missing
+  endpoint has a checkbox (the header checkbox ticks them all). **➕ Create and restart**
+  creates the ticked endpoints only (types in the table below), then restarts Tasmota, which
+  Google Home needs.
 
 ## Creating the Matter endpoints
 
@@ -232,7 +234,7 @@ The meaning of each device's DPs is in the `mapping` of `devices.json` (`code`, 
 | `TuyaScan [seconds]` | Network discovery (20 s by default, 60 at most); result published at the end: `{"TuyaScan":{"Devices":[...]}}` |
 | `TuyaImport [file] [all\|id,id]` | Imports tinytuya's `devices.json` (`/devices.json` by default) |
 | `TuyaCloud [json]` | Import from the cloud: `{"region":"eu","id":"<Access ID>","secret":"<Access Secret>"}` (and `"devices":[...]` to choose the ids, `"save":true` to save the credentials, `"save":false` to erase them); without an argument, the saved credentials; result published at the end. **The web console logs the command, secret included**: prefer the web page, or `TuyaCloud` without an argument once the credentials are saved |
-| `TuyaMatter` | Creates the missing Matter endpoints (then `Restart 1`) |
+| `TuyaMatter [name,name]` | Creates the missing Matter endpoints, all of them or only those named (case-insensitive), then `Restart 1` |
 
 These commands make up the **remote control API**: over HTTP
 (`http://<gateway>/cm?cmnd=TuyaSend%20Ventilateur,60,true`, with `&user=admin&password=...` if a

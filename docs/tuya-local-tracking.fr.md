@@ -135,6 +135,18 @@ Tuya Wi-Fi et les sous-appareils Zigbee de la passerelle Tuya, et les présenter
     de règles renommés : `project.md`, `berry-pitfalls.md`. Aucun changement fonctionnel
     (20/20 dans les deux modes) ; **pas de build**.
 
+15. **Liste des endpoints Matter avec cases à cocher** (8 novembre) : sur la passerelle, la
+    section listait les endpoints manquants en texte, et les créait tous d'un coup. C'est
+    maintenant un tableau comme la liste des appareils : une ligne par liaison, ✅ et le numéro
+    d'endpoint s'il existe, une case à cocher s'il manque (case d'en-tête pour tout cocher) ;
+    **➕ Create and restart** ne crée que les endpoints cochés (aucun coché : refus).
+    `TuyaMatter [nom,nom]` fait de même par commande. Scénario 18 complété (20/20 dans les deux
+    modes), page vérifiée à 340 px. **Pas de build**.
+    **À vérifier** : la capture de Guillaume listait comme manquants des endpoints qui
+    existaient déjà dans Configuration → Matter (`Entrée-Porche`, `Ventilateur`, `Récepteur
+    radio 1` à `4`...) : la nouvelle liste affiche le numéro de chaque endpoint trouvé, ce qui
+    montrera si le driver lit correctement la configuration de Matter sur la passerelle.
+
 ## Mesures sur la passerelle
 
 | Situation | `Heap` (`Status 4`) |

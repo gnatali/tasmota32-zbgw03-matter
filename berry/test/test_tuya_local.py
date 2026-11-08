@@ -5,6 +5,7 @@ The /tuya.json file is written for the test (fake configuration).
 """
 import json
 import os
+import re
 import subprocess
 import sys
 
@@ -525,7 +526,12 @@ def main():
     html, _ = page("GET", {})
     assert "Lampe test" in html and "Prise mesure" in html and "Discover devices" in html, html[:300]
     assert K["clamp"] not in html and K["lamp"] not in html
-    assert "Missing Matter endpoints" in html and "Lampe test <small>(v_light2)" in html, html
+    # Matter list: existing endpoint with its number, a checkbox for each missing one
+    assert "<td><span title='created'>&#x2705;</span></td><td>Porche</td><td style='font-size:smaller;'>v_light2</td>" \
+           "<td style='font-size:smaller;'>1</td>" in html, html
+    boxes = dict((v, n) for n, v in re.findall(r"<input type='checkbox' name='(m\d+)' value='([^']*)'>", html))
+    assert "Lampe test" in boxes and "Ventilateur" in boxes and "Porche" not in boxes, boxes
+    assert "title='all'" in html and "missing: tick the endpoints to create" in html
     html, _ = page("GET", {"edit": "Pince"})
     assert "&quot;key&quot;: &quot;***&quot;" in html and K["clamp"] not in html, html
     pince = [d for d in json.load(open("/tuya.json"))["devices"] if d["name"] == "Pince"][0]
@@ -539,14 +545,23 @@ def main():
     assert "Saved: Pince" in html
     page("POST", {"del": "", "ref": "Cloud double"})
     assert all(d["name"] != "Cloud double" for d in json.load(open("/tuya.json"))["devices"])
-    html, out = page("POST", {"matter": ""})
+    html, out = page("POST", {"matter": ""})                       # nothing ticked
+    assert not any(l.startswith("MATTERADD ") for l in out) and html.endswith("REDIRECT /tuya"), html
+    html, _ = page("GET", {})
+    assert "Error: no endpoint selected" in html
+    html, out = page("POST", {"matter": "", boxes["Lampe test"]: "Lampe test", boxes["Ventilateur"]: "Ventilateur"})
     added = [json.loads(l[10:]) for l in out if l.startswith("MATTERADD ")]
-    names = {a["name"]: a["type"] for a in added}
-    assert names.get("Lampe test") == "v_light2" and names.get("Ventilateur") == "v_fan", names
-    assert names.get("Prise mesure") == "v_relay_power" and "Porche" not in names, names
+    assert {a["name"]: a["type"] for a in added} == {"Lampe test": "v_light2", "Ventilateur": "v_fan"}, added
     assert html.endswith("REDIRECT /?rst="), html
     html, _ = page("GET", {})
-    assert "Every binding has its Matter endpoint" in html, html
+    assert "<td>Lampe test</td><td style='font-size:smaller;'>v_light2</td><td style='font-size:smaller;'>" in html
+    assert "value='Lampe test'" not in html and "value='Prise mesure'" in html, html
+    out = h.send("CMD TuyaMatter prise MESURE, inexistant")           # by name, case-insensitive
+    assert resp(out, "TuyaMatter")["Added"] == ["Prise mesure"], out
+    out = h.send("CMD TuyaMatter")                                     # all the remaining ones
+    assert "Prise mesure" not in resp(out, "TuyaMatter")["Added"] and resp(out, "TuyaMatter")["Restart"], out
+    html, _ = page("GET", {})
+    assert "Every binding has its Matter endpoint" in html and "name='m0'" not in html, html
     html, _ = page("POST", {"scan": ""})
     html, _ = page("GET", {})
     assert "Discovery in progress" in html
