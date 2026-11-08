@@ -115,7 +115,7 @@ Commandes (toutes accessibles en console, HTTP `/cm?cmnd=` et MQTT `cmnd/<topic>
 | `TuyaDel <appareil>` | suppression | `{"TuyaDel":"<nom>"}` |
 | `TuyaScan [s]` | recherche (20 s, 60 au plus) | immédiate, puis événement `TuyaScan` |
 | `TuyaImport [fichier] [all\|id,...]` | import du `devices.json` | `{"TuyaImport":{"Added":[...],"Updated":[...],"Skipped":[...]}}` |
-| `TuyaCloud <json>` | import par le cloud | immédiate, puis événement `TuyaCloud` |
+| `TuyaCloud [json]` | import par le cloud | immédiate, puis événement `TuyaCloud` |
 | `TuyaMatter` | création des endpoints Matter manquants | `{"TuyaMatter":{"Added":[...],"Restart":"..."}}` |
 
 Les commandes ajoutées passent par `run_cmd()` : une erreur prévue (`tuya_error`) devient
@@ -190,7 +190,12 @@ Reprise de `tinytuya.Cloud` (`Cloud.py`) :
   **35 Ko libres** exigés avant chaque requête (le client HTTPS de Tasmota réserve un tampon de
   16 Ko, `HttpClientLight`) ;
 - appareils : ceux passés dans `"devices"`, sinon ceux de la dernière recherche. Les
-  sous-appareils ne sont pas traités. Les identifiants ne sont pas enregistrés.
+  sous-appareils ne sont pas traités ;
+- identifiants : enregistrés seulement sur demande (case de la page, `"save":true`) dans
+  `/tuya_cloud.json` (`TuyaLocal.CLOUD_CONF`), à part de `tuya.json` pour que `TuyaConfig`, la
+  page d'édition et `tuya.json.bak` ne les exposent jamais ; `TuyaLocal.cloud_start` complète un
+  Access ID ou un Access Secret vide par ceux enregistrés ; `"save":false` (case décochée) vide
+  le fichier. La page réaffiche la région et l'Access ID, jamais le secret.
 
 ## 8. Page web
 
@@ -247,9 +252,10 @@ appareils (`fake_tuya.py`) et les annonces UDP (`udp_broadcast()`, vérifiées p
 | 17 | import cloud : signature identique à TinyTuya, clé et DP, erreur du cloud, garde mémoire |
 | 18 | page web : liste, édition (clé masquée puis conservée), suppression, endpoints Matter, recherche |
 | 19 | `TuyaSend ... toggle` |
+| 20 | identifiants du cloud enregistrés : case de la page, secret jamais affiché, `TuyaCloud` sans argument, effacement |
 
-Le workflow lance le banc avant la compilation ; il crée `/tuya.json`, `/tuya.json.bak` et
-`/devices.json`, que le test écrit.
+Le workflow lance le banc avant la compilation ; il crée `/tuya.json`, `/tuya.json.bak`,
+`/devices.json` et `/tuya_cloud.json`, que le test écrit.
 
 ## 11. Mesures
 
@@ -288,7 +294,8 @@ la configuration simplifiée ajoute 0,7 à 1,3 Ko au repos.
   Berry). Reste à valider sur la passerelle (TLS, au moins 35 Ko libres).
 - `bridge_add_endpoint()` est une API interne de Matter : à vérifier à chaque changement de
   `TASMOTA_REF`.
-- La commande `TuyaCloud` est journalisée par la console web, secret compris : préférer la page.
+- La commande `TuyaCloud` est journalisée par la console web, secret compris : préférer la page,
+  ou `TuyaCloud` sans argument avec des identifiants enregistrés.
 - Non gérés à l'import : `temp_value` (ancien format 0 à 255), vitesse de ventilateur en
   énumération, `colour_data` (ancien format) ; sous-appareils par le cloud.
 - La recherche ne traverse pas un routeur (diffusion UDP).
@@ -304,7 +311,7 @@ la configuration simplifiée ajoute 0,7 à 1,3 Ko au repos.
 | `platformio_override.ini` | `custom_berry_solidify` |
 | `berry/test/run_tests.sh` | construction des deux interpréteurs, solidification, scénarios |
 | `berry/test/harness.be`, `webserver.be`, `crypto.be` | simulations de Tasmota |
-| `berry/test/fake_tuya.py`, `test_tuya_local.py` | faux appareils, annonces UDP, 19 scénarios |
+| `berry/test/fake_tuya.py`, `test_tuya_local.py` | faux appareils, annonces UDP, 20 scénarios |
 | `.github/workflows/build.yml` | fichiers écrits par les tests |
 | `docs/tuya-local.fr.md` / `.en.md` | documentation d'utilisation |
 | `docs/tuya-local-examples.fr.md` / `.en.md` | exemples de commandes et d'événements |

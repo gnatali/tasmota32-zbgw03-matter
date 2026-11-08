@@ -10,7 +10,7 @@
   page web Configuration -> Tuya local (/tuya)
   Commandes : TuyaStatus [appareil], TuyaSend <appareil>,<dp ou code>,<valeur|toggle>, TuyaReload,
     TuyaConfig [appareil], TuyaAdd <json>, TuyaDel <appareil>, TuyaScan [s],
-    TuyaImport [fichier] [all|id,...], TuyaCloud <json>, TuyaMatter
+    TuyaImport [fichier] [all|id,...], TuyaCloud [json], TuyaMatter
 
   Necessite un firmware avec USE_BERRY_CRYPTO_AES_CBC (3.3, 3.4) et le correctif
   AES_GCM 128 bits avec AAD (3.5).
@@ -1474,15 +1474,23 @@ class TuyaWeb
                            "Sans « tous », seuls les appareils trouvés par la recherche ou déjà configurés sont importés.</p>")
     webserver.content_send("<form action='/tuya' method='post'><input name='file' value='/devices.json'>" +
                            "<label><input type='checkbox' name='all'> tous</label><button name='import'>Importer</button></form>")
+    var c = drv.cloud_saved()
     webserver.content_send("<p>Ou depuis le cloud Tuya, pour les appareils trouvés par la recherche (compte Tuya IoT, comme " +
-                           "<code>tinytuya wizard</code> ; identifiants non enregistrés). Mémoire libre : " + str(heap) + " Ko, " +
+                           "<code>tinytuya wizard</code>). Identifiants enregistrés dans <code>" + drv.CLOUD_CONF +
+                           "</code> seulement si la case est cochée. Mémoire libre : " + str(heap) + " Ko, " +
                            str(drv.CLOUD_MIN_HEAP) + " Ko nécessaires.</p>")
-    webserver.content_send("<form action='/tuya' method='post'><select name='region'><option value='eu'>Europe centrale</option>" +
-                           "<option value='we'>Europe de l'ouest</option><option value='us'>Amérique de l'ouest</option>" +
-                           "<option value='ue'>Amérique de l'est</option><option value='cn'>Chine</option><option value='in'>Inde</option>" +
-                           "<option value='sg'>Singapour</option></select>" +
-                           "<input name='cid' placeholder='Access ID'><input name='secret' type='password' placeholder='Access Secret'>" +
-                           "<button name='cloud'>Importer depuis le cloud</button></form>")
+    var reg = (c != nil) ? str(c.find("region", "eu")) : "eu"
+    var opts = ""
+    for r: [["eu", "Europe centrale"], ["we", "Europe de l'ouest"], ["us", "Amérique de l'ouest"], ["ue", "Amérique de l'est"],
+            ["cn", "Chine"], ["in", "Inde"], ["sg", "Singapour"]]
+      opts += "<option value='" + r[0] + "'" + (r[0] == reg ? " selected" : "") + ">" + r[1] + "</option>"
+    end
+    webserver.content_send("<form action='/tuya' method='post'><select name='region'>" + opts + "</select>" +
+                           "<input name='cid' placeholder='Access ID' value='" + TuyaWeb.esc(c != nil ? c.find("id", "") : "") + "'>" +
+                           "<input name='secret' type='password' placeholder='" +
+                           (c != nil ? "Access Secret enregistré (laisser vide)" : "Access Secret") + "'>" +
+                           "<label><input type='checkbox' name='keep'" + (c != nil ? " checked" : "") +
+                           "> enregistrer les identifiants</label><button name='cloud'>Importer depuis le cloud</button></form>")
     webserver.content_send("</fieldset><p></p>")
   end
 
@@ -1509,7 +1517,8 @@ class TuyaWeb
       elif webserver.has_arg("import")
         msg = drv.summary(drv.import_file(webserver.arg("file"), webserver.has_arg("all") ? "all" : nil))
       elif webserver.has_arg("cloud")
-        msg = drv.start_cloud(webserver.arg("region"), webserver.arg("cid"), webserver.arg("secret"), nil)
+        msg = drv.cloud_start({"region": webserver.arg("region"), "id": webserver.arg("cid"),
+                               "secret": webserver.arg("secret"), "save": webserver.has_arg("keep")})
       elif webserver.has_arg("matter")
         var added = drv.matter_create()
         msg = "Endpoints Matter créés : " + str(size(added)) + ", redémarrage"
@@ -1529,6 +1538,7 @@ end
 #@ solidify:TuyaLocal,weak
 class TuyaLocal
   static var CONFIG = "/tuya.json"
+  static var CLOUD_CONF = "/tuya_cloud.json"   # identifiants du cloud, si enregistres (jamais dans tuya.json)
   static var SYNC_RETRY = 30000   # ms entre deux renvois aux endpoints Matter qui ont refuse
   # memoire libre minimale (Ko) pour lancer : une recherche, un import de fichier, un import cloud
   # (HTTPS : le client TLS de Tasmota reserve a lui seul 16 Ko)
@@ -1815,14 +1825,70 @@ class TuyaLocal
     return r
   end
 
-  # TuyaCloud {"region":"eu","id":"<Access ID>","secret":"<Access Secret>"[,"devices":["id",...]]}
+  # TuyaCloud {"region":"eu","id":"<Access ID>","secret":"<Access Secret>"[,"devices":["id",...]][,"save":true|false]}
+  # TuyaCloud sans argument : identifiants enregistres
   def cloud_json(p)
     import json
-    var a = json.load(str(p))
+    var a = (self.trim(str(p)) == "") ? {} : json.load(str(p))
     if type(a) != 'instance' || classname(a) != 'map'
       raise "tuya_error", "syntaxe : TuyaCloud {\"region\":\"eu\",\"id\":\"<Access ID>\",\"secret\":\"<Access Secret>\"}"
     end
-    return self.start_cloud(a.find("region", "eu"), a.find("id"), a.find("secret"), a.find("devices"))
+    return self.cloud_start(a)
+  end
+
+  # identifiants du cloud enregistres : {"region","id","secret"} ou nil
+  def cloud_saved()
+    import json
+    var c
+    try
+      var f = open(self.CLOUD_CONF, "r")
+      c = json.load(f.read())
+      f.close()
+    except .. as e, m
+    end
+    if type(c) != 'instance' || classname(c) != 'map'  return nil  end
+    return (str(c.find("id", "")) != "" && str(c.find("secret", "")) != "") ? c : nil
+  end
+
+  def write_cloud(s)
+    var f = open(self.CLOUD_CONF, "w")
+    f.write(s)
+    f.close()
+  end
+
+  # a : {"region","id","secret","devices","save"}. Id ou secret vides : ceux enregistres.
+  # "save" true : enregistre les identifiants ; false : les efface (sans id ni secret, rien d'autre).
+  def cloud_start(a)
+    import json
+    import string
+    var saved = self.cloud_saved()
+    var key = self.trim(str(a.find("id", "")))
+    var secret = self.trim(str(a.find("secret", "")))
+    var region = string.tolower(self.trim(str(a.find("region", ""))))
+    if saved != nil && (key == "" || key == saved["id"])
+      key = saved["id"]
+      if secret == ""  secret = saved["secret"]  end
+      if region == ""  region = str(saved.find("region", "eu"))  end
+    end
+    if region == ""  region = "eu"  end
+    var save = a.find("save")
+    if save == false && saved != nil  self.write_cloud("")  end
+    if save == false && key == "" && secret == ""
+      return (saved != nil) ? "identifiants du cloud effaces" : "aucun identifiant enregistre"
+    end
+    if key == "" || secret == ""  raise "tuya_error", "Access ID et Access Secret requis"  end
+    if TuyaCloud.HOSTS.find(region) == nil  raise "tuya_error", "region inconnue (eu, we, us, ue, cn, in, sg)"  end
+    if save == true
+      self.write_cloud(json.dump({"region": region, "id": key, "secret": secret}))
+    end
+    var note = (save == true) ? " (identifiants enregistres)" : ""
+    var msg
+    try
+      msg = self.start_cloud(region, key, secret, a.find("devices"))
+    except "tuya_error" as e, m
+      raise "tuya_error", str(m) + note
+    end
+    return msg + note
   end
 
   # import cloud : par defaut, les appareils trouves par la derniere recherche

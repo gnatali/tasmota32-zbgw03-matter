@@ -565,8 +565,45 @@ def main():
     ok += 1
     print("OK 19 TuyaSend toggle : inversion d'un DP booleen, refus sinon")
 
+    # 20. identifiants du cloud enregistres (case de la page) : hors de tuya.json, secret jamais affiche
+    with open("/tuya_cloud.json", "w") as f:
+        f.write("")
+    html, _ = page("GET", {})
+    assert "name='keep'>" in html and "value=''" in html, html
+    saved = {"region": "eu", "id": "SaVeDiD0123", "secret": "s4v3d-s3cr3t"}
+    h.pump(h.send("ADV 30000"))                                    # fin de la recherche du scenario 18
+    html, _ = page("POST", {"cloud": "", "region": "eu", "cid": saved["id"], "secret": saved["secret"], "keep": "on"})
+    assert json.load(open("/tuya_cloud.json")) == saved
+    assert saved["secret"] not in open("/tuya.json").read()
+    html, _ = page("GET", {})
+    assert "aucun appareil" in html and "(identifiants enregistres)" in html, html[:400]   # pas de recherche
+    for _ in range(8):
+        h.pump(h.send("ADV 1000"))
+    html, _ = page("GET", {})
+    assert "name='keep' checked>" in html and "value='%s'" % saved["id"] in html, html
+    assert saved["secret"] not in html and "Access Secret enregistré" in html
+    assert saved["secret"] not in json.dumps(resp(h.send("CMD TuyaConfig"), "TuyaConfig"))
+    h.send('HTTPSRESP /v1.0/token?grant_type=1 200 {"success":true,"result":{"access_token":"tok123"},"t":1794092132086}')
+    out = h.send("CMD TuyaCloud " + json.dumps({"devices": [cloud_id]}))   # identifiants enregistres
+    assert resp(out, "TuyaCloud") == "import cloud lance pour 1 appareil(s)", out
+    for _ in range(5):
+        out += h.pump(h.send("ADV 1000"))
+    reqs = [l for l in out if l.startswith("HTTPS ")]
+    assert reqs, out
+    hdr = json.loads(reqs[0].split(" ", 2)[2])
+    assert hdr["client_id"] == saved["id"] and hdr["sign"] == tinytuya_sign(saved, reqs[0].split(" ")[1], hdr), hdr
+    html, _ = page("POST", {"cloud": "", "region": "eu", "cid": saved["id"], "secret": ""})   # case decochee
+    assert open("/tuya_cloud.json").read() == ""
+    html, _ = page("GET", {})
+    assert "name='keep'>" in html and saved["id"] not in html, html
+    for _ in range(8):
+        h.pump(h.send("ADV 1000"))
+    assert "Access ID et Access Secret requis" in resp(h.send("CMD TuyaCloud"), "TuyaCloud")["Error"]
+    ok += 1
+    print("OK 20 identifiants du cloud enregistres : case de la page, TuyaCloud sans argument, effacement")
+
     h.close()
-    print("%d/19 scenarios OK" % ok)
+    print("%d/20 scenarios OK" % ok)
 
 
 if __name__ == "__main__":

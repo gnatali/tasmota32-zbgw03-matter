@@ -5,4 +5,6 @@ __pycache__/
 
 # configuration Tuya reelle (cles locales) : uniquement sur la passerelle
 /tuya.json
+/tuya_cloud.json
 berry/tuya.json
+tuya_cloud.json

@@ -163,6 +163,22 @@ TuyaCloud {"region":"eu","id":"<Access ID>","secret":"<Access Secret>","devices"
 {"TuyaCloud":"import cloud lance pour 3 appareil(s)"}
 ```
 
+Identifiants enregistrés dans `/tuya_cloud.json` (comme la case de la page), puis réutilisés sans
+les retaper, ce qui évite aussi de les voir dans le journal ; `"save":false` les efface :
+
+```
+TuyaCloud {"region":"eu","id":"<Access ID>","secret":"<Access Secret>","save":true}
+TuyaCloud
+TuyaCloud {"devices":["00000000000000lamp01"]}
+TuyaCloud {"save":false}
+```
+```json
+{"TuyaCloud":"import cloud lance pour 3 appareil(s) (identifiants enregistres)"}
+{"TuyaCloud":"import cloud lance pour 3 appareil(s)"}
+{"TuyaCloud":"import cloud lance pour 1 appareil(s)"}
+{"TuyaCloud":"identifiants du cloud effaces"}
+```
+
 Une requête par seconde, puis l'événement de fin :
 
 ```json
@@ -172,7 +188,8 @@ Une requête par seconde, puis l'événement de fin :
 
 Autres erreurs : `"memoire libre insuffisante : 30 Ko, 35 Ko necessaires"`,
 `"heure non synchronisee (NTP)"`, `"region inconnue (eu, we, us, ue, cn, in, sg)"`,
-`"aucun appareil : lancer d'abord une recherche (TuyaScan)"`, `"cloud Tuya : HTTP 404"`.
+`"aucun appareil : lancer d'abord une recherche (TuyaScan)"`, `"cloud Tuya : HTTP 404"`,
+`"Access ID et Access Secret requis"` (sans argument et sans identifiants enregistrés).
 
 ## 6. Matter
 

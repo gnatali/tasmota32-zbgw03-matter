@@ -11,16 +11,16 @@ git sparse-checkout set --no-cone 'lib/libesp32/berry/*' 'lib/libesp32/re1.5/*' 
   'lib/libesp32/berry_mapping/*' 'lib/libesp32/berry_int64/*' 'lib/libesp32/berry_custom/*' \
   'lib/lib_ssl/bearssl-esp8266/*'
 git checkout <TASMOTA_REF du workflow> && cd ..
-bash berry/test/run_tests.sh tasmota     # ecrit /tuya.json, /tuya.json.bak, /devices.json : conteneur ou CI
+bash berry/test/run_tests.sh tasmota     # ecrit /tuya.json(.bak), /devices.json, /tuya_cloud.json : conteneur ou CI
 ```
 
 - `run_tests.sh` compile l'interpréteur Berry de Tasmota avec `testcrypto.c` (AES-CBC, AES-GCM
   avec AAD, HMAC-SHA256, MD5 sur le BearSSL de Tasmota). `crypto.be` reproduit l'API du module
   `crypto` de Tasmota, `webserver.be` le module `webserver`, et `harness.be` simule `tasmota`,
   `tcpclientasync`, `udp`, `webclient` (cloud) et `matter_device`, piloté par
-  `test_tuya_local.py` ligne à ligne. Le test écrit `/tuya.json`, `/tuya.json.bak` et
-  `/devices.json`.
-- Les 19 scénarios sont joués **deux fois** : driver source (compilé par le harnais en mode
+  `test_tuya_local.py` ligne à ligne. Le test écrit `/tuya.json`, `/tuya.json.bak`,
+  `/devices.json` et `/tuya_cloud.json`.
+- Les 20 scénarios sont joués **deux fois** : driver source (compilé par le harnais en mode
   strict), puis driver **solidifié** comme au build (port Python de Berry `berry_port`, table
   des chaînes `coc`, classes natives en lecture seule liées dans un second interpréteur).
   Une erreur de solidification ou une écriture dans une `static var` y apparaît sans attendre

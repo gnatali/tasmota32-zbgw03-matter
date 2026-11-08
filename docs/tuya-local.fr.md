@@ -124,7 +124,11 @@ et mettre à jour `tuya.json`.
     sous-appareils Zigbee ;
   - **le cloud Tuya directement**, pour les appareils trouvés par la recherche : choisir la
     région et saisir l'**Access ID** et l'**Access Secret** du projet Tuya IoT (le même compte
-    développeur que pour `tinytuya wizard`). Ils ne sont pas enregistrés. Il faut l'heure à jour
+    développeur que pour `tinytuya wizard`). Avec la case **« enregistrer les identifiants »**, ils
+    sont gardés dans `/tuya_cloud.json` (jamais dans `tuya.json`) : la page reprend ensuite la
+    région et l'Access ID, et un Access Secret laissé vide reprend celui enregistré ; le secret
+    n'est jamais réaffiché. Décocher la case efface le fichier (l'import en cours se sert encore
+    une fois des identifiants). Il faut l'heure à jour
     (NTP) et **35 Ko de mémoire libre** (le client HTTPS de Tasmota en réserve 16) ; l'import
     fait une requête par seconde, le résultat s'affiche sur la page.
 
@@ -225,7 +229,7 @@ La signification des DP de chaque appareil se trouve dans `mapping` de `devices.
 | `TuyaDel <appareil>` | Supprime un appareil |
 | `TuyaScan [secondes]` | Recherche sur le réseau (20 s par défaut, 60 au plus) ; résultat publié à la fin : `{"TuyaScan":{"Devices":[...]}}` |
 | `TuyaImport [fichier] [all\|id,id]` | Importe le `devices.json` de tinytuya (`/devices.json` par défaut) |
-| `TuyaCloud <json>` | Import depuis le cloud : `{"region":"eu","id":"<Access ID>","secret":"<Access Secret>"}` (et `"devices":[...]` pour choisir les identifiants) ; résultat publié à la fin. **La console web journalise la commande, secret compris** : préférer la page web |
+| `TuyaCloud [json]` | Import depuis le cloud : `{"region":"eu","id":"<Access ID>","secret":"<Access Secret>"}` (et `"devices":[...]` pour choisir les identifiants, `"save":true` pour enregistrer les identifiants, `"save":false` pour les effacer) ; sans argument, identifiants enregistrés ; résultat publié à la fin. **La console web journalise la commande, secret compris** : préférer la page web, ou `TuyaCloud` sans argument une fois les identifiants enregistrés |
 | `TuyaMatter` | Crée les endpoints Matter manquants (puis `Restart 1`) |
 
 Ces commandes forment l'**API de pilotage à distance** : en HTTP
@@ -296,7 +300,7 @@ Il n'apparaît plus dans Smart Life, et le retirer de `tuya.json` s'il y figurai
 ## Tests
 
 `berry/test/run_tests.sh <dépôt Tasmota>` compile l'interpréteur Berry de Tasmota avec le
-chiffrement BearSSL de Tasmota, et joue 19 scénarios contre de faux appareils Tuya construits
+chiffrement BearSSL de Tasmota, et joue 20 scénarios contre de faux appareils Tuya construits
 sur [TinyTuya](https://github.com/jasonacox/tinytuya) (3.3, 3.4, 3.5, passerelle Zigbee) :
 négociation de clé, commandes Matter, retours d'état, mesures, coupure et reconnexion, trames
 corrompues ou fragmentées, endpoint Matter créé à chaud, API, recherche (annonces au format

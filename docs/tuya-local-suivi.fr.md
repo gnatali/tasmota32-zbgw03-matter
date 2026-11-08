@@ -106,6 +106,13 @@ Tuya Wi-Fi et les sous-appareils Zigbee de la passerelle Tuya, et les présenter
     complété (il échoue sans le correctif). Build : exécution 16 (commit `1171ed1`), 19/19 dans
     les deux modes, firmware de 2 099 967 octets (+0,5 Ko) ; à flasher.
 
+12. **Identifiants du cloud enregistrables** (8 novembre) : case « enregistrer les
+    identifiants » sur la page, `"save":true|false` et `TuyaCloud` sans argument pour la
+    commande. Fichier à part, `/tuya_cloud.json`, pour que `TuyaConfig`, la page d'édition et
+    `tuya.json.bak` ne les exposent jamais ; secret jamais réaffiché ; case décochée = fichier
+    vidé. Scénario 20 (20/20 dans les deux modes). **Pas de build** à la demande de Guillaume :
+    il viendra avec la prochaine modification.
+
 ## Mesures sur la passerelle
 
 | Situation | `Heap` (`Status 4`) |

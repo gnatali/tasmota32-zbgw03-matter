@@ -168,6 +168,22 @@ TuyaCloud {"region":"eu","id":"<Access ID>","secret":"<Access Secret>","devices"
 {"TuyaCloud":"import cloud lance pour 3 appareil(s)"}
 ```
 
+Credentials saved in `/tuya_cloud.json` (like the page's checkbox), then reused without typing
+them again, which also keeps them out of the log; `"save":false` erases them:
+
+```
+TuyaCloud {"region":"eu","id":"<Access ID>","secret":"<Access Secret>","save":true}
+TuyaCloud
+TuyaCloud {"devices":["00000000000000lamp01"]}
+TuyaCloud {"save":false}
+```
+```json
+{"TuyaCloud":"import cloud lance pour 3 appareil(s) (identifiants enregistres)"}
+{"TuyaCloud":"import cloud lance pour 3 appareil(s)"}
+{"TuyaCloud":"import cloud lance pour 1 appareil(s)"}
+{"TuyaCloud":"identifiants du cloud effaces"}
+```
+
 One request per second, then the final event:
 
 ```json
@@ -179,7 +195,8 @@ Other errors: `"memoire libre insuffisante : 30 Ko, 35 Ko necessaires"` (not eno
 memory), `"heure non synchronisee (NTP)"` (time not synchronised),
 `"region inconnue (eu, we, us, ue, cn, in, sg)"` (unknown region),
 `"aucun appareil : lancer d'abord une recherche (TuyaScan)"` (no device: run a discovery first),
-`"cloud Tuya : HTTP 404"`.
+`"cloud Tuya : HTTP 404"`, `"Access ID et Access Secret requis"` (Access ID and Access Secret
+required: no argument and no saved credentials).
 
 ## 6. Matter
 

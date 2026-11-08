@@ -126,7 +126,11 @@ again and update `tuya.json`.
     sub-devices;
   - **the Tuya cloud directly**, for the devices found by the discovery: choose the region and
     enter the **Access ID** and **Access Secret** of the Tuya IoT project (the same developer
-    account as for `tinytuya wizard`). They are not stored. The time must be set (NTP) and
+    account as for `tinytuya wizard`). With the **save the credentials** checkbox (*enregistrer
+    les identifiants*), they are kept in `/tuya_cloud.json` (never in `tuya.json`): the page then
+    fills in the region and the Access ID, and an Access Secret left empty uses the saved one; the
+    secret is never shown again. Unchecking the box erases the file (the current import still
+    uses the credentials once). The time must be set (NTP) and
     **35 KB of free memory** is required (Tasmota's HTTPS client reserves 16 of them); the
     import makes one request per second, and the result is shown on the page.
 
@@ -226,7 +230,7 @@ The meaning of each device's DPs is in the `mapping` of `devices.json` (`code`, 
 | `TuyaDel <device>` | Deletes a device |
 | `TuyaScan [seconds]` | Network discovery (20 s by default, 60 at most); result published at the end: `{"TuyaScan":{"Devices":[...]}}` |
 | `TuyaImport [file] [all\|id,id]` | Imports tinytuya's `devices.json` (`/devices.json` by default) |
-| `TuyaCloud <json>` | Import from the cloud: `{"region":"eu","id":"<Access ID>","secret":"<Access Secret>"}` (and `"devices":[...]` to choose the ids); result published at the end. **The web console logs the command, secret included**: prefer the web page |
+| `TuyaCloud [json]` | Import from the cloud: `{"region":"eu","id":"<Access ID>","secret":"<Access Secret>"}` (and `"devices":[...]` to choose the ids, `"save":true` to save the credentials, `"save":false` to erase them); without an argument, the saved credentials; result published at the end. **The web console logs the command, secret included**: prefer the web page, or `TuyaCloud` without an argument once the credentials are saved |
 | `TuyaMatter` | Creates the missing Matter endpoints (then `Restart 1`) |
 
 These commands make up the **remote control API**: over HTTP
@@ -295,7 +299,7 @@ It no longer appears in Smart Life; remove it from `tuya.json` if it was there.
 ## Tests
 
 `berry/test/run_tests.sh <Tasmota repository>` compiles Tasmota's Berry interpreter with
-Tasmota's BearSSL encryption, and runs 19 scenarios against fake Tuya devices built on
+Tasmota's BearSSL encryption, and runs 20 scenarios against fake Tuya devices built on
 [TinyTuya](https://github.com/jasonacox/tinytuya) (3.3, 3.4, 3.5, Zigbee gateway): key
 negotiation, Matter commands, state feedback, readings, disconnection and reconnection,
 corrupted or fragmented frames, Matter endpoint created later, API, discovery (announcements in

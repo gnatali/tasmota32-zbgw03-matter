@@ -40,8 +40,8 @@ jobs:
       # /devices.json). Joues sur le
       # driver source puis sur le driver solidifie comme au build (custom_berry_solidify)
       - run: |
-          sudo touch /tuya.json /tuya.json.bak /devices.json
-          sudo chmod 666 /tuya.json /tuya.json.bak /devices.json
+          sudo touch /tuya.json /tuya.json.bak /devices.json /tuya_cloud.json
+          sudo chmod 666 /tuya.json /tuya.json.bak /devices.json /tuya_cloud.json
           bash berry/test/run_tests.sh tasmota
 
       - run: |
