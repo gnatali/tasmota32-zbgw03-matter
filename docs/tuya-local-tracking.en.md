@@ -185,6 +185,20 @@ Wi-Fi devices and the Zigbee sub-devices of the Tuya gateway, and expose them to
     flag, the driver is in flash but not started). Patch checked against `TASMOTA_REF`;
     driver unchanged (22/22). **No build yet.**
 
+20. **Tasmota 16.0.0.3** (8 November): `TASMOTA_REF` moved from `a281cec` (16.0.0.2) to
+    `43d9409` (head of `development`, 18 commits). Review of the changes:
+    - **Matter event timestamps fixed upstream** (`4676a03`, new `tasmota.rtc_utc_ms()`): same
+      encoding as our `matter-event-timestamp-ms.patch` (tag `0x2703`, uint64 ms), with true
+      millisecond resolution. Our patch no longer applied: **removed**;
+    - web server: the `Referer` check of privileged pages now requires `host/` or `ip/`
+      (security fix): compatible with the Tuya Local forms (posted from the same gateway);
+    - `subStr()` / `ArgV()` bounds, settings migration from versions below 9.1 removed,
+      Matter attestation timestamp, sensors and displays: no effect on this firmware;
+    - unchanged: Berry, BearSSL, `pio-tools` (solidification), Zigbee, `Matter_zz_Device`
+      (`plugins_config`, `udp_server`, `bridge_add_endpoint`), the Berry init code.
+    The three remaining patches apply; test bench 22/22 in both modes on the new Berry. Build:
+    run 21.
+
 ## Measurements on the gateway
 
 | Situation | `Heap` (`Status 4`) |

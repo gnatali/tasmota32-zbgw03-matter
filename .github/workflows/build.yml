@@ -6,8 +6,8 @@ on:
   workflow_dispatch:
 
 env:
-  # Reference Tasmota commit (development branch, 16.0.0.2)
-  TASMOTA_REF: a281cece518b0031e22f2317ca7dbc530c934da1
+  # Reference Tasmota commit (development branch, 16.0.0.3)
+  TASMOTA_REF: 43d9409e67c4a28adac34925e1a1c6813f315ce0
   PIO_ENV: tasmota32-zbgw03-matter
 
 jobs:

@@ -193,6 +193,23 @@ Tuya Wi-Fi et les sous-appareils Zigbee de la passerelle Tuya, et les présenter
     est en flash mais pas démarré). Correctif vérifié sur `TASMOTA_REF` ; driver inchangé
     (22/22). **Pas encore de build.**
 
+20. **Tasmota 16.0.0.3** (8 novembre) : `TASMOTA_REF` passe de `a281cec` (16.0.0.2) à
+    `43d9409` (tête de `development`, 18 commits). Revue des changements :
+    - **horodatage des événements Matter corrigé en amont** (`4676a03`, nouvelle fonction
+      `tasmota.rtc_utc_ms()`) : même encodage que notre `matter-event-timestamp-ms.patch`
+      (balise `0x2703`, uint64 en ms), avec une vraie résolution à la milliseconde. Notre
+      correctif ne s'appliquait plus : **supprimé** ;
+    - serveur web : le contrôle du `Referer` des pages protégées exige désormais `hôte/` ou
+      `ip/` (correctif de sécurité) : compatible avec les formulaires de Tuya Local (envoyés
+      depuis la même passerelle) ;
+    - bornes de `subStr()` / `ArgV()`, migration des réglages des versions antérieures à 9.1
+      supprimée, horodatage d'attestation Matter, capteurs et afficheurs : sans effet sur ce
+      firmware ;
+    - inchangés : Berry, BearSSL, `pio-tools` (solidification), Zigbee, `Matter_zz_Device`
+      (`plugins_config`, `udp_server`, `bridge_add_endpoint`), le code d'initialisation Berry.
+    Les trois correctifs restants s'appliquent ; banc de test 22/22 dans les deux modes sur le
+    nouveau Berry. Build : exécution 21.
+
 ## Mesures sur la passerelle
 
 | Situation | `Heap` (`Status 4`) |
