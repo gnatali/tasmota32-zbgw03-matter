@@ -12,6 +12,7 @@
 #   NOMATTER / MATTERON   removes / restores matter_device (firmware without Matter)
 #   MATTEROFF         Matter disabled: matter_device without configuration (restored by MATTERON)
 #   ZIGBEE <0|1|nil>  zigbee.started() result (nil: no Zigbee)
+#   MATTERUDP <0|1>   Matter's UDP server not created yet / created (Matter started)
 #   SECOND            calls every_second() (ADV also calls it every 1000 ms)
 #   NEWDRV            second TuyaLocal() instance, like old autoexec.be lines
 # Outputs: CONNECT, TX, CLOSE, CMD (MtrUpdate), PUB, RESP, APPEND, WEB, LOG, UDPBIND, UDPTX,
@@ -118,8 +119,9 @@ end
 
 # Matter: endpoint configuration, like Tasmota's matter_device
 class MockMatter
-  var plugins_config, next_ep, started
-  def init()  self.plugins_config = {"1": {"type": "v_light2", "name": "Porche"}}  self.next_ep = 2  self.started = true  end
+  var plugins_config, next_ep, udp_server, started
+  # like Tasmota: `started` stays nil, the UDP server exists once Matter is started
+  def init()  self.plugins_config = {"1": {"type": "v_light2", "name": "Porche"}}  self.next_ep = 2  self.udp_server = true  end
   def bridge_add_endpoint(t, conf)
     var c = {"type": t}
     for k: conf.keys()  c[k] = conf[k]  end
@@ -215,6 +217,8 @@ while true
     import global
     global.matter_device = saved_matter
     if saved_config != nil  saved_matter.plugins_config = saved_config  saved_config = nil  end
+  elif op == "MATTERUDP"
+    matter_device.udp_server = (arg == "1") ? true : nil
   elif op == "ZIGBEE"
     zigbee.ok = (arg == "nil") ? nil : (arg == "1")
   elif op == "SECOND"

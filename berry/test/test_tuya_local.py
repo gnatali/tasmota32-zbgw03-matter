@@ -215,8 +215,14 @@ def main():
     nd = [l for l in out if l.startswith("NEWDRV ")][0].split()
     assert nd[1] == "true" and nd[2] == "1", nd                            # inert, not registered
     h.send("ZIGBEE 1")
+    h.send("MATTERUDP 0")                                                  # Matter enabled, not started
+    out = h.send("SECOND")
+    assert any("TUY: waiting for Matter" in l for l in out), out
+    assert not [l for l in out if l.startswith(("CONNECT", "TX"))], out
+    assert resp(h.send("CMD TuyaEnable"), "TuyaEnable")["State"] == "waiting for Matter"
+    h.send("MATTERUDP 1")                                                  # UDP server up: started
     ok += 1
-    print("OK 0 start at boot: disabled, enabled, waiting for Zigbee (greyed button), second instance inert")
+    print("OK 0 start at boot: disabled, enabled, waiting for Zigbee (greyed button) then Matter, second instance inert")
 
     # 1. start (Zigbee ready): connection, negotiation and initial state of all devices
     out = h.pump(h.send("SECOND"))                                         # starts: tuya.json loaded

@@ -96,7 +96,8 @@ the instance always exists, and the work is deferred:
   `TuyaEnable 0|1` (`set_enabled()`); disabling closes the connections (`stop()`);
 - `every_second()` starts the driver (`running`, `load_config()`) once `start_wait()` returns
   `nil`: enabled, `zigbee.started()` not `false` (`nil`: no Zigbee), an IP address
-  (`TuyaScan.local_ip()`), `matter_device.started` if Matter is enabled (`plugins_config` not
+  (`TuyaScan.local_ip()`), Matter's UDP server (`matter_device.udp_server`; `started` is never
+  set by Tasmota) if Matter is enabled (`plugins_config` not
   `nil`), and `START_MIN_HEAP` (45 KB) free. Otherwise `wait` holds the reason, logged once
   when it changes;
 - main page: `web_sensor()` calls `TuyaWeb.main_button()`, in the sensor area that the browser

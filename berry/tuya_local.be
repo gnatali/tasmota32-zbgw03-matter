@@ -1713,7 +1713,8 @@ class TuyaLocal
     end
     if TuyaScan.local_ip() == ""  return "waiting for the network"  end
     var md = global.contains("matter_device") ? global.matter_device : nil
-    if md != nil && md.plugins_config != nil && md.started != true  return "waiting for Matter"  end
+    # Matter started: its UDP server exists (`started` is declared by Matter_zz_Device but never set)
+    if md != nil && md.plugins_config != nil && md.udp_server == nil  return "waiting for Matter"  end
     var h = tasmota.memory().find("heap_free", 0)
     if h < self.START_MIN_HEAP  return f"waiting for memory ({h} KB, {self.START_MIN_HEAP} KB needed)"  end
     return nil

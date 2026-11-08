@@ -94,7 +94,8 @@ l'instance existe toujours, et le travail est différé :
   `TuyaEnable 0|1` (`set_enabled()`) ; la désactivation ferme les connexions (`stop()`) ;
 - `every_second()` démarre le driver (`running`, `load_config()`) dès que `start_wait()` renvoie
   `nil` : activé, `zigbee.started()` différent de `false` (`nil` : pas de Zigbee), une adresse
-  IP (`TuyaScan.local_ip()`), `matter_device.started` si Matter est activé (`plugins_config`
+  IP (`TuyaScan.local_ip()`), le serveur UDP de Matter (`matter_device.udp_server` ; Tasmota ne
+  renseigne jamais `started`) si Matter est activé (`plugins_config`
   non `nil`), et `START_MIN_HEAP` (45 Ko) libres. Sinon `wait` garde la raison, journalisée une
   fois à chaque changement ;
 - page d'accueil : `web_sensor()` appelle `TuyaWeb.main_button()`, dans la zone des capteurs

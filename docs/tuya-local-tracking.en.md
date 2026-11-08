@@ -168,6 +168,14 @@ Wi-Fi devices and the Zigbee sub-devices of the Tuya gateway, and expose them to
     unchanged (DRAM 66,076 bytes); to be flashed. On the gateway: **enable the driver once** after flashing (the setting starts unset), and remove
     the `tuya_start()` lines from `autoexec.be`.
 
+18. **Driver stuck on "waiting for Matter"** (8 November, run 19 on the gateway): Matter was
+    started (`MTR: Starting UDP server on port: 5540`) but the driver kept waiting. Cause:
+    `matter_device.started` is declared by `Matter_zz_Device` but never set by Tasmota (it
+    stays `nil`); the test bench's fake Matter set it to `true`, so the bench could not see
+    it. Fix: Matter is considered started once its UDP server exists
+    (`matter_device.udp_server`); the fake Matter now behaves like Tasmota (`started` left
+    `nil`), and scenario 0 checks the wait for Matter (`MATTERUDP 0/1`). 22/22 in both modes.
+
 ## Measurements on the gateway
 
 | Situation | `Heap` (`Status 4`) |

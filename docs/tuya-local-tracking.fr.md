@@ -175,6 +175,15 @@ Tuya Wi-Fi et les sous-appareils Zigbee de la passerelle Tuya, et les présenter
     le driver une fois** après le flash (le réglage part non défini), et retirer les lignes
     `tuya_start()` d'`autoexec.be`.
 
+18. **Driver bloqué sur « waiting for Matter »** (8 novembre, exécution 19 sur la passerelle) :
+    Matter était démarré (`MTR: Starting UDP server on port: 5540`) mais le driver attendait
+    toujours. Cause : `matter_device.started` est déclaré par `Matter_zz_Device` mais jamais
+    renseigné par Tasmota (il reste à `nil`) ; le faux Matter du banc de test le mettait à
+    `true`, le banc ne pouvait donc pas le voir. Correctif : Matter est considéré comme démarré
+    dès que son serveur UDP existe (`matter_device.udp_server`) ; le faux Matter se comporte
+    maintenant comme Tasmota (`started` laissé à `nil`), et le scénario 0 vérifie l'attente de
+    Matter (`MATTERUDP 0/1`). 22/22 dans les deux modes.
+
 ## Mesures sur la passerelle
 
 | Situation | `Heap` (`Status 4`) |

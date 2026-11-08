@@ -49,4 +49,7 @@ paths:
   **disables all rules**. `TuyaEnable 0` (or `tuya_local` set to `false` in `_persist.json`)
   keeps the driver stopped.
 - Matter disabled (`SetOption151 0`): `matter_device` still exists, without configuration
-  (`plugins_config` is `nil`) and without the `MtrUpdate` command.
+  (`plugins_config` is `nil`) and without the `MtrUpdate` command. Matter started:
+  `matter_device.udp_server` is set; `matter_device.started` is declared but **never set**
+  (stays `nil`). Check such Tasmota internals in its source before relying on them, and make
+  the mocks behave like the source, not like the name suggests.
