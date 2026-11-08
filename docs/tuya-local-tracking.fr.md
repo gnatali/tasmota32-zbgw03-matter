@@ -169,7 +169,9 @@ Tuya Wi-Fi et les sous-appareils Zigbee de la passerelle Tuya, et les présenter
     `autoexec.be` crée une seconde instance inerte et un avertissement. Corrigé aussi : avec
     Matter désactivé, `matter_device` existe sans configuration, donc `push()` vérifie aussi
     `plugins_config` (l'entrée 16 ne couvrait qu'un firmware sans Matter). Scénarios 0 et 1
-    (démarrage), 12 et 21 adaptés : 22/22 dans les deux modes. Sur la passerelle : **activer
+    (démarrage), 12 et 21 adaptés : 22/22 dans les deux modes. Build : exécution 19 (commit
+    `e264ca8`), firmware de 2 112 271 octets (2063 Ko, +6,5 Ko depuis l'exécution 18), RAM
+    statique inchangée (DRAM 66 076 octets) ; à flasher. Sur la passerelle : **activer
     le driver une fois** après le flash (le réglage part non défini), et retirer les lignes
     `tuya_start()` d'`autoexec.be`.
 

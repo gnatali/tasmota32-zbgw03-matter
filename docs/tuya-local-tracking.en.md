@@ -163,8 +163,9 @@ Wi-Fi devices and the Zigbee sub-devices of the Tuya gateway, and expose them to
     active **🔌 Tuya Local** button. An old `autoexec.be` creates an inert second instance and
     a warning. Also fixed: with Matter disabled, `matter_device` exists without configuration,
     so `push()` now also checks `plugins_config` (entry 16 only covered a firmware without
-    Matter). Scenarios 0 and 1 (start), 12 and 21 adapted: 22/22 in both modes. On the
-    gateway: **enable the driver once** after flashing (the setting starts unset), and remove
+    Matter). Scenarios 0 and 1 (start), 12 and 21 adapted: 22/22 in both modes. Build: run 19
+    (commit `e264ca8`), 2,112,271-byte firmware (2063 KB, +6.5 KB since run 18), static RAM
+    unchanged (DRAM 66,076 bytes); to be flashed. On the gateway: **enable the driver once** after flashing (the setting starts unset), and remove
     the `tuya_start()` lines from `autoexec.be`.
 
 ## Measurements on the gateway
