@@ -152,8 +152,11 @@ Tuya Wi-Fi et les sous-appareils Zigbee de la passerelle Tuya, et les présenter
     `matter_device` (firmware compilé sans Matter, ou Matter désactivé), `TuyaBinding.push()`
     n'envoie plus rien et ne met jamais une liaison en attente : avant, chaque liaison était
     refusée (commande « Unknown ») et renvoyée toutes les 30 s pour rien. Scénario 21 (21/21
-    dans les deux modes ; il échoue sans le contrôle). Build : exécution 17, qui apporte aussi
-    les entrées 12, 13 et 15 sur la passerelle.
+    dans les deux modes ; il échoue sans le contrôle). Build : exécution 18 (commit `7dc2e3a`),
+    firmware de 2 105 743 octets (2056 Ko, +5,8 Ko depuis l'exécution 16), RAM statique
+    inchangée (DRAM 66 076 octets) ; il apporte les entrées 12, 13, 15 et 16 sur la passerelle
+    (l'exécution 17, lancée par Guillaume sur le commit `36389bb`, avait 12 et 13 mais pas 15).
+    À flasher.
 
 ## Mesures sur la passerelle
 

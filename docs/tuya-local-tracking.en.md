@@ -149,7 +149,9 @@ Wi-Fi devices and the Zigbee sub-devices of the Tuya gateway, and expose them to
     without Matter, or Matter disabled), `TuyaBinding.push()` now sends nothing and never makes
     a binding pending: before, every binding was refused ("Unknown" command) and resent every
     30 s for nothing. Scenario 21 (21/21 in both modes; it fails without the check). Build:
-    run 17, which also brings entries 12, 13 and 15 to the gateway.
+    run 18 (commit `7dc2e3a`), 2,105,743-byte firmware (2056 KB, +5.8 KB since run 16), static
+    RAM unchanged (DRAM 66,076 bytes); it brings entries 12, 13, 15 and 16 to the gateway (run
+    17, started by Guillaume on commit `36389bb`, had 12 and 13 but not 15). To be flashed.
 
 ## Measurements on the gateway
 
