@@ -197,7 +197,8 @@ Wi-Fi devices and the Zigbee sub-devices of the Tuya gateway, and expose them to
     - unchanged: Berry, BearSSL, `pio-tools` (solidification), Zigbee, `Matter_zz_Device`
       (`plugins_config`, `udp_server`, `bridge_add_endpoint`), the Berry init code.
     The three remaining patches apply; test bench 22/22 in both modes on the new Berry. Build:
-    run 21.
+    run 21 (commit `2abb2fb`), 2,112,351-byte firmware (+80 bytes), static RAM DRAM 65,892
+    bytes (−184); firmware version 16.0.0.3(zbgw03-matter); to be flashed.
 
 ## Measurements on the gateway
 

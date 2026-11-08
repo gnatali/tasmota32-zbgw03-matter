@@ -208,7 +208,9 @@ Tuya Wi-Fi et les sous-appareils Zigbee de la passerelle Tuya, et les présenter
     - inchangés : Berry, BearSSL, `pio-tools` (solidification), Zigbee, `Matter_zz_Device`
       (`plugins_config`, `udp_server`, `bridge_add_endpoint`), le code d'initialisation Berry.
     Les trois correctifs restants s'appliquent ; banc de test 22/22 dans les deux modes sur le
-    nouveau Berry. Build : exécution 21.
+    nouveau Berry. Build : exécution 21 (commit `2abb2fb`), firmware de 2 112 351 octets
+    (+80 octets), RAM statique DRAM 65 892 octets (−184) ; version 16.0.0.3(zbgw03-matter) ;
+    à flasher.
 
 ## Mesures sur la passerelle
 
