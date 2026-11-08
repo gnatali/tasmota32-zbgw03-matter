@@ -39,7 +39,7 @@ dans le firmware (une directive `#@ solidify:<Classe>,weak` par classe).
 | `TuyaScan` | recherche des appareils sur le réseau local | **créée à la demande**, libérée à la fin |
 | `TuyaImport` | conversion des appareils de tinytuya ou du cloud en entrées de `tuya.json`, déduction des liaisons | fonctions statiques |
 | `TuyaCloud` | requêtes signées vers l'API OpenAPI de Tuya | **créée à la demande**, libérée à la fin |
-| `TuyaWeb` | page Configuration → Tuya local | fonctions statiques |
+| `TuyaWeb` | page Configuration → Tuya Local | fonctions statiques |
 | `TuyaLocal` | le driver Tasmota : configuration, boucle, commandes, événements | une instance, créée par `autoexec.be` |
 
 `TuyaLocal.every_50ms()` fait tourner les connexions, la recherche en cours, l'import cloud en
@@ -87,7 +87,7 @@ environ 17 Ko sur les 40 Ko qu'il occupait avec 12 appareils. Solidifié, ce cod
 - Au premier refus, la liaison passe **en attente** (`pending`) et le refus est journalisé une
   seule fois. `TuyaLocal.sync_pending()` lui renvoie l'**état complet** toutes les 30 s
   (`SYNC_RETRY`), et toute nouvelle valeur de l'appareil aussi. Dès que l'endpoint accepte :
-  `TUY: endpoint Matter '<ep>' disponible, etat envoye`.
+  `TUY: Matter endpoint '<ep>' available, state sent`.
 - Côté Google Home, un nouvel endpoint reste **hors ligne jusqu'au `Restart 1`** de Tasmota (le
   contrôleur ne s'abonne aux nouveaux endpoints qu'à la reconnexion), quel que soit l'état
   envoyé par le driver.
@@ -147,7 +147,7 @@ Garde mémoire : 15 Ko libres au moins pour lancer une recherche.
 - **Lecture par morceaux** (`TuyaImport.each_object`) : le fichier est lu par blocs de 512
   octets, les objets du tableau sont repérés par un automate (profondeur d'accolades, chaînes,
   échappements) et analysés un par un. Un objet de plus de 8 Ko est ignoré (journal
-  `objet JSON trop gros`). La taille du fichier n'est donc pas limitée par la RAM.
+  `JSON object too big`). La taille du fichier n'est donc pas limitée par la RAM.
 - **Sélection** : par défaut, les appareils trouvés par la dernière recherche ou déjà
   configurés, et les sous-appareils dont la passerelle l'est ; `all` : tous ; `id,id` : ceux-là.
 - **Entrée créée** (`TuyaImport.entry`) : `name`, `id`, `key` (ou `local_key`), `ip` et
@@ -199,13 +199,24 @@ Reprise de `tinytuya.Cloud` (`Cloud.py`) :
 
 ## 8. Page web
 
-- Enregistrement : `web_add_config_button()` (bouton **Tuya local** sur la page Configuration)
+- Enregistrement : `web_add_config_button()` (bouton **🔌 Tuya Local** sur la page Configuration)
   et `web_add_handler()` (routes `GET` et `POST /tuya`). Le driver démarrant après le serveur
   web, Tasmota ne lui appelle pas `web_add_handler()` : le driver l'appelle lui-même, seulement
   si `webserver.state() > 0` (`webserver.on()` fait planter l'ESP32 si le serveur n'est pas
   démarré).
-- `TuyaWeb.page()` : message de la dernière action, sections Appareils, Endpoints Matter,
-  Recherche, Importer ; `?edit=<ref>` : édition JSON (clé remplacée par `***`).
+- `TuyaWeb.page()` : message de la dernière action, sections *Tuya devices*, *Matter endpoints*,
+  *Network discovery*, *Import local keys* ; `?edit=<ref>` : édition JSON (clé remplacée par
+  `***`).
+- Mise en page des pages de Tasmota (comme Matter) : le conteneur de Tasmota est un
+  `inline-block` d'au moins 340 px qui s'élargit selon son contenu le plus large ; le texte va
+  donc dans `<p style='width:320px;'>` (`TuyaWeb.p`), chaque champ dans son propre bloc
+  `<p><b>Libellé</b><br><input></p>` (côte à côte, une liste et deux champs élargissaient la
+  page à 600 px), les en-têtes de tableau en `font-size:smaller` (`TuyaWeb.th`). Pictogrammes
+  HTML pour les actions, comme Tasmota (📝 modifier, 🔥 supprimer, comme le gestionnaire de
+  fichiers) : états des appareils dans `TuyaWeb.STATES` (🟢 🔴 ⚪ ⚠), ✅/🆕 pour la recherche.
+- Langue : page, réponses, erreurs et journal en anglais (comme Tasmota) ; les commentaires du
+  code restent en français, ainsi que les noms des endpoints Matter déduits à l'import
+  (`Lumière <nom>`, `<nom> humidité`), qui sont ceux que Google Home affiche.
 - `TuyaWeb.post()` : actions `save`, `del`, `reload`, `scan`, `import`, `cloud`, `matter`, puis
   redirection vers `/tuya` (ou `/?rst=` pour redémarrer après la création d'endpoints).
 - Endpoints Matter : `matter_missing()` compare les noms des liaisons à ceux de

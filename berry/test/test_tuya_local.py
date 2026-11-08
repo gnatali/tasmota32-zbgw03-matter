@@ -186,7 +186,7 @@ def main():
 
     # 1. connexion, negociation et etat initial de tous les appareils
     out = h.pump(h.send("ADV 50"))
-    errs = [l for l in out if l.startswith("LOG 1") or "erreur" in l]
+    errs = [l for l in out if l.startswith("LOG 1") or " error: " in l]
     assert not errs, errs
     up = mtr_updates(out)
     assert find(up, "Ventilateur") == {"Name": "Ventilateur", "FanSpeed": 0}, find(up, "Ventilateur")
@@ -295,7 +295,7 @@ def main():
     out = []
     for _ in range(8):
         out += h.pump(h.send("ADV 5000"))
-    assert any("Recepteur radio" in l and "plus de reponse" in l for l in out), [l for l in out if "LOG" in l][-5:]
+    assert any("Recepteur radio" in l and "no more replies" in l for l in out), [l for l in out if "LOG" in l][-5:]
     DEVS[radio_ip].feed = saved
     ok += 1
     print("OK 9 detection d'un appareil muet")
@@ -304,7 +304,7 @@ def main():
     bad = bytearray(gw.push({"cid": "00158d0000000002", "dps": {"1": 300}}))
     bad[-10] ^= 0xFF
     out = h.send("RX 10.0.0.180 " + bytes(bad).hex())
-    assert any("CRC invalide" in l for l in out), out
+    assert any("invalid CRC" in l for l in out), out
     good = gw.push({"cid": "00158d0000000002", "dps": {"1": 199}})
     out = h.pump(h.send("RX 10.0.0.180 " + good.hex()))
     assert abs(find(mtr_updates(out), "Temperature SdB")["Temperature"] - 19.9) < 0.01
@@ -331,7 +331,7 @@ def main():
         json.dump(cfg, f)
     h = Harness()
     out = h.pump(h.send("ADV 50"))
-    assert any("endpoint Matter 'Inconnu' : Invalid Device" in l for l in out), [l for l in out if "LOG" in l]
+    assert any("Matter endpoint 'Inconnu': Invalid Device" in l for l in out), [l for l in out if "LOG" in l]
     ok += 1
     print("OK 12 endpoint Matter absent signale")
 
@@ -349,7 +349,7 @@ def main():
     h.send("EPADD Inconnu")                       # l'endpoint est cree dans Configuration -> Matter
     out = adv(30000)
     assert find(mtr_updates(out), "Inconnu") == {"Name": "Inconnu", "Power": 0}, mtr_updates(out)
-    assert any("endpoint Matter 'Inconnu' disponible" in l for l in out), [l for l in out if "LOG" in l]
+    assert any("Matter endpoint 'Inconnu' available" in l for l in out), [l for l in out if "LOG" in l]
     out = adv(30000)
     assert find(mtr_updates(out), "Inconnu") == {}, "endpoint accepte : plus de renvoi"
     push = DEVS["10.0.0.15"].push({"protocol": 4, "t": 5, "data": {"dps": {"1": True}}})
@@ -380,7 +380,7 @@ def main():
     assert saved["key"] == K["plug"] and saved["codes"] == {"switch": 1}, saved
     out = h.pump(h.send("CMD TuyaSend Prise test,switch,true"))
     assert DEVS["10.0.0.99"].dps["1"] is True, DEVS["10.0.0.99"].dps
-    assert "DP inconnu" in h.send("CMD TuyaSend Prise test,inexistant,1")[-1]
+    assert "Unknown DP" in h.send("CMD TuyaSend Prise test,inexistant,1")[-1]
     assert "Error" in resp(h.send("CMD TuyaAdd {pas du json"), "TuyaAdd")
     out = h.pump(h.send("CMD TuyaDel Prise test"))
     assert resp(out, "TuyaDel") == "Prise test"
@@ -418,7 +418,7 @@ def main():
     assert found["mplug35000000000000bb"]["version"] == "3.5" and found["lamp330000000000000aa"]["ip"] == "10.0.0.50"
     assert sum(l.startswith("UDPCLOSE ") for l in out) == 3
     h.send("HEAP 10")
-    assert "memoire" in resp(h.send("CMD TuyaScan"), "TuyaScan")["Error"]
+    assert "memory" in resp(h.send("CMD TuyaScan"), "TuyaScan")["Error"]
     h.send("HEAP 60")
     ok += 1
     print("OK 15 recherche : annonces 3.1/3.3/3.5 (format TinyTuya), demande 3.5, resultat publie")
@@ -472,7 +472,7 @@ def main():
     out = h.pump(h.send("CMD TuyaImport /devices.json all"))
     r = resp(out, "TuyaImport")
     assert "Ailleurs" in r["Added"] and "Enorme" not in r["Added"] + r["Updated"], r
-    assert any("trop gros" in l for l in out), [l for l in out if l.startswith("LOG")]
+    assert any("too big" in l for l in out), [l for l in out if l.startswith("LOG")]
     remote = [d for d in json.load(open("/tuya.json"))["devices"] if d["id"] == "remote000000000000000"][0]
     assert remote["enabled"] is False and [b["ep"] for b in remote["matter"]] == ["Ailleurs 1", "Ailleurs 2"], remote
     ok += 1
@@ -490,10 +490,10 @@ def main():
            '"type":"Boolean","values":"{}"}],"status":[]},"t":1794092133494}' % cloud_id)
     creds = {"region": "eu", "id": "AcCeSsId0123", "secret": "s3cr3t-s3cr3t", "devices": [cloud_id]}
     h.send("HEAP 30")
-    assert "memoire" in resp(h.send("CMD TuyaCloud " + json.dumps(creds)), "TuyaCloud")["Error"]
+    assert "memory" in resp(h.send("CMD TuyaCloud " + json.dumps(creds)), "TuyaCloud")["Error"]
     h.send("HEAP 60")
     out = h.send("CMD TuyaCloud " + json.dumps(creds))
-    assert "1 appareil" in resp(out, "TuyaCloud")
+    assert "1 device" in resp(out, "TuyaCloud")
     for _ in range(5):
         out += h.pump(h.send("ADV 1000"))
     reqs = [l for l in out if l.startswith("HTTPS ")]
@@ -523,9 +523,9 @@ def main():
     btn, _ = page_btn(h)
     assert "action='tuya'" in btn
     html, _ = page("GET", {})
-    assert "Lampe test" in html and "Prise mesure" in html and "Rechercher" in html, html[:300]
+    assert "Lampe test" in html and "Prise mesure" in html and "Discover devices" in html, html[:300]
     assert K["clamp"] not in html and K["lamp"] not in html
-    assert "Sans endpoint Matter" in html and "Lampe test <small>(v_light2)" in html, html
+    assert "Missing Matter endpoints" in html and "Lampe test <small>(v_light2)" in html, html
     html, _ = page("GET", {"edit": "Pince"})
     assert "&quot;key&quot;: &quot;***&quot;" in html and K["clamp"] not in html, html
     pince = [d for d in json.load(open("/tuya.json"))["devices"] if d["name"] == "Pince"][0]
@@ -536,7 +536,7 @@ def main():
     pince = [d for d in json.load(open("/tuya.json"))["devices"] if d["name"] == "Pince"][0]
     assert pince["key"] == K["clamp"] and "Puissance B" in pince["sensors"], pince
     html, _ = page("GET", {})
-    assert "Enregistré : Pince" in html
+    assert "Saved: Pince" in html
     page("POST", {"del": "", "ref": "Cloud double"})
     assert all(d["name"] != "Cloud double" for d in json.load(open("/tuya.json"))["devices"])
     html, out = page("POST", {"matter": ""})
@@ -546,10 +546,10 @@ def main():
     assert names.get("Prise mesure") == "v_relay_power" and "Porche" not in names, names
     assert html.endswith("REDIRECT /?rst="), html
     html, _ = page("GET", {})
-    assert "Chaque liaison du driver a son endpoint Matter" in html, html
+    assert "Every binding has its Matter endpoint" in html, html
     html, _ = page("POST", {"scan": ""})
     html, _ = page("GET", {})
-    assert "Recherche en cours" in html
+    assert "Discovery in progress" in html
     ok += 1
     print("OK 18 page web : liste, edition (cle masquee), suppression, endpoints Matter, recherche")
 
@@ -560,8 +560,8 @@ def main():
     assert lampdev.dps["20"] is (not before), lampdev.dps
     h.pump(h.send("CMD TuyaSend Lampe test,switch_led,TOGGLE"))
     assert lampdev.dps["20"] is before, lampdev.dps
-    assert "non booleen" in h.send("CMD TuyaSend Lampe test,22,toggle")[-1]
-    assert "inconnu" in h.send("CMD TuyaSend Lampe test,99,toggle")[-1]
+    assert "not boolean" in h.send("CMD TuyaSend Lampe test,22,toggle")[-1]
+    assert "unknown" in h.send("CMD TuyaSend Lampe test,99,toggle")[-1]
     ok += 1
     print("OK 19 TuyaSend toggle : inversion d'un DP booleen, refus sinon")
 
@@ -576,16 +576,16 @@ def main():
     assert json.load(open("/tuya_cloud.json")) == saved
     assert saved["secret"] not in open("/tuya.json").read()
     html, _ = page("GET", {})
-    assert "aucun appareil" in html and "(identifiants enregistres)" in html, html[:400]   # pas de recherche
+    assert "no device" in html and "(credentials saved)" in html, html[:400]   # pas de recherche
     for _ in range(8):
         h.pump(h.send("ADV 1000"))
     html, _ = page("GET", {})
     assert "name='keep' checked>" in html and "value='%s'" % saved["id"] in html, html
-    assert saved["secret"] not in html and "Access Secret enregistré" in html
+    assert saved["secret"] not in html and "Access Secret (saved, leave empty)" in html
     assert saved["secret"] not in json.dumps(resp(h.send("CMD TuyaConfig"), "TuyaConfig"))
     h.send('HTTPSRESP /v1.0/token?grant_type=1 200 {"success":true,"result":{"access_token":"tok123"},"t":1794092132086}')
     out = h.send("CMD TuyaCloud " + json.dumps({"devices": [cloud_id]}))   # identifiants enregistres
-    assert resp(out, "TuyaCloud") == "import cloud lance pour 1 appareil(s)", out
+    assert resp(out, "TuyaCloud") == "cloud import started for 1 device(s)", out
     for _ in range(5):
         out += h.pump(h.send("ADV 1000"))
     reqs = [l for l in out if l.startswith("HTTPS ")]
@@ -598,7 +598,7 @@ def main():
     assert "name='keep'>" in html and saved["id"] not in html, html
     for _ in range(8):
         h.pump(h.send("ADV 1000"))
-    assert "Access ID et Access Secret requis" in resp(h.send("CMD TuyaCloud"), "TuyaCloud")["Error"]
+    assert "Access ID and Access Secret required" in resp(h.send("CMD TuyaCloud"), "TuyaCloud")["Error"]
     ok += 1
     print("OK 20 identifiants du cloud enregistres : case de la page, TuyaCloud sans argument, effacement")
 

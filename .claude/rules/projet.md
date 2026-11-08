@@ -7,7 +7,9 @@ paths:
 Firmware Tasmota maison pour la passerelle **eWeLink ZB-GW03** de Guillaume : Zigbee (EFR32 en
 EZSP), Ethernet et **Matter**, plus un driver Berry qui pilote les appareils **Tuya en local**.
 Échanges, commentaires, commits et documentation **en français**. Les README existent en
-français et en anglais : toute modification de l'un se reporte dans l'autre.
+français et en anglais : toute modification de l'un se reporte dans l'autre. Exception :
+l'**interface du driver** (page web, réponses des commandes, erreurs, journal) est **en anglais**,
+comme Tasmota, et la page suit la mise en page des pages de Tasmota (voir `berry-pieges.md`).
 
 **Chantier en cours** : appareils Tuya en local, branche `tuya-local-crypto`, PR #7. L'état,
 les mesures faites sur la passerelle et les prochaines étapes sont dans

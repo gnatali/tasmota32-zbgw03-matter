@@ -113,6 +113,17 @@ Tuya Wi-Fi et les sous-appareils Zigbee de la passerelle Tuya, et les présenter
     vidé. Scénario 20 (20/20 dans les deux modes). **Pas de build** à la demande de Guillaume :
     il viendra avec la prochaine modification.
 
+13. **Page web au format Tasmota, interface en anglais** (8 novembre) : sur un écran
+    d'ordinateur, la page s'étalait sur toute la largeur (formulaire du cloud : liste et champs
+    côte à côte, longs paragraphes), contrairement aux pages de Tasmota (Matter). Désormais
+    340 px comme Tasmota (paragraphes de 320 px, un champ par bloc avec son libellé, en-têtes de
+    tableau en petit), vérifié par capture avec le CSS de Tasmota. Pictogrammes HTML pour les
+    actions (🔌 bouton, 📝 modifier, 🔥 supprimer, 💾, ➕, 🔄, 🔍, 📥, ☁️ ; états 🟢 🔴 ⚪ ⚠ ;
+    recherche ✅/🆕). Page, réponses, erreurs et journal **en anglais** ; noms d'endpoints
+    déduits à l'import inchangés (français). Tests et docs FR/EN adaptés (20/20 dans les deux
+    modes). **Pas de build** : à lancer avec la prochaine modification. Le `autoexec.be` de la
+    doc journalise aussi en anglais (celui de la passerelle reste valable tel quel).
+
 ## Mesures sur la passerelle
 
 | Situation | `Heap` (`Status 4`) |

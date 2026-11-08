@@ -22,8 +22,8 @@ It requires a firmware from this repository, which includes the `berry-aes-gcm-1
 patch and the `USE_BERRY_CRYPTO_AES_CBC` option (the official Tasmota firmware cannot encrypt
 the 3.5 protocol).
 
-The driver's console messages, error messages and web page are in French; their meaning is
-given in this guide.
+The driver's web page, command responses, error messages and console messages are in English,
+like the rest of Tasmota.
 
 ## Contents
 
@@ -71,10 +71,10 @@ again and update `tuya.json`.
      import global
      var free = tasmota.memory()['heap_free']
      if free < 60
-       tasmota.log(f"TUY: driver non demarre, memoire libre insuffisante ({free} Ko)", 2)
+       tasmota.log(f"TUY: driver not started, not enough free memory ({free} KB)", 2)
        return
      end
-     tasmota.log(f"TUY: demarrage du driver, memoire libre {free} Ko", 2)
+     tasmota.log(f"TUY: starting the driver, free memory {free} KB", 2)
      # firmware without the built-in driver: load the tuya_local.be file
      if !global.contains("TuyaLocal")  load("tuya_local.be")  end
      global.tuya_local = TuyaLocal()
@@ -96,9 +96,9 @@ again and update `tuya.json`.
    number of devices and Matter endpoints, then each connection):
 
    ```
-   TUY: demarrage du driver, memoire libre 74 Ko
-   TUY: 5 appareil(s), 16 endpoint(s) Matter
-   TUY: Ventilateur (192.168.1.18) connecte, protocole 3.5
+   TUY: starting the driver, free memory 74 KB
+   TUY: 5 device(s), 16 Matter endpoint(s)
+   TUY: Ventilateur (192.168.1.18) connected, protocol 3.5
    ...
    ```
 
@@ -107,32 +107,34 @@ again and update `tuya.json`.
 
 ## Web page: adding and managing devices
 
-**Configuration → Tuya local** (`/tuya`):
+**Configuration → 🔌 Tuya Local** (`/tuya`). The page follows the layout of Tasmota's own pages
+(340 px wide), with pictograms for the actions.
 
-- **Devices** (*Appareils*): name, IP, version and state (connected, disconnected, disabled) of
-  each `tuya.json` entry. **Edit** (*Modifier*) opens the entry as JSON (same format as the
-  file): the key is replaced by `***`, and a key left as `***` is kept when saving. **Add a
-  device** (*Ajouter un appareil*) offers a template. Each save keeps the previous version in
-  `/tuya.json.bak`, then reloads the configuration.
-- **Discover devices (20 s)** (*Rechercher les appareils*): listens to the Wi-Fi devices'
+- **Tuya devices**: name, IP, version and state of each `tuya.json` entry (🟢 connected,
+  🔴 disconnected, ⚪ disabled, ⚠ incomplete). **📝** opens the entry as JSON (same format as the
+  file): the key is replaced by `***`, and a key left as `***` is kept when saving (**💾 Save**;
+  **🔥 Delete** removes the device). **➕ Add device** offers a template. Each save keeps the
+  previous version in `/tuya.json.bak`, then reloads the configuration. **🔄 Reload tuya.json**
+  reads the file again.
+- **Network discovery → 🔍 Discover devices (20 s)**: listens to the Wi-Fi devices'
   announcements on the local network (UDP ports 6666, 6667, 7000) and asks 3.5 devices to
-  announce themselves, like `tinytuya scan`. Gives the id, IP and version of each one. The
-  gateway and the devices must be on the **same local network** (announcements do not cross a
-  router).
-- **Import the local keys** (*Importer les clés locales*), two options:
-  - `tinytuya wizard`'s `devices.json`, uploaded through **Tools → Manage File system**. It is
-    read in chunks: its size is not limited by memory. The devices found by the discovery or
-    already configured are imported (or all of them, *tous* checkbox), with their Zigbee
-    sub-devices;
-  - **the Tuya cloud directly**, for the devices found by the discovery: choose the region and
-    enter the **Access ID** and **Access Secret** of the Tuya IoT project (the same developer
-    account as for `tinytuya wizard`). With the **save the credentials** checkbox (*enregistrer
-    les identifiants*), they are kept in `/tuya_cloud.json` (never in `tuya.json`): the page then
-    fills in the region and the Access ID, and an Access Secret left empty uses the saved one; the
-    secret is never shown again. Unchecking the box erases the file (the current import still
-    uses the credentials once). The time must be set (NTP) and
-    **35 KB of free memory** is required (Tasmota's HTTPS client reserves 16 of them); the
-    import makes one request per second, and the result is shown on the page.
+  announce themselves, like `tinytuya scan`. Gives the id, IP and version of each one (✅ already
+  configured, 🆕 new). The gateway and the devices must be on the **same local network**
+  (announcements do not cross a router).
+- **Import local keys**, two options:
+  - **📥 Import file**: `tinytuya wizard`'s `devices.json`, uploaded through **Tools → Manage
+    File system**. It is read in chunks: its size is not limited by memory. The devices found by
+    the discovery or already configured are imported (or all of them, **all** checkbox), with
+    their Zigbee sub-devices;
+  - **☁️ Import from cloud**: the Tuya cloud directly, for the devices found by the discovery.
+    Choose the **Region** and enter the **Access ID** and **Access Secret** of the Tuya IoT
+    project (the same developer account as for `tinytuya wizard`). With the **save credentials**
+    checkbox, they are kept in `/tuya_cloud.json` (never in `tuya.json`): the page then fills in
+    the region and the Access ID, and an Access Secret left empty uses the saved one; the secret
+    is never shown again. Unchecking the box erases the file (the current import still uses the
+    credentials once). The time must be set (NTP) and **35 KB of free memory** is required
+    (Tasmota's HTTPS client reserves 16 of them); the import makes one request per second, and
+    the result is shown on the page.
 
   The import completes `tuya.json`: a new device gets its key, its IP and version (from the
   discovery), its **Matter bindings deduced from its DPs** (light, fan, plug with or without
@@ -140,12 +142,12 @@ again and update `tuya.json`.
   table of its DPs. An already configured device keeps its bindings: only its key, IP and
   version are updated. A device without a known IP is added with `"enabled": false`.
 - **Matter endpoints**: lists the bindings that have no Matter endpoint with the same name.
-  **Create the endpoints and restart** (*Créer les endpoints et redémarrer*) creates them
+  **➕ Create endpoints and restart** creates them
   (types in the table below) then restarts Tasmota, which Google Home needs.
 
 ## Creating the Matter endpoints
 
-The **Tuya local** page creates them in one click (see above). By hand:
+The **Tuya Local** page creates them in one click (see above). By hand:
 
 In **Configuration → Matter**, add one endpoint per `matter` entry of `tuya.json`, of the type
 below and with **exactly** the name given in `ep` (32 bytes at most; an accented letter counts
@@ -169,9 +171,8 @@ it the device state every 30 s until it accepts it.
 | `humidity` | v.Humidity | humidity |
 
 If a name matches no endpoint, the console says so once:
-`TUY: endpoint Matter 'xxx' : Invalid Device (nouvel essai toutes les 30 s)` (retried every
-30 s). As soon as the endpoint exists: `TUY: endpoint Matter 'xxx' disponible, etat envoye`
-(available, state sent).
+`TUY: Matter endpoint 'xxx': Invalid Device (retry every 30 s)`. As soon as the endpoint
+exists: `TUY: Matter endpoint 'xxx' available, state sent`.
 
 ## Configuration file
 
@@ -292,7 +293,7 @@ It no longer appears in Smart Life; remove it from `tuya.json` if it was there.
   handle Zigbee sub-devices (they do not announce themselves on the network): use tinytuya's
   `devices.json`.
 - Commands go through when the device is connected; otherwise they are ignored (log:
-  `non connecte, commande ignoree`), and the driver reconnects by itself (5 s, then up to 60 s
+  `not connected, command ignored`), and the driver reconnects by itself (5 s, then up to 60 s
   between attempts).
 - A device silent for more than 35 seconds is disconnected, then reconnected.
 

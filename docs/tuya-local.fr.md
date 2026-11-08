@@ -69,10 +69,10 @@ et mettre à jour `tuya.json`.
      import global
      var free = tasmota.memory()['heap_free']
      if free < 60
-       tasmota.log(f"TUY: driver non demarre, memoire libre insuffisante ({free} Ko)", 2)
+       tasmota.log(f"TUY: driver not started, not enough free memory ({free} KB)", 2)
        return
      end
-     tasmota.log(f"TUY: demarrage du driver, memoire libre {free} Ko", 2)
+     tasmota.log(f"TUY: starting the driver, free memory {free} KB", 2)
      # firmware sans le driver integre : charger le fichier tuya_local.be
      if !global.contains("TuyaLocal")  load("tuya_local.be")  end
      global.tuya_local = TuyaLocal()
@@ -94,9 +94,9 @@ et mettre à jour `tuya.json`.
 4. `Restart 1`. Au bout de 30 secondes, la console affiche :
 
    ```
-   TUY: demarrage du driver, memoire libre 74 Ko
-   TUY: 5 appareil(s), 16 endpoint(s) Matter
-   TUY: Ventilateur (192.168.1.18) connecte, protocole 3.5
+   TUY: starting the driver, free memory 74 KB
+   TUY: 5 device(s), 16 Matter endpoint(s)
+   TUY: Ventilateur (192.168.1.18) connected, protocol 3.5
    ...
    ```
 
@@ -106,25 +106,30 @@ et mettre à jour `tuya.json`.
 
 ## Page web : ajouter et gérer les appareils
 
-**Configuration → Tuya local** (`/tuya`) :
+**Configuration → 🔌 Tuya Local** (`/tuya`). Comme le reste de Tasmota, la page est en anglais,
+avec la mise en page des pages de Tasmota (340 px de large) et des pictogrammes pour les actions.
+Les messages des commandes, les réponses et le journal sont aussi en anglais.
 
-- **Appareils** : nom, IP, version et état (connecté, déconnecté, désactivé) de chaque entrée de
-  `tuya.json`. **Modifier** ouvre l'entrée en JSON (même format que le fichier) : la clé y est
-  remplacée par `***`, et une clé laissée à `***` est conservée à l'enregistrement.
-  **Ajouter un appareil** propose un modèle. Chaque enregistrement garde l'ancienne version
-  dans `/tuya.json.bak`, puis recharge la configuration.
-- **Rechercher les appareils (20 s)** : écoute les annonces des appareils Wi-Fi sur le réseau
+- **Tuya devices** : nom, IP, version et état de chaque entrée de `tuya.json` (🟢 connecté,
+  🔴 déconnecté, ⚪ désactivé, ⚠ incomplet). **📝** ouvre l'entrée en JSON (même format que le
+  fichier) : la clé y est remplacée par `***`, et une clé laissée à `***` est conservée à
+  l'enregistrement (**💾 Save** ; **🔥 Delete** supprime l'appareil). **➕ Add device** propose
+  un modèle. Chaque enregistrement garde l'ancienne version dans `/tuya.json.bak`, puis recharge
+  la configuration. **🔄 Reload tuya.json** relit le fichier.
+- **Network discovery → 🔍 Discover devices (20 s)** : écoute les annonces des appareils Wi-Fi sur le réseau
   local (ports UDP 6666, 6667, 7000) et demande aux appareils 3.5 de s'annoncer, comme
-  `tinytuya scan`. Donne l'identifiant, l'IP et la version de chacun. La passerelle et les
+  `tinytuya scan`. Donne l'identifiant, l'IP et la version de chacun (✅ déjà configuré, 🆕
+nouveau). La passerelle et les
   appareils doivent être sur le **même réseau local** (les annonces ne traversent pas un routeur).
-- **Importer les clés locales**, deux possibilités :
-  - le `devices.json` de `tinytuya wizard`, envoyé par **Outils → Gestion des fichiers**. Il est
-    lu par morceaux : sa taille n'est pas limitée par la mémoire. Sont importés les appareils
-    trouvés par la recherche ou déjà configurés (ou tous, case « tous »), avec leurs
-    sous-appareils Zigbee ;
-  - **le cloud Tuya directement**, pour les appareils trouvés par la recherche : choisir la
-    région et saisir l'**Access ID** et l'**Access Secret** du projet Tuya IoT (le même compte
-    développeur que pour `tinytuya wizard`). Avec la case **« enregistrer les identifiants »**, ils
+- **Import local keys**, deux possibilités :
+  - **📥 Import file** : le `devices.json` de `tinytuya wizard`, envoyé par **Outils → Gestion
+    des fichiers**. Il est lu par morceaux : sa taille n'est pas limitée par la mémoire. Sont
+    importés les appareils trouvés par la recherche ou déjà configurés (ou tous, case **all**),
+    avec leurs sous-appareils Zigbee ;
+  - **☁️ Import from cloud** : le cloud Tuya directement, pour les appareils trouvés par la
+    recherche. Choisir la région (**Region**) et saisir l'**Access ID** et l'**Access Secret** du
+    projet Tuya IoT (le même compte développeur que pour `tinytuya wizard`). Avec la case
+    **save credentials**, ils
     sont gardés dans `/tuya_cloud.json` (jamais dans `tuya.json`) : la page reprend ensuite la
     région et l'Access ID, et un Access Secret laissé vide reprend celui enregistré ; le secret
     n'est jamais réaffiché. Décocher la case efface le fichier (l'import en cours se sert encore
@@ -138,13 +143,13 @@ et mettre à jour `tuya.json`.
   la table `codes` de ses DP. Un appareil déjà configuré garde ses liaisons : seules sa clé, son
   IP et sa version sont mises à jour. Un appareil sans IP connue est ajouté avec
   `"enabled": false`.
-- **Endpoints Matter** : liste les liaisons sans endpoint Matter du même nom. **Créer les
-  endpoints et redémarrer** les crée (types du tableau ci-dessous) puis redémarre Tasmota, ce qui
+- **Matter endpoints** : liste les liaisons sans endpoint Matter du même nom. **➕ Create
+  endpoints and restart** les crée (types du tableau ci-dessous) puis redémarre Tasmota, ce qui
   est nécessaire pour Google Home.
 
 ## Créer les endpoints Matter
 
-La page **Tuya local** les crée en un clic (voir ci-dessus). À la main :
+La page **Tuya Local** les crée en un clic (voir ci-dessus). À la main :
 
 Dans **Configuration → Matter**, ajouter un endpoint par entrée `matter` de `tuya.json`, du
 type ci-dessous et avec **exactement** le nom donné dans `ep` (32 octets au plus ; une lettre
@@ -169,8 +174,8 @@ l'état de l'appareil toutes les 30 s jusqu'à ce qu'il l'accepte.
 | `humidity` | v.Humidity | humidité |
 
 Si un nom ne correspond à aucun endpoint, la console l'indique une fois :
-`TUY: endpoint Matter 'xxx' : Invalid Device (nouvel essai toutes les 30 s)`. Dès que
-l'endpoint existe : `TUY: endpoint Matter 'xxx' disponible, etat envoye`.
+`TUY: Matter endpoint 'xxx': Invalid Device (retry every 30 s)`. Dès que
+l'endpoint existe : `TUY: Matter endpoint 'xxx' available, state sent`.
 
 ## Fichier de configuration
 
@@ -293,7 +298,7 @@ Il n'apparaît plus dans Smart Life, et le retirer de `tuya.json` s'il y figurai
   ventilateur devient un simple marche/arrêt). L'import cloud ne traite pas les sous-appareils
   Zigbee (ils ne s'annoncent pas sur le réseau) : passer par le `devices.json` de tinytuya.
 - Les commandes passent quand l'appareil est connecté ; sinon elles sont ignorées (journal :
-  `non connecte, commande ignoree`), et le driver se reconnecte tout seul (5 s, puis jusqu'à
+  `not connected, command ignored`), et le driver se reconnecte tout seul (5 s, puis jusqu'à
   60 s entre deux essais).
 - Un appareil muet plus de 35 secondes est déconnecté puis reconnecté.
 

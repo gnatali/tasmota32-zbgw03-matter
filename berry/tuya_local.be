@@ -283,14 +283,14 @@ class TuyaBinding
     # accepte : l'etat de l'endpoint, ou "Done" pour un endpoint qui n'en publie pas (v_fan)
     if type(v) == 'instance' || v == "Done"
       if self.pending
-        tasmota.log(f"TUY: endpoint Matter '{self.ep}' disponible, etat envoye", 2)
+        tasmota.log(f"TUY: Matter endpoint '{self.ep}' available, state sent", 2)
         self.pending = false
       end
       return true
     end
     if !self.pending                  # "Invalid Device", "Invalid attribute '...'" ou rien : signale une fois
       var why = (v != nil) ? v : res
-      tasmota.log(f"TUY: endpoint Matter '{self.ep}' : {why} (nouvel essai toutes les 30 s)", 2)
+      tasmota.log(f"TUY: Matter endpoint '{self.ep}': {why} (retry every 30 s)", 2)
       self.pending = true
     end
     return false
@@ -467,7 +467,7 @@ class TuyaDevice : TuyaNode
     if self.tcp  self.tcp.close()  end
     self.tcp = nil
     if self.state != self.ST_IDLE
-      tasmota.log(f"TUY: {self.name} ({self.ip}) deconnecte : {reason}", 2)
+      tasmota.log(f"TUY: {self.name} ({self.ip}) disconnected: {reason}", 2)
     end
     self.state = self.ST_IDLE
     self.rx = bytes()
@@ -488,7 +488,7 @@ class TuyaDevice : TuyaNode
 
   def on_connected()
     import crypto
-    tasmota.log(f"TUY: {self.name} ({self.ip}) connecte, protocole {self.ver}", 2)
+    tasmota.log(f"TUY: {self.name} ({self.ip}) connected, protocol {self.ver}", 2)
     self.t_last_rx = tasmota.millis()
     self.t_hb = tasmota.millis()
     if self.v34()
@@ -519,13 +519,13 @@ class TuyaDevice : TuyaNode
       if c == true
         self.on_connected()
       elif c == false || now - self.t_state > 10000
-        self.close("connexion impossible")
+        self.close("connection failed")
         return
       end
       return
     end
     if c != true
-      self.close("connexion fermee")
+      self.close("connection closed")
       return
     end
     # reception
@@ -538,12 +538,12 @@ class TuyaDevice : TuyaNode
     # emission en attente
     self.flush()
     if self.state == self.ST_NEGO && now - self.t_state > 5000
-      self.close("negociation de cle sans reponse")
+      self.close("no reply to key negotiation")
       return
     end
     if self.state == self.ST_READY
       if now - self.t_last_rx > 35000
-        self.close("plus de reponse")
+        self.close("no more replies")
         return
       end
       if now - self.t_hb > 10000
@@ -585,7 +585,7 @@ class TuyaDevice : TuyaNode
   def set_dps(node, dps)
     import json
     if self.state != self.ST_READY
-      tasmota.log(f"TUY: {node.name} non connecte, commande ignoree", 2)
+      tasmota.log(f"TUY: {node.name} not connected, command ignored", 2)
       return false
     end
     var d = json.dump(dps)
@@ -673,7 +673,7 @@ class TuyaDevice : TuyaNode
         total = 18 + self.rx.get(14, -4) + 4
       end
       if total < 24 || total > 4096
-        self.close("trame invalide")
+        self.close("invalid frame")
         return
       end
       if n < total  return  end
@@ -682,7 +682,7 @@ class TuyaDevice : TuyaNode
       try
         self.handle(frame)
       except .. as e, m
-        tasmota.log(f"TUY: {self.name} erreur de decodage : {e} {m}", 2)
+        tasmota.log(f"TUY: {self.name} decoding error: {e} {m}", 2)
       end
       if self.tcp == nil  return  end
     end
@@ -700,7 +700,7 @@ class TuyaDevice : TuyaNode
       var tag = frame[total - 20 .. total - 5]
       var g = crypto.AES_GCM(k, iv, frame[4 .. 17])
       var pt = g.decrypt(ct)
-      if g.tag() != tag  raise "tag_error", "authentification GCM invalide"  end
+      if g.tag() != tag  raise "tag_error", "GCM authentication failed"  end
       return [cmd, size(pt) >= 4 ? pt[4 ..] : bytes()]
     end
     var cmd = frame.get(8, -4)
@@ -708,9 +708,9 @@ class TuyaDevice : TuyaNode
     var end_len = use_hmac ? 36 : 8
     var signed = frame[0 .. total - end_len - 1]
     if use_hmac
-      if TuyaCodec.hmac(k, signed) != frame[total - 36 .. total - 5]  raise "hmac_error", "HMAC invalide"  end
+      if TuyaCodec.hmac(k, signed) != frame[total - 36 .. total - 5]  raise "hmac_error", "invalid HMAC"  end
     else
-      if TuyaCodec.crc32(signed, size(signed)) != frame.get(total - 8, -4)  raise "crc_error", "CRC invalide"  end
+      if TuyaCodec.crc32(signed, size(signed)) != frame.get(total - 8, -4)  raise "crc_error", "invalid CRC"  end
     end
     var body = (total - end_len > 20) ? frame[20 .. total - end_len - 1] : bytes()     # apres le code retour
     if size(body) == 0  return [cmd, body]  end
@@ -742,7 +742,7 @@ class TuyaDevice : TuyaNode
     if s[0] != '{'  return  end
     var m = json.load(s)
     if m == nil
-      tasmota.log(f"TUY: {self.name} JSON invalide : {s}", 3)
+      tasmota.log(f"TUY: {self.name} invalid JSON: {s}", 3)
       return
     end
     var data = m.find("data")
@@ -757,7 +757,7 @@ class TuyaDevice : TuyaNode
     if cid != nil
       node = self.children.find(str(cid))
       if node == nil
-        tasmota.log(f"TUY: {self.name} sous-appareil inconnu cid={cid}", 3)
+        tasmota.log(f"TUY: {self.name} unknown sub-device cid={cid}", 3)
         return
       end
     end
@@ -768,12 +768,12 @@ class TuyaDevice : TuyaNode
   def nego_step2(p)
     import crypto
     if self.state != self.ST_NEGO || size(p) < 48
-      self.close("negociation : reponse inattendue")
+      self.close("negotiation: unexpected reply")
       return
     end
     var remote = p[0 .. 15]
     if TuyaCodec.hmac(self.key, self.nonce) != p[16 .. 47]
-      self.close("negociation : cle locale incorrecte ?")
+      self.close("negotiation: wrong local key?")
       return
     end
     self.send_raw(5, TuyaCodec.hmac(self.key, remote))
@@ -818,7 +818,7 @@ class TuyaScan
       if u.begin("", p)
         self.socks.push(u)
       else
-        tasmota.log(f"TUY: recherche : port UDP {p} indisponible", 2)
+        tasmota.log(f"TUY: discovery: UDP port {p} unavailable", 2)
       end
     end
     self.t_end = tasmota.millis() + ms
@@ -950,7 +950,7 @@ class TuyaImport
           if size(acc) > TuyaImport.MAX_OBJECT
             acc = nil
             skip = true
-            tasmota.log("TUY: import : objet JSON trop gros, ignore", 2)
+            tasmota.log("TUY: import: JSON object too big, ignored", 2)
           end
         end
       end
@@ -1210,8 +1210,8 @@ class TuyaCloud
   def init(region, key, secret, ids)
     import string
     self.host = self.HOSTS.find(string.tolower(str(region)))
-    if self.host == nil  raise "tuya_error", "region inconnue (eu, we, us, ue, cn, in, sg)"  end
-    if key == nil || key == "" || secret == nil || secret == ""  raise "tuya_error", "Access ID et Access Secret requis"  end
+    if self.host == nil  raise "tuya_error", "unknown region (eu, we, us, ue, cn, in, sg)"  end
+    if key == nil || key == "" || secret == nil || secret == ""  raise "tuya_error", "Access ID and Access Secret required"  end
     self.key = key
     self.secret = secret
     self.ids = ids
@@ -1231,7 +1231,7 @@ class TuyaCloud
 
   static def now_ms()
     var u = tasmota.rtc()["utc"]
-    if u < 1600000000  raise "tuya_error", "heure non synchronisee (NTP)"  end
+    if u < 1600000000  raise "tuya_error", "time not synchronized (NTP)"  end
     return str(u) + "000"
   end
 
@@ -1278,12 +1278,12 @@ class TuyaCloud
     var code = wc.GET()
     var s = (code == 200) ? wc.get_string() : nil
     wc.close()
-    if s == nil  raise "tuya_error", f"cloud Tuya : HTTP {code}"  end
+    if s == nil  raise "tuya_error", f"Tuya cloud: HTTP {code}"  end
     var m = json.load(TuyaCloud.quote_big(s))
     s = nil
     if m == nil || m.find("success") != true
-      var why = (m != nil) ? m.find("msg", m.find("code")) : "reponse invalide"
-      raise "tuya_error", f"cloud Tuya : {why}"
+      var why = (m != nil) ? m.find("msg", m.find("code")) : "invalid response"
+      raise "tuya_error", f"Tuya cloud: {why}"
     end
     return m["result"]
   end
@@ -1327,7 +1327,7 @@ class TuyaCloud
       try
         self.cur["mapping"] = TuyaCloud.mapping(self.request("/v1.1/devices/" + id + "/specifications"))
       except .. as e, m
-        tasmota.log(f"TUY: cloud : pas de DP pour {id} : {m}", 2)
+        tasmota.log(f"TUY: cloud: no DP for {id}: {m}", 2)
       end
       self.out.push(self.cur)
       self.cur = nil
@@ -1339,27 +1339,51 @@ class TuyaCloud
 end
 
 #################################################################################
-# TuyaWeb : page Configuration -> Tuya local (/tuya). Fonctions statiques uniquement.
+# TuyaWeb : page Configuration -> Tuya Local (/tuya). Fonctions statiques uniquement.
+# Mise en page des pages de Tasmota (comme Matter) : texte de 320 px, en-tetes de tableau en
+# petit, pictogrammes HTML pour les actions. Interface en anglais, comme Tasmota.
 #################################################################################
 #@ solidify:TuyaWeb,weak
 class TuyaWeb
+  # etat d'un appareil (TuyaLocal.state_of) -> pictogramme et libelle
+  static var STATES = {"connected": ["&#x1F7E2;", "connected"], "disconnected": ["&#x1F534;", "disconnected"],
+                       "disabled": ["&#x26AA;", "disabled"], "ignored": ["&#x26A0;", "incomplete, ignored"]}
+  static var REGIONS = [["eu", "Central Europe"], ["we", "Western Europe"], ["us", "Western America"],
+                        ["ue", "Eastern America"], ["cn", "China"], ["in", "India"], ["sg", "Singapore"]]
+
   static def esc(s)
     import webserver
     return webserver.html_escape(str(s))
   end
 
+  static def p(txt)
+    import webserver
+    webserver.content_send("<p style='width:320px;'>" + txt + "</p>")
+  end
+
+  static def legend(title)
+    import webserver
+    webserver.content_send("<fieldset><legend><b>&nbsp;" + title + "&nbsp;</b></legend><p></p>")
+  end
+
+  static def th(cols)
+    var s = "<tr>"
+    for c: cols  s += "<td width='" + str(c[1]) + "' style='font-size:smaller;'>" + c[0] + "</td>"  end
+    return s + "</tr>"
+  end
+
   static def button()
     import webserver
-    webserver.content_send("<p></p><form id=tuya action='tuya' style='display: block;' method='get'><button>Tuya local</button></form>")
+    webserver.content_send("<p></p><form id=tuya action='tuya' style='display: block;' method='get'><button>&#x1F50C; Tuya Local</button></form>")
   end
 
   static def page(drv)
     import webserver
     if !webserver.check_privileged_access()  return nil  end
-    webserver.content_start("Tuya local")
+    webserver.content_start("Tuya Local")
     webserver.content_send_style()
     if drv.web_msg != nil
-      webserver.content_send("<p style='text-align:center'><b>" + TuyaWeb.esc(drv.web_msg) + "</b></p>")
+      webserver.content_send("<p style='width:320px;text-align:center'><b>" + TuyaWeb.esc(drv.web_msg) + "</b></p>")
       drv.web_msg = nil
     end
     if webserver.has_arg("edit")
@@ -1376,26 +1400,29 @@ class TuyaWeb
 
   static def devices(drv)
     import webserver
-    webserver.content_send("<fieldset><legend><b>&nbsp;Appareils&nbsp;</b></legend>")
+    TuyaWeb.legend("Tuya devices")
     var conf
     try
       conf = drv.read_conf()
     except .. as e, m
-      webserver.content_send("<p>" + TuyaWeb.esc(m) + "</p>")
+      TuyaWeb.p("&#x26A0; " + TuyaWeb.esc(m))
     end
     if conf != nil
-      webserver.content_send("<table style='width:100%'><tr><th>Nom</th><th>IP</th><th>Ver.</th><th>État</th><th></th></tr>")
+      webserver.content_send("<table style='width:100%'>" +
+                             TuyaWeb.th([["Name", 130], ["IP", 100], ["Ver.", 30], ["", 20], ["", 20]]))
       for c: conf["devices"]
         var id = str(c.find("id", ""))
-        var row = "<tr><td>" + TuyaWeb.esc(c.find("name", id)) + "</td><td>" + TuyaWeb.esc(c.find("ip", "")) +
-                  "</td><td>" + TuyaWeb.esc(c.find("version", "")) + "</td><td>" + drv.state_of(c) +
-                  "</td><td><a href='/tuya?edit=" + TuyaWeb.esc(id) + "'>Modifier</a></td></tr>"
-        webserver.content_send(row)
+        var st = TuyaWeb.STATES.find(drv.state_of(c), ["?", "?"])
+        webserver.content_send("<tr><td>" + TuyaWeb.esc(c.find("name", id)) + "</td><td style='font-size:smaller;'>" +
+                               TuyaWeb.esc(c.find("ip", "")) + "</td><td style='font-size:smaller;'>" + TuyaWeb.esc(c.find("version", "")) +
+                               "</td><td title='" + st[1] + "'>" + st[0] + "</td><td><a href='/tuya?edit=" + TuyaWeb.esc(id) +
+                               "' title='Edit' style='text-decoration:none;'>&#x1F4DD;</a></td></tr>")
       end
       webserver.content_send("</table>")
+      if size(conf["devices"]) == 0  TuyaWeb.p("No device: run a discovery, then import the local keys.")  end
     end
-    webserver.content_send("<p></p><form action='/tuya' method='get'><input type='hidden' name='edit' value=''><button>Ajouter un appareil</button></form>")
-    webserver.content_send("<p></p><form action='/tuya' method='post'><button name='reload'>Recharger tuya.json</button></form></fieldset><p></p>")
+    webserver.content_send("<p></p><form action='/tuya' method='get'><input type='hidden' name='edit' value=''><button>&#x2795; Add device</button></form>")
+    webserver.content_send("<p></p><form action='/tuya' method='post'><button name='reload'>&#x1F504; Reload tuya.json</button></form></fieldset><p></p>")
   end
 
   static def edit(drv, ref)
@@ -1413,55 +1440,57 @@ class TuyaWeb
     elif d.contains("key")
       d["key"] = "***"
     end
-    var title = (ref == "") ? "Nouvel appareil" : "Appareil"
-    webserver.content_send("<fieldset><legend><b>&nbsp;" + title + "&nbsp;</b></legend>")
-    webserver.content_send("<p>Configuration en JSON (voir la documentation). Une clé <code>***</code> conserve la clé enregistrée.</p>")
+    TuyaWeb.legend((ref == "") ? "New Tuya device" : "Tuya device")
+    TuyaWeb.p("JSON configuration (see the documentation). A <code>***</code> key keeps the saved key.")
     webserver.content_send("<form action='/tuya' method='post'><input type='hidden' name='ref' value='" + TuyaWeb.esc(ref) + "'>")
-    webserver.content_send("<textarea name='json' rows='18' style='width:100%;font-family:monospace'>" + TuyaWeb.esc(json.dump(d, "format")) + "</textarea>")
-    webserver.content_send("<button name='save' class='button bgrn'>Enregistrer</button></form>")
+    webserver.content_send("<textarea name='json' style='width:100%;box-sizing:border-box;font-family:monospace;font-size:smaller'>" +
+                           TuyaWeb.esc(json.dump(d, "format")) + "</textarea>")
+    webserver.content_send("<button name='save' class='button bgrn'>&#x1F4BE; Save</button></form>")
     if ref != ""
-      webserver.content_send("<p></p><form action='/tuya' method='post' onsubmit='return confirm(\"Supprimer cet appareil ?\")'>" +
-                             "<input type='hidden' name='ref' value='" + TuyaWeb.esc(ref) + "'><button name='del' class='button bred'>Supprimer</button></form>")
+      webserver.content_send("<p></p><form action='/tuya' method='post' onsubmit='return confirm(\"Delete this device?\")'>" +
+                             "<input type='hidden' name='ref' value='" + TuyaWeb.esc(ref) + "'><button name='del' class='button bred'>&#x1F525; Delete</button></form>")
     end
-    webserver.content_send("<p></p><form action='/tuya' method='get'><button>Retour</button></form></fieldset><p></p>")
+    webserver.content_send("<p></p><form action='/tuya' method='get'><button>&#x21A9; Back</button></form></fieldset><p></p>")
   end
 
   static def matter(drv)
     import webserver
-    webserver.content_send("<fieldset><legend><b>&nbsp;Endpoints Matter&nbsp;</b></legend>")
+    TuyaWeb.legend("Matter endpoints")
     var miss = drv.matter_missing()
     if miss == nil
-      webserver.content_send("<p>Matter n'est pas actif.</p>")
+      TuyaWeb.p("&#x26A0; Matter is not enabled.")
     elif size(miss) == 0
-      webserver.content_send("<p>Chaque liaison du driver a son endpoint Matter.</p>")
+      TuyaWeb.p("&#x2705; Every binding has its Matter endpoint.")
     else
       var l = []
       for b: miss  l.push(TuyaWeb.esc(b.ep) + " <small>(" + TuyaImport.MATTER_TYPES.find(b.type, "?") + ")</small>")  end
-      webserver.content_send("<p>Sans endpoint Matter : " + l.concat(", ") + "</p>")
-      webserver.content_send("<form action='/tuya' method='post' onsubmit='return confirm(\"Créer les endpoints et redémarrer ?\")'>" +
-                             "<button name='matter' class='button bgrn'>Créer les endpoints et redémarrer</button></form>")
+      TuyaWeb.p("&#x26A0; Missing Matter endpoints: " + l.concat(", "))
+      webserver.content_send("<form action='/tuya' method='post' onsubmit='return confirm(\"Create the endpoints and restart?\")'>" +
+                             "<button name='matter' class='button bgrn'>&#x2795; Create endpoints and restart</button></form>")
     end
     webserver.content_send("</fieldset><p></p>")
   end
 
   static def scan(drv)
     import webserver
-    webserver.content_send("<fieldset><legend><b>&nbsp;Recherche sur le réseau&nbsp;</b></legend>")
+    TuyaWeb.legend("Network discovery")
     if drv.scan != nil
-      webserver.content_send("<p>Recherche en cours...</p><script>setTimeout(function(){location.href='/tuya'},4000)</script>")
+      TuyaWeb.p("&#x23F3; Discovery in progress...")
+      webserver.content_send("<script>setTimeout(function(){location.href='/tuya'},4000)</script>")
     else
-      webserver.content_send("<form action='/tuya' method='post'><button name='scan'>Rechercher les appareils (20 s)</button></form>")
+      webserver.content_send("<form action='/tuya' method='post'><button name='scan'>&#x1F50D; Discover devices (20 s)</button></form>")
     end
     if drv.scan_result != nil
       var conf
       try  conf = drv.read_conf()  except .. as e, m  conf = {"devices": []}  end
-      webserver.content_send("<table style='width:100%'><tr><th>Id</th><th>IP</th><th>Ver.</th><th></th></tr>")
+      webserver.content_send("<p></p><table style='width:100%'>" + TuyaWeb.th([["Id", 160], ["IP", 100], ["Ver.", 30], ["", 20]]))
       for r: drv.scan_result
-        var known = (TuyaImport.find(conf["devices"], r["id"]) != nil) ? "configuré" : "nouveau"
-        webserver.content_send("<tr><td><small>" + TuyaWeb.esc(r["id"]) + "</small></td><td>" + TuyaWeb.esc(r["ip"]) +
-                               "</td><td>" + TuyaWeb.esc(r["version"]) + "</td><td>" + known + "</td></tr>")
+        var known = (TuyaImport.find(conf["devices"], r["id"]) != nil) ? "<span title='configured'>&#x2705;</span>" : "<span title='new'>&#x1F195;</span>"
+        webserver.content_send("<tr><td style='font-size:smaller;'>" + TuyaWeb.esc(r["id"]) + "</td><td style='font-size:smaller;'>" + TuyaWeb.esc(r["ip"]) +
+                               "</td><td style='font-size:smaller;'>" + TuyaWeb.esc(r["version"]) + "</td><td>" + known + "</td></tr>")
       end
       webserver.content_send("</table>")
+      if size(drv.scan_result) == 0  TuyaWeb.p("No device found.")  end
     end
     webserver.content_send("</fieldset><p></p>")
   end
@@ -1469,28 +1498,29 @@ class TuyaWeb
   static def imports(drv)
     import webserver
     var heap = tasmota.memory().find("heap_free", 0)
-    webserver.content_send("<fieldset><legend><b>&nbsp;Importer les clés locales&nbsp;</b></legend>")
-    webserver.content_send("<p>Depuis le <code>devices.json</code> de <code>tinytuya wizard</code>, envoyé par Outils → Gestion des fichiers. " +
-                           "Sans « tous », seuls les appareils trouvés par la recherche ou déjà configurés sont importés.</p>")
-    webserver.content_send("<form action='/tuya' method='post'><input name='file' value='/devices.json'>" +
-                           "<label><input type='checkbox' name='all'> tous</label><button name='import'>Importer</button></form>")
+    TuyaWeb.legend("Import local keys")
+    TuyaWeb.p("From the <code>devices.json</code> of <code>tinytuya wizard</code>, uploaded with Tools &#x2192; Manage File system. " +
+              "Without <i>all</i>, only the devices found by the discovery or already configured are imported.")
+    webserver.content_send("<form action='/tuya' method='post'><p><b>File</b><br><input name='file' value='/devices.json'></p>" +
+                           "<p><label><input type='checkbox' name='all'> all</label></p>" +
+                           "<button name='import'>&#x1F4E5; Import file</button></form>")
     var c = drv.cloud_saved()
-    webserver.content_send("<p>Ou depuis le cloud Tuya, pour les appareils trouvés par la recherche (compte Tuya IoT, comme " +
-                           "<code>tinytuya wizard</code>). Identifiants enregistrés dans <code>" + drv.CLOUD_CONF +
-                           "</code> seulement si la case est cochée. Mémoire libre : " + str(heap) + " Ko, " +
-                           str(drv.CLOUD_MIN_HEAP) + " Ko nécessaires.</p>")
+    webserver.content_send("<hr>")
+    TuyaWeb.p("Or from the Tuya cloud, for the devices found by the discovery (Tuya IoT project, as for " +
+              "<code>tinytuya wizard</code>). Free memory: " + str(heap) + " KB, " + str(drv.CLOUD_MIN_HEAP) + " KB needed.")
     var reg = (c != nil) ? str(c.find("region", "eu")) : "eu"
     var opts = ""
-    for r: [["eu", "Europe centrale"], ["we", "Europe de l'ouest"], ["us", "Amérique de l'ouest"], ["ue", "Amérique de l'est"],
-            ["cn", "Chine"], ["in", "Inde"], ["sg", "Singapour"]]
+    for r: TuyaWeb.REGIONS
       opts += "<option value='" + r[0] + "'" + (r[0] == reg ? " selected" : "") + ">" + r[1] + "</option>"
     end
-    webserver.content_send("<form action='/tuya' method='post'><select name='region'>" + opts + "</select>" +
-                           "<input name='cid' placeholder='Access ID' value='" + TuyaWeb.esc(c != nil ? c.find("id", "") : "") + "'>" +
-                           "<input name='secret' type='password' placeholder='" +
-                           (c != nil ? "Access Secret enregistré (laisser vide)" : "Access Secret") + "'>" +
-                           "<label><input type='checkbox' name='keep'" + (c != nil ? " checked" : "") +
-                           "> enregistrer les identifiants</label><button name='cloud'>Importer depuis le cloud</button></form>")
+    webserver.content_send("<form action='/tuya' method='post'><p><b>Region</b><br><select name='region'>" + opts + "</select></p>" +
+                           "<p><b>Access ID</b><br><input name='cid' placeholder='Access ID' value='" +
+                           TuyaWeb.esc(c != nil ? c.find("id", "") : "") + "'></p>" +
+                           "<p><b>Access Secret</b><br><input name='secret' type='password' placeholder='" +
+                           (c != nil ? "Access Secret (saved, leave empty)" : "Access Secret") + "'></p>" +
+                           "<p><label><input type='checkbox' name='keep'" + (c != nil ? " checked" : "") +
+                           "> save credentials (<code>" + drv.CLOUD_CONF + "</code>)</label></p>" +
+                           "<button name='cloud'>&#x2601;&#xFE0F; Import from cloud</button></form>")
     webserver.content_send("</fieldset><p></p>")
   end
 
@@ -1504,14 +1534,14 @@ class TuyaWeb
     try
       if webserver.has_arg("save")
         var d = json.load(webserver.arg("json"))
-        if type(d) != 'instance' || classname(d) != 'map'  raise "tuya_error", "JSON invalide"  end
+        if type(d) != 'instance' || classname(d) != 'map'  raise "tuya_error", "invalid JSON"  end
         var ref = webserver.arg("ref")
-        msg = "Enregistré : " + drv.save_device(d, ref != "" ? ref : nil)
+        msg = "Saved: " + drv.save_device(d, ref != "" ? ref : nil)
       elif webserver.has_arg("del")
-        msg = "Supprimé : " + drv.del_device(webserver.arg("ref"))
+        msg = "Deleted: " + drv.del_device(webserver.arg("ref"))
       elif webserver.has_arg("reload")
         drv.load_config()
-        msg = "tuya.json rechargé"
+        msg = "tuya.json reloaded"
       elif webserver.has_arg("scan")
         msg = drv.start_scan(20)
       elif webserver.has_arg("import")
@@ -1521,11 +1551,11 @@ class TuyaWeb
                                "secret": webserver.arg("secret"), "save": webserver.has_arg("keep")})
       elif webserver.has_arg("matter")
         var added = drv.matter_create()
-        msg = "Endpoints Matter créés : " + str(size(added)) + ", redémarrage"
+        msg = "Matter endpoints created: " + str(size(added)) + ", restarting"
         rst = size(added) > 0
       end
     except .. as e, m
-      msg = "Erreur : " + str(m)
+      msg = "Error: " + str(m)
     end
     drv.web_msg = msg
     webserver.redirect(rst ? "/?rst=" : "/tuya")
@@ -1545,7 +1575,7 @@ class TuyaLocal
   static var SCAN_MIN_HEAP = 15
   static var IMPORT_MIN_HEAP = 20
   static var CLOUD_MIN_HEAP = 35
-  static var LABELS = {"Added": "ajoutés", "Updated": "mis à jour", "Skipped": "ignorés"}
+  static var LABELS = {"Added": "added", "Updated": "updated", "Skipped": "skipped"}
   var devices                 # list de TuyaDevice
   var by_ep                   # {nom d'endpoint Matter en minuscules: TuyaBinding}
   var t_sync                  # millis du dernier renvoi
@@ -1593,7 +1623,7 @@ class TuyaLocal
       r = f()
     except .. as e, m
       r = {"Error": str(m)}
-      if e != "tuya_error"  tasmota.log(f"TUY: {name} : {e} {m}", 2)  end
+      if e != "tuya_error"  tasmota.log(f"TUY: {name}: {e} {m}", 2)  end
     end
     var o = {}
     o[name] = r
@@ -1607,23 +1637,23 @@ class TuyaLocal
     o[name] = r
     tasmota.log(f"TUY: {name} {json.dump(r)}", 2)
     tasmota.publish_result(json.dump(o), "RESULT")
-    self.web_msg = name + " : " + self.summary(r)
+    self.web_msg = name + ": " + self.summary(r)
   end
 
   def summary(r)
     if type(r) != 'instance'  return str(r)  end
-    if r.contains("Error")  return "erreur : " + str(r["Error"])  end
-    if r.contains("Devices")  return str(size(r["Devices"])) + " appareil(s) trouvé(s)"  end
+    if r.contains("Error")  return "error: " + str(r["Error"])  end
+    if r.contains("Devices")  return str(size(r["Devices"])) + " device(s) found"  end
     var l = []
     for k: ["Added", "Updated", "Skipped"]
-      if r.contains(k) && size(r[k]) > 0  l.push(self.LABELS[k] + " : " + r[k].concat(", "))  end
+      if r.contains(k) && size(r[k]) > 0  l.push(self.LABELS[k] + ": " + r[k].concat(", "))  end
     end
-    return size(l) > 0 ? l.concat(" ; ") : "aucun appareil importé"
+    return size(l) > 0 ? l.concat("; ") : "no device imported"
   end
 
   def check_heap(min)
     var h = tasmota.memory().find("heap_free", 0)
-    if h < min  raise "tuya_error", f"memoire libre insuffisante : {h} Ko, {min} Ko necessaires"  end
+    if h < min  raise "tuya_error", f"not enough free memory: {h} KB, {min} KB needed"  end
   end
 
   ###################### fichier de configuration ######################
@@ -1641,7 +1671,7 @@ class TuyaLocal
     if s == nil || s == ""  return {"devices": []}  end
     var conf = json.load(s)
     if type(conf) != 'instance' || classname(conf) != 'map'
-      raise "tuya_error", f"{self.CONFIG} n'est pas un JSON valide : non modifie"
+      raise "tuya_error", f"{self.CONFIG} is not valid JSON: not modified"
     end
     if type(conf.find("devices")) != 'instance'  conf["devices"] = []  end
     return conf
@@ -1673,7 +1703,7 @@ class TuyaLocal
     ref = self.trim(str(ref != nil ? ref : ""))
     if ref == ""  return conf  end
     var i = TuyaImport.find(conf["devices"], ref)
-    if i == nil  raise "tuya_error", "appareil inconnu"  end
+    if i == nil  raise "tuya_error", "unknown device"  end
     return conf["devices"][i]
   end
 
@@ -1682,7 +1712,7 @@ class TuyaLocal
     import json
     var d = json.load(str(p))
     if type(d) != 'instance' || classname(d) != 'map'
-      raise "tuya_error", "syntaxe : TuyaAdd {\"name\":...,\"id\":...,\"key\":...,\"ip\":...,\"version\":...,\"matter\":[...]}"
+      raise "tuya_error", "syntax: TuyaAdd {\"name\":...,\"id\":...,\"key\":...,\"ip\":...,\"version\":...,\"matter\":[...]}"
     end
     return self.save_device(d, nil)
   end
@@ -1690,18 +1720,18 @@ class TuyaLocal
   # ajoute ou remplace un appareil (designe par ref, sinon par son id) -> nom de l'appareil.
   # Cle absente, vide ou "***" : la cle enregistree est conservee.
   def save_device(d, ref)
-    if str(d.find("name", "")) == "" || str(d.find("id", "")) == ""  raise "tuya_error", "name et id requis"  end
+    if str(d.find("name", "")) == "" || str(d.find("id", "")) == ""  raise "tuya_error", "name and id required"  end
     var conf = self.read_conf()
     var devs = conf["devices"]
     var i = TuyaImport.find(devs, ref != nil ? ref : d["id"])
     var k = d.find("key")
     if k == nil || k == "" || k == "***"
-      if i == nil || devs[i].find("key") == nil  raise "tuya_error", "cle locale (key) requise"  end
+      if i == nil || devs[i].find("key") == nil  raise "tuya_error", "local key (key) required"  end
       d["key"] = devs[i]["key"]
     end
     if i == nil
       if TuyaImport.find(devs, d["name"]) != nil || TuyaImport.find(devs, d["id"]) != nil
-        raise "tuya_error", "nom ou id deja utilise"
+        raise "tuya_error", "name or id already used"
       end
       devs.push(d)
     else
@@ -1716,7 +1746,7 @@ class TuyaLocal
   def del_device(ref)
     var conf = self.read_conf()
     var i = TuyaImport.find(conf["devices"], ref)
-    if i == nil  raise "tuya_error", "appareil inconnu"  end
+    if i == nil  raise "tuya_error", "unknown device"  end
     var name = conf["devices"][i].find("name", ref)
     conf["devices"].remove(i)
     self.write_conf(conf)
@@ -1726,22 +1756,22 @@ class TuyaLocal
 
   # etat d'une entree de tuya.json, pour la page web
   def state_of(c)
-    if c.find("enabled", true) == false  return "désactivé"  end
+    if c.find("enabled", true) == false  return "disabled"  end
     var id = str(c.find("id", ""))
     for d: self.devices
-      if d.id == id  return (d.state == d.ST_READY) ? "connecté" : "déconnecté"  end
+      if d.id == id  return (d.state == d.ST_READY) ? "connected" : "disconnected"  end
     end
-    return "ignoré"
+    return "ignored"
   end
 
   ###################### recherche et import ######################
   # TuyaScan [s] : recherche sur le reseau local, resultat publie a la fin
   def start_scan(sec)
-    if self.scan != nil  raise "tuya_error", "recherche deja en cours"  end
+    if self.scan != nil  raise "tuya_error", "discovery already running"  end
     self.check_heap(self.SCAN_MIN_HEAP)
     if sec > 60  sec = 60  end
     self.scan = TuyaScan(sec * 1000)
-    return f"recherche lancee pour {sec} s"
+    return f"discovery started for {sec} s"
   end
 
   def scan_done()
@@ -1810,7 +1840,7 @@ class TuyaLocal
         end
       end)
     except "io_error" as e, m
-      raise "tuya_error", f"{fname} introuvable"
+      raise "tuya_error", f"{fname} not found"
     end
     return self.merge_entries(conf, entries, skipped)
   end
@@ -1831,7 +1861,7 @@ class TuyaLocal
     import json
     var a = (self.trim(str(p)) == "") ? {} : json.load(str(p))
     if type(a) != 'instance' || classname(a) != 'map'
-      raise "tuya_error", "syntaxe : TuyaCloud {\"region\":\"eu\",\"id\":\"<Access ID>\",\"secret\":\"<Access Secret>\"}"
+      raise "tuya_error", "syntax: TuyaCloud {\"region\":\"eu\",\"id\":\"<Access ID>\",\"secret\":\"<Access Secret>\"}"
     end
     return self.cloud_start(a)
   end
@@ -1874,14 +1904,14 @@ class TuyaLocal
     var save = a.find("save")
     if save == false && saved != nil  self.write_cloud("")  end
     if save == false && key == "" && secret == ""
-      return (saved != nil) ? "identifiants du cloud effaces" : "aucun identifiant enregistre"
+      return (saved != nil) ? "cloud credentials erased" : "no saved credentials"
     end
-    if key == "" || secret == ""  raise "tuya_error", "Access ID et Access Secret requis"  end
-    if TuyaCloud.HOSTS.find(region) == nil  raise "tuya_error", "region inconnue (eu, we, us, ue, cn, in, sg)"  end
+    if key == "" || secret == ""  raise "tuya_error", "Access ID and Access Secret required"  end
+    if TuyaCloud.HOSTS.find(region) == nil  raise "tuya_error", "unknown region (eu, we, us, ue, cn, in, sg)"  end
     if save == true
       self.write_cloud(json.dump({"region": region, "id": key, "secret": secret}))
     end
-    var note = (save == true) ? " (identifiants enregistres)" : ""
+    var note = (save == true) ? " (credentials saved)" : ""
     var msg
     try
       msg = self.start_cloud(region, key, secret, a.find("devices"))
@@ -1893,19 +1923,19 @@ class TuyaLocal
 
   # import cloud : par defaut, les appareils trouves par la derniere recherche
   def start_cloud(region, key, secret, ids)
-    if self.cloud != nil  raise "tuya_error", "import cloud deja en cours"  end
-    if self.scan != nil  raise "tuya_error", "recherche en cours : reessayer a la fin"  end
+    if self.cloud != nil  raise "tuya_error", "cloud import already running"  end
+    if self.scan != nil  raise "tuya_error", "discovery running: retry when it ends"  end
     if ids == nil
       ids = []
       if self.scan_result != nil
         for r: self.scan_result  ids.push(r["id"])  end
       end
     end
-    if size(ids) == 0  raise "tuya_error", "aucun appareil : lancer d'abord une recherche (TuyaScan)"  end
+    if size(ids) == 0  raise "tuya_error", "no device: run a discovery first (TuyaScan)"  end
     self.check_heap(self.CLOUD_MIN_HEAP)
     self.cloud = TuyaCloud(region, key, secret, ids)
     self.cloud_t = 0
-    return f"import cloud lance pour {size(ids)} appareil(s)"
+    return f"cloud import started for {size(ids)} device(s)"
   end
 
   # une requete du cloud par seconde (chacune bloque le temps de la poignee de main TLS)
@@ -1975,7 +2005,7 @@ class TuyaLocal
   def matter_create()
     import global
     var miss = self.matter_missing()
-    if miss == nil  raise "tuya_error", "Matter n'est pas actif"  end
+    if miss == nil  raise "tuya_error", "Matter is not enabled"  end
     var added = []
     for b: miss
       var t = TuyaImport.MATTER_TYPES.find(b.type)
@@ -1987,7 +2017,7 @@ class TuyaLocal
 
   def matter_cmd()
     var added = self.matter_create()
-    return {"Added": added, "Restart": size(added) > 0 ? "Restart 1 pour que Google Home les voie" : ""}
+    return {"Added": added, "Restart": size(added) > 0 ? "Restart 1 so that Google Home sees them" : ""}
   end
 
   def load_config()
@@ -2002,17 +2032,17 @@ class TuyaLocal
       conf = json.load(f.read())
       f.close()
     except .. as e, m
-      tasmota.log(f"TUY: lecture de {self.CONFIG} impossible : {m}", 1)
+      tasmota.log(f"TUY: cannot read {self.CONFIG}: {m}", 1)
       return
     end
     if conf == nil
-      tasmota.log(f"TUY: {self.CONFIG} n'est pas un JSON valide", 1)
+      tasmota.log(f"TUY: {self.CONFIG} is not valid JSON", 1)
       return
     end
     for c: conf.find("devices", [])
       if c.find("enabled", true) == false  continue  end
       if c.find("ip", "") == "" || !c.contains("key") || !c.contains("id")
-        tasmota.log(f"TUY: appareil incomplet ignore : {c.find('name')}", 1)
+        tasmota.log(f"TUY: incomplete device ignored: {c.find('name')}", 1)
         continue
       end
       var d = TuyaDevice(c)
@@ -2023,7 +2053,7 @@ class TuyaLocal
         end
       end
     end
-    tasmota.log(f"TUY: {size(self.devices)} appareil(s), {size(self.by_ep)} endpoint(s) Matter", 2)
+    tasmota.log(f"TUY: {size(self.devices)} device(s), {size(self.by_ep)} Matter endpoint(s)", 2)
   end
 
   def every_50ms()
@@ -2031,8 +2061,8 @@ class TuyaLocal
       try
         d.loop()
       except .. as e, m
-        tasmota.log(f"TUY: {d.name} erreur : {e} {m}", 2)
-        d.close("erreur interne")
+        tasmota.log(f"TUY: {d.name} error: {e} {m}", 2)
+        d.close("internal error")
       end
     end
     var now = tasmota.millis()
@@ -2041,7 +2071,7 @@ class TuyaLocal
       try
         running = self.scan.loop()
       except .. as e, m
-        tasmota.log(f"TUY: recherche : {e} {m}", 2)
+        tasmota.log(f"TUY: discovery: {e} {m}", 2)
       end
       if !running  self.scan_done()  end
     end
@@ -2054,7 +2084,7 @@ class TuyaLocal
       try
         self.sync_pending()
       except .. as e, m
-        tasmota.log(f"TUY: renvoi vers Matter : {e} {m}", 2)
+        tasmota.log(f"TUY: resend to Matter: {e} {m}", 2)
       end
     end
   end
@@ -2107,22 +2137,22 @@ class TuyaLocal
     import string
     import json
     var a = string.split(payload, ",", 2)
-    if size(a) < 3  return tasmota.resp_cmnd_str("Syntaxe : TuyaSend <appareil>,<dp ou code>,<valeur|toggle>")  end
+    if size(a) < 3  return tasmota.resp_cmnd_str("Syntax: TuyaSend <device>,<dp or code>,<value|toggle>")  end
     var n = self.find_node(self.trim(a[0]))
-    if n == nil  return tasmota.resp_cmnd_str("Appareil inconnu")  end
+    if n == nil  return tasmota.resp_cmnd_str("Unknown device")  end
     var v = json.load(a[2])
     if v == nil  v = a[2]  end
     var dp = self.trim(a[1])
     var num = int(dp)
     if str(num) != dp                         # code de DP (switch_led...) : "codes" de l'import
       var c = (n.codes != nil) ? n.codes.find(dp) : nil
-      if c == nil  return tasmota.resp_cmnd_str("DP inconnu : " + dp)  end
+      if c == nil  return tasmota.resp_cmnd_str("Unknown DP: " + dp)  end
       num = int(c)
     end
     if string.tolower(self.trim(a[2])) == "toggle"   # inverse un DP booleen (bouton Zigbee...)
       var cur = n.dps.find(str(num))
       if type(cur) != 'bool'
-        return tasmota.resp_cmnd_str(cur == nil ? "toggle : etat du DP inconnu" : "toggle : DP non booleen")
+        return tasmota.resp_cmnd_str(cur == nil ? "toggle: DP state unknown" : "toggle: DP not boolean")
       end
       v = !cur
     end
@@ -2131,7 +2161,7 @@ class TuyaLocal
     if n.conn.set_dps(n, dps)
       tasmota.resp_cmnd_done()
     else
-      tasmota.resp_cmnd_str("Appareil non connecte")
+      tasmota.resp_cmnd_str("Device not connected")
     end
   end
 
@@ -2154,7 +2184,7 @@ class TuyaLocal
         r[n.name] = {"Connected": d.state == d.ST_READY, "Ip": d.ip, "Version": d.ver, "Dps": n.all_dps()}
       end
     end
-    if f != "" && size(r) == 0  return tasmota.resp_cmnd_str("Appareil inconnu")  end
+    if f != "" && size(r) == 0  return tasmota.resp_cmnd_str("Unknown device")  end
     tasmota.resp_cmnd(json.dump({"TuyaStatus": r}))
   end
 

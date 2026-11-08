@@ -9,8 +9,8 @@ page), direct links with Zigbee, and the test bench that covers all of it. The u
 [tuya-local.en.md](tuya-local.en.md); command and event examples are in
 [tuya-local-examples.en.md](tuya-local-examples.en.md).
 
-The driver's console messages and error messages are in French; their meaning is given in
-parentheses where useful.
+The driver's web page, responses and console messages are in English, like Tasmota; code
+comments are in French.
 
 ## Contents
 
@@ -42,7 +42,7 @@ into the firmware (one `#@ solidify:<Class>,weak` directive per class).
 | `TuyaScan` | discovery of devices on the local network | **created on demand**, released at the end |
 | `TuyaImport` | turns tinytuya or cloud devices into `tuya.json` entries, deduces bindings | static functions |
 | `TuyaCloud` | signed requests to Tuya's OpenAPI | **created on demand**, released at the end |
-| `TuyaWeb` | Configuration → Tuya local page | static functions |
+| `TuyaWeb` | Configuration → Tuya Local page | static functions |
 | `TuyaLocal` | the Tasmota driver: configuration, loop, commands, events | one instance, created by `autoexec.be` |
 
 `TuyaLocal.every_50ms()` runs the connections, the current discovery, the current cloud import
@@ -88,7 +88,7 @@ into the firmware (one `#@ solidify:<Class>,weak` directive per class).
 - On the first refusal, the binding becomes **pending** and the refusal is logged once.
   `TuyaLocal.sync_pending()` resends it the **full state** every 30 s (`SYNC_RETRY`), and so does
   any new value from the device. As soon as the endpoint accepts:
-  `TUY: endpoint Matter '<ep>' disponible, etat envoye` (endpoint available, state sent).
+  `TUY: Matter endpoint '<ep>' available, state sent`.
 - In Google Home, a new endpoint stays **offline until Tasmota's `Restart 1`** (the controller
   only subscribes to new endpoints when it reconnects), whatever state the driver sends.
 
@@ -146,8 +146,8 @@ Memory guard: at least 15 KB free to start a discovery.
 
 - **Chunked reading** (`TuyaImport.each_object`): the file is read in 512-byte blocks, the
   objects of the array are found by a small state machine (brace depth, strings, escapes) and
-  parsed one at a time. An object over 8 KB is skipped (log `objet JSON trop gros`, JSON object
-  too big). The file size is therefore not limited by RAM.
+  parsed one at a time. An object over 8 KB is skipped (log `JSON object
+  too big`). The file size is therefore not limited by RAM.
 - **Selection**: by default, the devices found by the last discovery or already configured, and
   the sub-devices whose gateway is; `all`: all of them; `id,id`: those ones.
 - **Created entry** (`TuyaImport.entry`): `name`, `id`, `key` (or `local_key`), `ip` and
@@ -198,12 +198,22 @@ Ported from `tinytuya.Cloud` (`Cloud.py`):
 
 ## 8. Web page
 
-- Registration: `web_add_config_button()` (**Tuya local** button on the Configuration page) and
+- Registration: `web_add_config_button()` (**🔌 Tuya Local** button on the Configuration page) and
   `web_add_handler()` (`GET` and `POST /tuya` routes). Since the driver starts after the web
   server, Tasmota does not call its `web_add_handler()`: the driver calls it itself, only if
   `webserver.state() > 0` (`webserver.on()` crashes the ESP32 if the server is not running).
-- `TuyaWeb.page()`: message of the last action, Devices, Matter endpoints, Discovery and Import
-  sections; `?edit=<ref>`: JSON editing (key replaced by `***`).
+- `TuyaWeb.page()`: message of the last action, *Tuya devices*, *Matter endpoints*, *Network
+  discovery* and *Import local keys* sections; `?edit=<ref>`: JSON editing (key replaced by
+  `***`).
+- Layout of Tasmota's pages (like Matter's): Tasmota's container is an `inline-block` at least
+  340 px wide that grows to its widest content, so text goes in `<p style='width:320px;'>`
+  (`TuyaWeb.p`), each form field in its own `<p><b>Label</b><br><input></p>` block (side by side,
+  a select and two inputs widened the page to 600 px), table headers in `font-size:smaller`
+  (`TuyaWeb.th`). Actions use HTML pictograms, as Tasmota does (📝 edit, 🔥 delete, as in the file
+  manager): device states in `TuyaWeb.STATES` (🟢 🔴 ⚪ ⚠), ✅/🆕 in the discovery.
+- Language: the page, responses, errors and logs are in English (like Tasmota); the names of
+  the Matter endpoints deduced on import stay in French (`Lumière <name>`, `<name> humidité`),
+  as they are what Google Home shows.
 - `TuyaWeb.post()`: `save`, `del`, `reload`, `scan`, `import`, `cloud`, `matter` actions, then a
   redirect to `/tuya` (or `/?rst=` to restart after creating endpoints).
 - Matter endpoints: `matter_missing()` compares the binding names with those of

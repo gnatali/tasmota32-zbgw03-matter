@@ -184,7 +184,7 @@ Sans PSRAM, Zigbee et Matter laissent environ 70 à 100 Ko de mémoire libre : s
 Le driver Berry `berry/tuya_local.be` pilote les appareils Tuya Wi-Fi (protocoles 3.3, 3.4 et
 3.5) et les sous-appareils d'une passerelle Tuya, sans le cloud, et les présente à Matter. Il
 est intégré au firmware (solidifié : son code reste en flash au lieu d'être compilé en RAM) et
-démarré par `autoexec.be`. La page **Configuration → Tuya local** recherche les appareils sur le
+démarré par `autoexec.be`. La page **Configuration → Tuya Local** recherche les appareils sur le
 réseau, importe leurs clés locales (depuis le `devices.json` de tinytuya ou le cloud Tuya), crée
 leurs endpoints Matter et modifie la configuration ; les mêmes fonctions existent en commandes
 (HTTP, MQTT). Voir [docs/tuya-local.fr.md](docs/tuya-local.fr.md) (utilisation),

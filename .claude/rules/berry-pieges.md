@@ -35,6 +35,10 @@ paths:
 - `webserver.on()` **fait planter l'ESP32** si le serveur web n'est pas encore démarré : le
   driver ne l'appelle lui-même que si `webserver.state() > 0` (Tasmota n'appelle pas
   `web_add_handler()` pour un driver ajouté après le démarrage du serveur).
+- **Page web** : le conteneur de Tasmota est un `inline-block` d'au moins 340 px qui s'élargit
+  selon son contenu le plus large. Texte dans `<p style='width:320px;'>` (`TuyaWeb.p`), un champ
+  par bloc `<p><b>Libellé</b><br><input></p>`, jamais plusieurs champs côte à côte ; vérifier la
+  largeur sur un écran d'ordinateur (capture avec le CSS de Tasmota).
 - Fichier plus gros que la RAM libre (`devices.json` de tinytuya) : le lire par morceaux
   (`readbytes(512)`, `TuyaImport.each_object`), jamais `read()` d'un bloc.
 - **Ne jamais démarrer le driver directement dans `autoexec.be`** : sans PSRAM, le charger

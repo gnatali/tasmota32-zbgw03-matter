@@ -7,8 +7,8 @@ scripts. Ids, addresses and responses are made up but use the driver's exact for
 appears (the driver replaces them with `***`). Details: [tuya-local.en.md](tuya-local.en.md)
 and [tuya-local-dev.en.md](tuya-local-dev.en.md).
 
-The driver's messages are in French; their meaning is given in the tables below. Device names
-are those of the example installation (they are user-defined).
+The driver's messages are in English, like the rest of Tasmota. Device names are those of the
+example installation (they are user-defined, here in French).
 
 Devices used in the examples: `Ventilateur` (fan, 3.5; DP 60 on/off, 62 speed, 20 light),
 `Récepteur radio` (radio receiver, 3.5; DP 1 to 4), `Entrée-Porche` (porch bulb, 3.3; DP 20 to
@@ -66,7 +66,7 @@ TuyaStatus
 ```
 
 **A single device** (case-insensitive name, or id): `TuyaStatus entrée-porche`. Unknown:
-`{"TuyaStatus":"Appareil inconnu"}` (unknown device).
+`{"TuyaStatus":"Unknown device"}`.
 
 **Configuration without keys**: `TuyaConfig`, or `TuyaConfig Ventilateur` for one device:
 
@@ -91,12 +91,12 @@ Responses: `{"TuyaSend":"Done"}` if the command was sent, otherwise:
 
 | Response | Meaning |
 |---|---|
-| `Appareil inconnu` | no device with that name or id |
-| `Appareil non connecte` | device offline (the command is not sent) |
-| `DP inconnu : xxx` | code missing from the device's `codes` table |
-| `toggle : etat du DP inconnu` | the device has not sent this DP yet |
-| `toggle : DP non booleen` | `toggle` on a value that is not true/false |
-| `Syntaxe : TuyaSend <appareil>,<dp ou code>,<valeur\|toggle>` | missing arguments (syntax) |
+| `Unknown device` | no device with that name or id |
+| `Device not connected` | device offline (the command is not sent) |
+| `Unknown DP: xxx` | code missing from the device's `codes` table |
+| `toggle: DP state unknown` | the device has not sent this DP yet |
+| `toggle: DP not boolean` | `toggle` on a value that is not true/false |
+| `Syntax: TuyaSend <device>,<dp or code>,<value\|toggle>` | missing arguments |
 
 ## 4. Adding, editing, deleting
 
@@ -119,9 +119,9 @@ TuyaAdd {"name":"Lampe bureau","id":"00000000000000lamp01","key":"***","ip":"192
 **Reload** a hand-edited `tuya.json`: `TuyaReload` → `{"TuyaReload":"Done"}`.
 
 Each write keeps the previous version in `/tuya.json.bak`. Possible errors:
-`{"TuyaAdd":{"Error":"name et id requis"}}` (name and id required), `"cle locale (key) requise"`
-(local key required), `"nom ou id deja utilise"` (name or id already used),
-`"/tuya.json n'est pas un JSON valide : non modifie"` (invalid JSON, file left untouched).
+`{"TuyaAdd":{"Error":"name and id required"}}`, `"local key (key) required"`,
+`"name or id already used"`, `"/tuya.json is not valid JSON: not modified"` (file left
+untouched).
 
 ## 5. Discovery and import
 
@@ -131,7 +131,7 @@ Each write keeps the previous version in `/tuya.json.bak`. Possible errors:
 TuyaScan 30
 ```
 ```json
-{"TuyaScan":"recherche lancee pour 30 s"}
+{"TuyaScan":"discovery started for 30 s"}
 ```
 
 At the end, an event (MQTT `stat/<topic>/RESULT` and rules):
@@ -158,14 +158,14 @@ system):
 
 **Import from the Tuya cloud** (Tuya IoT project: Access ID and Access Secret; devices of the
 last discovery, or a `devices` list). The web console logs the command with the secret: prefer
-the **Tuya local** page, or MQTT / HTTP.
+the **Tuya Local** page, or MQTT / HTTP.
 
 ```
 TuyaCloud {"region":"eu","id":"<Access ID>","secret":"<Access Secret>"}
 TuyaCloud {"region":"eu","id":"<Access ID>","secret":"<Access Secret>","devices":["00000000000000lamp01"]}
 ```
 ```json
-{"TuyaCloud":"import cloud lance pour 3 appareil(s)"}
+{"TuyaCloud":"cloud import started for 3 device(s)"}
 ```
 
 Credentials saved in `/tuya_cloud.json` (like the page's checkbox), then reused without typing
@@ -178,25 +178,23 @@ TuyaCloud {"devices":["00000000000000lamp01"]}
 TuyaCloud {"save":false}
 ```
 ```json
-{"TuyaCloud":"import cloud lance pour 3 appareil(s) (identifiants enregistres)"}
-{"TuyaCloud":"import cloud lance pour 3 appareil(s)"}
-{"TuyaCloud":"import cloud lance pour 1 appareil(s)"}
-{"TuyaCloud":"identifiants du cloud effaces"}
+{"TuyaCloud":"cloud import started for 3 device(s) (credentials saved)"}
+{"TuyaCloud":"cloud import started for 3 device(s)"}
+{"TuyaCloud":"cloud import started for 1 device(s)"}
+{"TuyaCloud":"cloud credentials erased"}
 ```
 
 One request per second, then the final event:
 
 ```json
 {"TuyaCloud":{"Added":["Lampe bureau"],"Updated":["Ventilateur"],"Skipped":[]}}
-{"TuyaCloud":{"Error":"cloud Tuya : sign invalid"}}
+{"TuyaCloud":{"Error":"Tuya cloud: sign invalid"}}
 ```
 
-Other errors: `"memoire libre insuffisante : 30 Ko, 35 Ko necessaires"` (not enough free
-memory), `"heure non synchronisee (NTP)"` (time not synchronised),
-`"region inconnue (eu, we, us, ue, cn, in, sg)"` (unknown region),
-`"aucun appareil : lancer d'abord une recherche (TuyaScan)"` (no device: run a discovery first),
-`"cloud Tuya : HTTP 404"`, `"Access ID et Access Secret requis"` (Access ID and Access Secret
-required: no argument and no saved credentials).
+Other errors: `"not enough free memory: 30 KB, 35 KB needed"`,
+`"time not synchronized (NTP)"`, `"unknown region (eu, we, us, ue, cn, in, sg)"`,
+`"no device: run a discovery first (TuyaScan)"`, `"Tuya cloud: HTTP 404"`,
+`"Access ID and Access Secret required"` (no argument and no saved credentials).
 
 ## 6. Matter
 
@@ -206,7 +204,7 @@ required: no argument and no saved credentials).
 TuyaMatter
 ```
 ```json
-{"TuyaMatter":{"Added":["Lampe bureau"],"Restart":"Restart 1 pour que Google Home les voie"}}
+{"TuyaMatter":{"Added":["Lampe bureau"],"Restart":"Restart 1 so that Google Home sees them"}}
 ```
 
 Then `Restart 1`: without a restart, Google Home shows the new devices offline.
@@ -238,16 +236,16 @@ and on the main page:
 
 | Message | Meaning |
 |---|---|
-| `TUY: demarrage du driver, memoire libre 73 Ko` | `autoexec.be` starts the driver (free memory) |
-| `TUY: 3 appareil(s), 5 endpoint(s) Matter` | configuration loaded |
-| `TUY: Ventilateur (192.168.1.20) connecte, protocole 3.5` | connected |
-| `TUY: Ventilateur (192.168.1.20) deconnecte : plus de reponse` | device silent for 35 s; automatic reconnection |
-| `TUY: Ventilateur non connecte, commande ignoree` | command while disconnected (ignored) |
-| `TUY: endpoint Matter 'Lampe' : Invalid Device (nouvel essai toutes les 30 s)` | Matter endpoint missing (different name or not created yet; retried every 30 s) |
-| `TUY: endpoint Matter 'Lampe' disponible, etat envoye` | the endpoint accepts, state sent |
-| `TUY: appareil incomplet ignore : Pergola 1` | entry without `ip`, `key` or `id` (skipped) |
+| `TUY: starting the driver, free memory 73 KB` | `autoexec.be` starts the driver |
+| `TUY: 3 device(s), 5 Matter endpoint(s)` | configuration loaded |
+| `TUY: Ventilateur (192.168.1.20) connected, protocol 3.5` | connected |
+| `TUY: Ventilateur (192.168.1.20) disconnected: no more replies` | device silent for 35 s; automatic reconnection |
+| `TUY: Ventilateur not connected, command ignored` | command while disconnected |
+| `TUY: Matter endpoint 'Lampe': Invalid Device (retry every 30 s)` | Matter endpoint missing (different name or not created yet) |
+| `TUY: Matter endpoint 'Lampe' available, state sent` | the endpoint accepts, state sent |
+| `TUY: incomplete device ignored: Pergola 1` | entry without `ip`, `key` or `id` |
 | `TUY: TuyaScan {"Devices":[...]}` | end of discovery |
-| `TUY: import : objet JSON trop gros, ignore` | entry over 8 KB in `devices.json` (skipped) |
+| `TUY: import: JSON object too big, ignored` | entry over 8 KB in `devices.json` |
 
 ## 9. Tasmota rules
 
@@ -288,10 +286,10 @@ def tuya_start()
   import global
   var free = tasmota.memory()['heap_free']
   if free < 60
-    tasmota.log(f"TUY: driver non demarre, memoire libre insuffisante ({free} Ko)", 2)
+    tasmota.log(f"TUY: driver not started, not enough free memory ({free} KB)", 2)
     return
   end
-  tasmota.log(f"TUY: demarrage du driver, memoire libre {free} Ko", 2)
+  tasmota.log(f"TUY: starting the driver, free memory {free} KB", 2)
   if !global.contains("TuyaLocal")  load("tuya_local.be")  end
   global.tuya_local = TuyaLocal()
 

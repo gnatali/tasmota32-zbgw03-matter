@@ -63,7 +63,7 @@ TuyaStatus
 ```
 
 **Un seul appareil** (nom sans casse, ou identifiant) : `TuyaStatus entrée-porche`. Inconnu :
-`{"TuyaStatus":"Appareil inconnu"}`.
+`{"TuyaStatus":"Unknown device"}`.
 
 **Configuration sans les clés** : `TuyaConfig`, ou `TuyaConfig Ventilateur` pour un appareil :
 
@@ -88,12 +88,12 @@ Réponses : `{"TuyaSend":"Done"}` si la commande est partie, sinon :
 
 | Réponse | Cause |
 |---|---|
-| `Appareil inconnu` | aucun appareil de ce nom ou de cet identifiant |
-| `Appareil non connecte` | appareil hors ligne (la commande n'est pas envoyée) |
-| `DP inconnu : xxx` | code absent de la table `codes` de l'appareil |
-| `toggle : etat du DP inconnu` | l'appareil n'a pas encore envoyé ce DP |
-| `toggle : DP non booleen` | `toggle` sur une valeur qui n'est pas vrai/faux |
-| `Syntaxe : TuyaSend <appareil>,<dp ou code>,<valeur\|toggle>` | arguments manquants |
+| `Unknown device` | aucun appareil de ce nom ou de cet identifiant |
+| `Device not connected` | appareil hors ligne (la commande n'est pas envoyée) |
+| `Unknown DP: xxx` | code absent de la table `codes` de l'appareil |
+| `toggle: DP state unknown` | l'appareil n'a pas encore envoyé ce DP |
+| `toggle: DP not boolean` | `toggle` sur une valeur qui n'est pas vrai/faux |
+| `Syntax: TuyaSend <device>,<dp or code>,<value\|toggle>` | arguments manquants |
 
 ## 4. Ajouter, modifier, supprimer
 
@@ -116,8 +116,8 @@ TuyaAdd {"name":"Lampe bureau","id":"00000000000000lamp01","key":"***","ip":"192
 **Relire** `tuya.json` modifié à la main : `TuyaReload` → `{"TuyaReload":"Done"}`.
 
 Chaque écriture garde l'ancienne version dans `/tuya.json.bak`. Erreurs possibles :
-`{"TuyaAdd":{"Error":"name et id requis"}}`, `"cle locale (key) requise"`,
-`"nom ou id deja utilise"`, `"/tuya.json n'est pas un JSON valide : non modifie"`.
+`{"TuyaAdd":{"Error":"name and id required"}}`, `"local key (key) required"`,
+`"name or id already used"`, `"/tuya.json is not valid JSON: not modified"`.
 
 ## 5. Rechercher et importer
 
@@ -127,7 +127,7 @@ Chaque écriture garde l'ancienne version dans `/tuya.json.bak`. Erreurs possibl
 TuyaScan 30
 ```
 ```json
-{"TuyaScan":"recherche lancee pour 30 s"}
+{"TuyaScan":"discovery started for 30 s"}
 ```
 
 À la fin, événement (MQTT `stat/<topic>/RESULT` et règles) :
@@ -153,14 +153,14 @@ TuyaScan 30
 
 **Importer par le cloud Tuya** (projet Tuya IoT : Access ID et Access Secret ; appareils de la
 dernière recherche, ou liste `devices`). La console web journalise la commande avec le secret :
-préférer la page **Tuya local**, ou MQTT / HTTP.
+préférer la page **Tuya Local**, ou MQTT / HTTP.
 
 ```
 TuyaCloud {"region":"eu","id":"<Access ID>","secret":"<Access Secret>"}
 TuyaCloud {"region":"eu","id":"<Access ID>","secret":"<Access Secret>","devices":["00000000000000lamp01"]}
 ```
 ```json
-{"TuyaCloud":"import cloud lance pour 3 appareil(s)"}
+{"TuyaCloud":"cloud import started for 3 device(s)"}
 ```
 
 Identifiants enregistrés dans `/tuya_cloud.json` (comme la case de la page), puis réutilisés sans
@@ -173,23 +173,23 @@ TuyaCloud {"devices":["00000000000000lamp01"]}
 TuyaCloud {"save":false}
 ```
 ```json
-{"TuyaCloud":"import cloud lance pour 3 appareil(s) (identifiants enregistres)"}
-{"TuyaCloud":"import cloud lance pour 3 appareil(s)"}
-{"TuyaCloud":"import cloud lance pour 1 appareil(s)"}
-{"TuyaCloud":"identifiants du cloud effaces"}
+{"TuyaCloud":"cloud import started for 3 device(s) (credentials saved)"}
+{"TuyaCloud":"cloud import started for 3 device(s)"}
+{"TuyaCloud":"cloud import started for 1 device(s)"}
+{"TuyaCloud":"cloud credentials erased"}
 ```
 
 Une requête par seconde, puis l'événement de fin :
 
 ```json
 {"TuyaCloud":{"Added":["Lampe bureau"],"Updated":["Ventilateur"],"Skipped":[]}}
-{"TuyaCloud":{"Error":"cloud Tuya : sign invalid"}}
+{"TuyaCloud":{"Error":"Tuya cloud: sign invalid"}}
 ```
 
-Autres erreurs : `"memoire libre insuffisante : 30 Ko, 35 Ko necessaires"`,
-`"heure non synchronisee (NTP)"`, `"region inconnue (eu, we, us, ue, cn, in, sg)"`,
-`"aucun appareil : lancer d'abord une recherche (TuyaScan)"`, `"cloud Tuya : HTTP 404"`,
-`"Access ID et Access Secret requis"` (sans argument et sans identifiants enregistrés).
+Autres erreurs : `"not enough free memory: 30 KB, 35 KB needed"`,
+`"time not synchronized (NTP)"`, `"unknown region (eu, we, us, ue, cn, in, sg)"`,
+`"no device: run a discovery first (TuyaScan)"`, `"Tuya cloud: HTTP 404"`,
+`"Access ID and Access Secret required"` (sans argument et sans identifiants enregistrés).
 
 ## 6. Matter
 
@@ -199,7 +199,7 @@ Autres erreurs : `"memoire libre insuffisante : 30 Ko, 35 Ko necessaires"`,
 TuyaMatter
 ```
 ```json
-{"TuyaMatter":{"Added":["Lampe bureau"],"Restart":"Restart 1 pour que Google Home les voie"}}
+{"TuyaMatter":{"Added":["Lampe bureau"],"Restart":"Restart 1 so that Google Home sees them"}}
 ```
 
 Puis `Restart 1` : sans redémarrage, Google Home affiche les nouveaux appareils hors ligne.
@@ -231,16 +231,16 @@ règles) : seulement les DP qui ont changé, ou tout l'état à la connexion.
 
 | Message | Signification |
 |---|---|
-| `TUY: demarrage du driver, memoire libre 73 Ko` | `autoexec.be` démarre le driver |
-| `TUY: 3 appareil(s), 5 endpoint(s) Matter` | configuration chargée |
-| `TUY: Ventilateur (192.168.1.20) connecte, protocole 3.5` | connexion établie |
-| `TUY: Ventilateur (192.168.1.20) deconnecte : plus de reponse` | appareil muet 35 s ; reconnexion automatique |
-| `TUY: Ventilateur non connecte, commande ignoree` | commande pendant une déconnexion |
-| `TUY: endpoint Matter 'Lampe' : Invalid Device (nouvel essai toutes les 30 s)` | endpoint Matter absent (nom différent ou pas encore créé) |
-| `TUY: endpoint Matter 'Lampe' disponible, etat envoye` | l'endpoint accepte, état envoyé |
-| `TUY: appareil incomplet ignore : Pergola 1` | entrée sans `ip`, `key` ou `id` |
+| `TUY: starting the driver, free memory 73 KB` | `autoexec.be` démarre le driver |
+| `TUY: 3 device(s), 5 Matter endpoint(s)` | configuration chargée |
+| `TUY: Ventilateur (192.168.1.20) connected, protocol 3.5` | connexion établie |
+| `TUY: Ventilateur (192.168.1.20) disconnected: no more replies` | appareil muet 35 s ; reconnexion automatique |
+| `TUY: Ventilateur not connected, command ignored` | commande pendant une déconnexion |
+| `TUY: Matter endpoint 'Lampe': Invalid Device (retry every 30 s)` | endpoint Matter absent (nom différent ou pas encore créé) |
+| `TUY: Matter endpoint 'Lampe' available, state sent` | l'endpoint accepte, état envoyé |
+| `TUY: incomplete device ignored: Pergola 1` | entrée sans `ip`, `key` ou `id` |
 | `TUY: TuyaScan {"Devices":[...]}` | fin de recherche |
-| `TUY: import : objet JSON trop gros, ignore` | entrée de plus de 8 Ko dans `devices.json` |
+| `TUY: import: JSON object too big, ignored` | entrée de plus de 8 Ko dans `devices.json` |
 
 ## 9. Règles Tasmota
 
@@ -281,10 +281,10 @@ def tuya_start()
   import global
   var free = tasmota.memory()['heap_free']
   if free < 60
-    tasmota.log(f"TUY: driver non demarre, memoire libre insuffisante ({free} Ko)", 2)
+    tasmota.log(f"TUY: driver not started, not enough free memory ({free} KB)", 2)
     return
   end
-  tasmota.log(f"TUY: demarrage du driver, memoire libre {free} Ko", 2)
+  tasmota.log(f"TUY: starting the driver, free memory {free} KB", 2)
   if !global.contains("TuyaLocal")  load("tuya_local.be")  end
   global.tuya_local = TuyaLocal()
 
