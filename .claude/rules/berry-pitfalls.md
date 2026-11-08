@@ -24,7 +24,8 @@ paths:
 - **Solidified driver** (`custom_berry_solidify`, classes in flash):
   - no top-level code outside the classes: solidification runs the file (without `tasmota`),
     and the firmware's Berry init code instantiates the driver (`global.tuya_local =
-    TuyaLocal()`, `patches/tuya-local-autostart.patch`, like Matter's `matter_device`);
+    TuyaLocal()`, `patches/tuya-local-autostart.patch`, under the `USE_TUYA_LOCAL` build flag,
+    like Matter's `matter_device`);
   - `import string` / `json` / `crypto` **in every method** that uses them: a top-level import
     does not exist in the firmware;
   - a solidified class is **read-only**: no write to a `static var`

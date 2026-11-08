@@ -82,8 +82,14 @@ environ 17 Ko sur les 40 Ko qu'il occupait avec 12 appareils. Solidifié, ce cod
 
 `patches/tuya-local-autostart.patch` ajoute au code d'initialisation Berry de Tasmota
 (`be_berry_init_code`, `xdrv_52_7_berry_embedded.ino`), juste après le
-`global.matter_device = matter.Device()` de Matter :
-`try global.tuya_local = TuyaLocal() except .. as e, m tasmota.log(...) end`. Comme pour Matter,
+`global.matter_device = matter.Device()` de Matter et sous la directive de compilation
+**`USE_TUYA_LOCAL`** (comme `USE_MATTER_DEVICE` pour Matter, définie dans
+`platformio_override.ini`) :
+`try global.tuya_local = TuyaLocal() except .. as e, m tasmota.log(...) end`. La directive ne
+commande que ce démarrage : les classes viennent de `custom_berry_solidify` ; un firmware avec
+`custom_berry_solidify` mais sans `USE_TUYA_LOCAL` embarque donc le driver sans le démarrer
+(`autoexec.be` peut alors l'instancier), et un firmware sans les deux n'a pas de driver. Comme
+pour Matter,
 l'instance existe toujours, et le travail est différé :
 
 - `TuyaLocal.init()` est léger : commandes, règle, enregistrement du driver (page web, bouton de
@@ -360,8 +366,8 @@ la configuration simplifiée ajoute 0,7 à 1,3 Ko au repos.
 |---|---|
 | `berry/tuya_local.be` | le driver (9 classes) |
 | `patches/berry-solidify-all-classes.patch` | enregistrement de toutes les classes solidifiées |
-| `patches/tuya-local-autostart.patch` | driver instancié au démarrage par le code d'initialisation Berry |
-| `platformio_override.ini` | `custom_berry_solidify` |
+| `patches/tuya-local-autostart.patch` | driver instancié au démarrage par le code d'initialisation Berry (`USE_TUYA_LOCAL`) |
+| `platformio_override.ini` | `-DUSE_TUYA_LOCAL` (démarrage au boot) et `custom_berry_solidify` (driver en flash) |
 | `berry/test/run_tests.sh` | construction des deux interpréteurs, solidification, scénarios |
 | `berry/test/harness.be`, `webserver.be`, `crypto.be`, `persist.be` | simulations de Tasmota |
 | `berry/test/fake_tuya.py`, `test_tuya_local.py` | faux appareils, annonces UDP, 22 scénarios (0 à 21) |

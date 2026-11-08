@@ -185,6 +185,14 @@ Tuya Wi-Fi et les sous-appareils Zigbee de la passerelle Tuya, et les présenter
     Matter (`MATTERUDP 0/1`). 22/22 dans les deux modes. Build : exécution 20 (commit
     `9b579c3`), firmware de 2 112 271 octets (même taille que l'exécution 19) ; à flasher.
 
+19. **Directive de compilation `USE_TUYA_LOCAL`** (8 novembre) : comme `USE_MATTER_DEVICE`
+    pour Matter, le démarrage du driver dans le code d'initialisation Berry
+    (`patches/tuya-local-autostart.patch`) est maintenant sous `#ifdef USE_TUYA_LOCAL`, et
+    `platformio_override.ini` définit `-DUSE_TUYA_LOCAL`. La directive ne commande que le
+    démarrage : les classes viennent de `custom_berry_solidify` (sans la directive, le driver
+    est en flash mais pas démarré). Correctif vérifié sur `TASMOTA_REF` ; driver inchangé
+    (22/22). **Pas encore de build.**
+
 ## Mesures sur la passerelle
 
 | Situation | `Heap` (`Status 4`) |

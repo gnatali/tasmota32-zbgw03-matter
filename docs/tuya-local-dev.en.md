@@ -84,8 +84,12 @@ into the firmware (one `#@ solidify:<Class>,weak` directive per class).
 
 `patches/tuya-local-autostart.patch` adds to Tasmota's Berry init code
 (`be_berry_init_code`, `xdrv_52_7_berry_embedded.ino`), right after Matter's
-`global.matter_device = matter.Device()`:
-`try global.tuya_local = TuyaLocal() except .. as e, m tasmota.log(...) end`. As with Matter,
+`global.matter_device = matter.Device()` and under the **`USE_TUYA_LOCAL`** build flag (like
+`USE_MATTER_DEVICE` for Matter, set in `platformio_override.ini`):
+`try global.tuya_local = TuyaLocal() except .. as e, m tasmota.log(...) end`. The flag only
+controls this start: the classes come from `custom_berry_solidify`, so a firmware with
+`custom_berry_solidify` but without `USE_TUYA_LOCAL` embeds the driver without starting it
+(`autoexec.be` can then instantiate it), and one without both has no driver. As with Matter,
 the instance always exists, and the work is deferred:
 
 - `TuyaLocal.init()` is light: commands, rule, driver registration (web page, main page button)
@@ -354,8 +358,8 @@ simplified configuration adds 0.7 to 1.3 KB at rest.
 |---|---|
 | `berry/tuya_local.be` | the driver (9 classes) |
 | `patches/berry-solidify-all-classes.patch` | registration of all solidified classes |
-| `patches/tuya-local-autostart.patch` | driver instantiated at boot by Berry's init code |
-| `platformio_override.ini` | `custom_berry_solidify` |
+| `patches/tuya-local-autostart.patch` | driver instantiated at boot by Berry's init code (`USE_TUYA_LOCAL`) |
+| `platformio_override.ini` | `-DUSE_TUYA_LOCAL` (start at boot) and `custom_berry_solidify` (driver in flash) |
 | `berry/test/run_tests.sh` | builds the two interpreters, solidification, scenarios |
 | `berry/test/harness.be`, `webserver.be`, `crypto.be`, `persist.be` | Tasmota mocks |
 | `berry/test/fake_tuya.py`, `test_tuya_local.py` | fake devices, UDP announcements, 22 scenarios (0 to 21) |

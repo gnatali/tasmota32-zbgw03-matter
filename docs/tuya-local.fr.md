@@ -66,7 +66,8 @@ et mettre à jour `tuya.json`.
    enable**, **💾 Save** (ou la commande `TuyaEnable 1`). Le réglage est gardé d'un redémarrage
    à l'autre (`_persist.json`). **Aucun `autoexec.be` n'est nécessaire** : le firmware instancie
    le driver au démarrage, comme le `matter_device` de Matter, et le driver attend lui-même le
-   bon moment.
+   bon moment. C'est activé à la compilation par la directive `USE_TUYA_LOCAL` (comme
+   `USE_MATTER_DEVICE` pour Matter), définie dans le `platformio_override.ini` de ce dépôt.
 4. À chaque démarrage, le driver ne se connecte aux appareils qu'une fois **Zigbee démarré** (ou
    absent), le **réseau** disponible, **Matter** démarré (s'il est activé) et au moins **45 Ko**
    de mémoire libres. En attendant, la page d'accueil affiche un bouton **⏳ Tuya Local** grisé

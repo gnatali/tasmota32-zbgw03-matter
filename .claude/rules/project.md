@@ -28,7 +28,7 @@ measurements made on the gateway and the next steps are in
 
 | Path | Role |
 |---|---|
-| `platformio_override.ini` | `tasmota32-zbgw03-matter` environment, derived from `tasmota32-zbbrdgpro` + `USE_MATTER_DEVICE` |
+| `platformio_override.ini` | `tasmota32-zbgw03-matter` environment, derived from `tasmota32-zbbrdgpro` + `USE_MATTER_DEVICE` + `USE_TUYA_LOCAL` (driver started at boot) and `custom_berry_solidify` (driver in flash) |
 | `user_config_override.h` | build options (EZSP, `USE_BERRY_CRYPTO_AES_CBC`...) |
 | `patches/*.patch` | patches applied to Tasmota by the workflow (`git apply`), in alphabetical order |
 | `.github/workflows/build.yml` | build: clones Tasmota at commit `TASMOTA_REF`, driver tests, patches, `pio run` |

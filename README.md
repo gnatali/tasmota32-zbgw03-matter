@@ -47,6 +47,7 @@ This build starts from the official `tasmota32-zbbrdgpro` environment and change
 |---|---|---|
 | Zigbee protocol | ZNP (CC2652P) | EZSP (EFR32MG21) |
 | Matter (`USE_MATTER_DEVICE`) | no | yes |
+| [Local Tuya driver](docs/tuya-local.en.md) (`USE_TUYA_LOCAL`, `custom_berry_solidify`) | no | yes: built in, started at boot like Matter, enabled from its page |
 | `espressif/mdns` component | removed | kept (Matter advertises over mDNS) |
 | `espressif/fb_gfx` component (camera) | kept | removed |
 | Partitions | `app1856k_fs1344k` | `app2880k_fs320k` (safeboot) |

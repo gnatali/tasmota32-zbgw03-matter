@@ -178,6 +178,13 @@ Wi-Fi devices and the Zigbee sub-devices of the Tuya gateway, and expose them to
     Build: run 20 (commit `9b579c3`), 2,112,271-byte firmware (same size as run 19); to be
     flashed.
 
+19. **`USE_TUYA_LOCAL` build flag** (8 November): like `USE_MATTER_DEVICE` for Matter, the
+    start of the driver in Berry's init code (`patches/tuya-local-autostart.patch`) is now
+    under `#ifdef USE_TUYA_LOCAL`, and `platformio_override.ini` sets `-DUSE_TUYA_LOCAL`. The
+    flag controls the start only: the classes come from `custom_berry_solidify` (without the
+    flag, the driver is in flash but not started). Patch checked against `TASMOTA_REF`;
+    driver unchanged (22/22). **No build yet.**
+
 ## Measurements on the gateway
 
 | Situation | `Heap` (`Status 4`) |

@@ -1,18 +1,19 @@
-# Berry init code: the Tuya Local driver (berry/tuya_local.be, solidified into the firmware by
-# custom_berry_solidify) is instantiated at boot, right after Matter, like Matter's
-# `matter_device`: no autoexec.be is needed any more. The instance itself is light (commands,
-# web page, main page button); it only starts once enabled (checkbox of its web page or
-# TuyaEnable 1, kept in _persist.json) and once Zigbee, the network and Matter are ready.
-# A failure is logged and does not stop Berry's initialisation.
+# Berry init code: with USE_TUYA_LOCAL (build flag, like USE_MATTER_DEVICE for Matter), the
+# Tuya Local driver (berry/tuya_local.be, solidified into the firmware by custom_berry_solidify)
+# is instantiated at boot, right after Matter's `matter_device`: no autoexec.be is needed. The
+# instance itself is light (commands, web page, main page button); it only starts once enabled
+# (checkbox of its web page or TuyaEnable 1, kept in _persist.json) and once Zigbee, the
+# network and Matter are ready. A failure is logged and does not stop Berry's initialisation.
 diff --git a/tasmota/tasmota_xdrv_driver/xdrv_52_7_berry_embedded.ino b/tasmota/tasmota_xdrv_driver/xdrv_52_7_berry_embedded.ino
-index fda8a25..1fea4f7 100644
+index fda8a25..620be04 100644
 --- a/tasmota/tasmota_xdrv_driver/xdrv_52_7_berry_embedded.ino
 +++ b/tasmota/tasmota_xdrv_driver/xdrv_52_7_berry_embedded.ino
-@@ -110,6 +110,16 @@ const char be_berry_init_code[] =
+@@ -110,6 +110,18 @@ const char be_berry_init_code[] =
    "import matter "
    "global.matter_device = matter.Device() "
  #endif
 +
++#ifdef USE_TUYA_LOCAL
 +  // Tuya Local driver of tasmota32-zbgw03-matter (berry/tuya_local.be, solidified into the
 +  // firmware by custom_berry_solidify): instantiated at boot like Matter, no autoexec.be. It
 +  // does nothing until enabled (web page or TuyaEnable 1), then waits for Zigbee, the network
@@ -22,6 +23,7 @@ index fda8a25..1fea4f7 100644
 +  "except .. as e, m "
 +    "tasmota.log('TUY: cannot instantiate the driver: ' + str(e) + ' ' + str(m), 1) "
 +  "end "
++#endif // USE_TUYA_LOCAL
  ;
  
  
