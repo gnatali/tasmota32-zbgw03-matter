@@ -10,6 +10,10 @@
 #   HTTP <GET|POST> <path> <json of the arguments>   request to the driver's web page (PAGE ...)
 #   WEBBTN            button of the Configuration page
 #   NOMATTER / MATTERON   removes / restores matter_device (firmware without Matter)
+#   MATTEROFF         Matter disabled: matter_device without configuration (restored by MATTERON)
+#   ZIGBEE <0|1|nil>  zigbee.started() result (nil: no Zigbee)
+#   SECOND            calls every_second() (ADV also calls it every 1000 ms)
+#   NEWDRV            second TuyaLocal() instance, like old autoexec.be lines
 # Outputs: CONNECT, TX, CLOSE, CMD (MtrUpdate), PUB, RESP, APPEND, WEB, LOG, UDPBIND, UDPTX,
 #   UDPCLOSE, HTTPS, MATTERADD, PAGE; READY after each line
 import json
@@ -41,6 +45,7 @@ class MockTasmota
   def resp_cmnd_done()  print("RESP Done")  end
   def response_append(s)  print("APPEND " + s)  end
   def web_send_decimal(s)  print("WEB " + s)  end
+  def web_send(s)  print("WEB " + s)  end
 end
 tasmota = MockTasmota()
 
@@ -113,8 +118,8 @@ end
 
 # Matter: endpoint configuration, like Tasmota's matter_device
 class MockMatter
-  var plugins_config, next_ep
-  def init()  self.plugins_config = {"1": {"type": "v_light2", "name": "Porche"}}  self.next_ep = 2  end
+  var plugins_config, next_ep, started
+  def init()  self.plugins_config = {"1": {"type": "v_light2", "name": "Porche"}}  self.next_ep = 2  self.started = true  end
   def bridge_add_endpoint(t, conf)
     var c = {"type": t}
     for k: conf.keys()  c[k] = conf[k]  end
@@ -126,8 +131,18 @@ class MockMatter
 end
 matter_device = MockMatter()
 saved_matter = nil
+saved_config = nil
 
-# The driver is instantiated here as in autoexec.be: the file only contains the classes.
+# Zigbee: started() is false during the initialisation, true once started, nil without Zigbee
+class MockZigbee
+  var ok
+  def init()  self.ok = false  end
+  def started()  return self.ok  end
+end
+zigbee = MockZigbee()
+
+# The driver is instantiated here as by the firmware's Berry init code (like Matter): the file
+# only contains the classes.
 # Interpreter with the solidified driver: the classes are already native. Otherwise the source
 # is compiled in strict mode, like load() in Tasmota.
 import global
@@ -160,6 +175,7 @@ while true
       tasmota.now += 50
       ms -= 50
       tick()
+      if tasmota.now % 1000 == 0  drv.every_second()  end
     end
   elif op == "MTR"
     tasmota.rules["MtrReceived"](json.load(arg), "MtrReceived", nil)
@@ -190,9 +206,23 @@ while true
     import global
     saved_matter = global.matter_device
     global.matter_device = nil
+  elif op == "MATTEROFF"
+    import global
+    saved_matter = global.matter_device
+    saved_config = saved_matter.plugins_config
+    saved_matter.plugins_config = nil
   elif op == "MATTERON"
     import global
     global.matter_device = saved_matter
+    if saved_config != nil  saved_matter.plugins_config = saved_config  saved_config = nil  end
+  elif op == "ZIGBEE"
+    zigbee.ok = (arg == "nil") ? nil : (arg == "1")
+  elif op == "SECOND"
+    drv.every_second()
+  elif op == "NEWDRV"
+    import global
+    var d2 = global.TuyaLocal()
+    print("NEWDRV " + str(d2.inert) + " " + str(size(tasmota.drivers)))
   elif op == "WEBBTN"
     webserver._out = []
     drv.web_add_config_button()

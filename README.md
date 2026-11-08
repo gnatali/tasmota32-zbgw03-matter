@@ -181,7 +181,9 @@ Without PSRAM, Zigbee and Matter leave about 70 to 100 KB of free heap: watch `H
 The Berry driver `berry/tuya_local.be` controls Tuya Wi-Fi devices (protocols 3.3, 3.4 and
 3.5) and Tuya gateway sub-devices locally, without the cloud, and exposes them to Matter. It
 is built into the firmware (solidified: its code stays in flash instead of being compiled into
-RAM) and started from `autoexec.be`. The **Configuration → Tuya Local** page discovers devices on
+RAM) and started at boot like Matter, without `autoexec.be`: a **Tuya Local enable** checkbox
+turns it on, and it waits for Zigbee before connecting (greyed-out button on the main page
+meanwhile). The **Configuration → Tuya Local** page discovers devices on
 the network, imports their local keys (from tinytuya's `devices.json` or the Tuya cloud), creates
 their Matter endpoints and edits the configuration; the same features are available as commands
 (HTTP, MQTT). See [docs/tuya-local.en.md](docs/tuya-local.en.md) (user guide),

@@ -276,8 +276,10 @@ class TuyaBinding
   def push(changed)
     import json
     import global
-    # Matter not built into the firmware, or disabled: nothing to update, nothing pending
-    if !global.contains("matter_device") || global.matter_device == nil  return true  end
+    # Matter not built into the firmware, or disabled (no configuration): nothing to update,
+    # nothing pending
+    var md = global.contains("matter_device") ? global.matter_device : nil
+    if md == nil || md.plugins_config == nil  return true  end
     var r = self.to_matter(changed)
     if r == nil  return true  end
     r["Name"] = self.ep
@@ -826,12 +828,18 @@ class TuyaScan
     end
     self.t_end = tasmota.millis() + ms
     self.t_req = 0
-    var e = tasmota.eth()                     # Ethernet, otherwise Wi-Fi
-    self.ip = (e != nil) ? e.find("ip", "") : ""
-    if self.ip == "" || self.ip == "0.0.0.0"
+    self.ip = TuyaScan.local_ip()
+  end
+
+  # IP address of the gateway: Ethernet, otherwise Wi-Fi; "" without network
+  static def local_ip()
+    var e = tasmota.eth()
+    var ip = (e != nil) ? str(e.find("ip", "")) : ""
+    if ip == "" || ip == "0.0.0.0"
       var w = tasmota.wifi()
-      self.ip = (w != nil) ? w.find("ip", "") : ""
+      ip = (w != nil) ? str(w.find("ip", "")) : ""
     end
+    return (ip == "0.0.0.0") ? "" : ip
   end
 
   # called every 50 ms; false when the discovery is over
@@ -1350,7 +1358,8 @@ end
 class TuyaWeb
   # device state (TuyaLocal.state_of) -> pictogram and label
   static var STATES = {"connected": ["&#x1F7E2;", "connected"], "disconnected": ["&#x1F534;", "disconnected"],
-                       "disabled": ["&#x26AA;", "disabled"], "ignored": ["&#x26A0;", "incomplete, ignored"]}
+                       "disabled": ["&#x26AA;", "disabled"], "ignored": ["&#x26A0;", "incomplete, ignored"],
+                       "stopped": ["&#x23F8;", "driver not running"]}
   static var REGIONS = [["eu", "Central Europe"], ["we", "Western Europe"], ["us", "Western America"],
                         ["ue", "Eastern America"], ["cn", "China"], ["in", "India"], ["sg", "Singapore"]]
 
@@ -1380,6 +1389,32 @@ class TuyaWeb
     webserver.content_send("<p></p><form id=tuya action='tuya' style='display: block;' method='get'><button>&#x1F50C; Tuya Local</button></form>")
   end
 
+  # button of the main page, in the sensor area that the browser refreshes: greyed out while the
+  # driver waits for Zigbee, the network or Matter (like Zigbee's buttons), nothing if disabled
+  static def main_button(drv)
+    var st = drv.state()
+    if st == "disabled"  return  end
+    if drv.running
+      tasmota.web_send("<tr><td colspan=2><a href='/tuya'><button>&#x1F50C; Tuya Local</button></a></td></tr>")
+    else
+      tasmota.web_send("{s}Tuya Local{m}" + TuyaWeb.esc(st) + "{e}" +
+                       "<tr><td colspan=2><button disabled style='background:var(--c_frm)'>&#x23F3; Tuya Local</button></td></tr>")
+    end
+  end
+
+  # enable checkbox, like Matter's page
+  static def enable(drv)
+    import webserver
+    TuyaWeb.legend("Tuya Local")
+    var on = drv.enabled()
+    webserver.content_send("<form action='/tuya' method='post'><p><label><input type='checkbox' name='enable'" +
+                           (on ? " checked" : "") + "><b>Tuya Local enable</b></label></p>")
+    var st = drv.state()
+    var icon = drv.running ? "&#x1F7E2;" : (st == "disabled" ? "&#x26AA;" : "&#x23F3;")
+    TuyaWeb.p(icon + " " + TuyaWeb.esc(st))
+    webserver.content_send("<button name='enable_save' class='button bgrn'>&#x1F4BE; Save</button></form></fieldset><p></p>")
+  end
+
   static def page(drv)
     import webserver
     if !webserver.check_privileged_access()  return nil  end
@@ -1392,6 +1427,7 @@ class TuyaWeb
     if webserver.has_arg("edit")
       TuyaWeb.edit(drv, webserver.arg("edit"))
     else
+      TuyaWeb.enable(drv)
       TuyaWeb.devices(drv)
       TuyaWeb.matter(drv)
       TuyaWeb.scan(drv)
@@ -1460,8 +1496,10 @@ class TuyaWeb
   static def matter(drv)
     import webserver
     TuyaWeb.legend("Matter endpoints")
-    var rows = drv.matter_status()
-    if rows == nil
+    var rows = drv.running ? drv.matter_status() : nil
+    if !drv.running
+      TuyaWeb.p("&#x23F8; Tuya Local is not running.")
+    elif rows == nil
       TuyaWeb.p("&#x26A0; Matter is not enabled.")
     elif size(rows) == 0
       TuyaWeb.p("No binding: add Tuya devices first.")
@@ -1566,8 +1604,12 @@ class TuyaWeb
       elif webserver.has_arg("del")
         msg = "Deleted: " + drv.del_device(webserver.arg("ref"))
       elif webserver.has_arg("reload")
+        if !drv.running  raise "tuya_error", "Tuya Local is not running: " + drv.state()  end
         drv.load_config()
         msg = "tuya.json reloaded"
+      elif webserver.has_arg("enable_save")
+        drv.set_enabled(webserver.has_arg("enable"))
+        msg = drv.enabled() ? "Tuya Local enabled" : "Tuya Local disabled"
       elif webserver.has_arg("scan")
         msg = drv.start_scan(20)
       elif webserver.has_arg("import")
@@ -1610,6 +1652,7 @@ class TuyaLocal
   static var SCAN_MIN_HEAP = 15
   static var IMPORT_MIN_HEAP = 20
   static var CLOUD_MIN_HEAP = 35
+  static var START_MIN_HEAP = 45  # free memory (KB) needed to start the driver at boot
   static var LABELS = {"Added": "added", "Updated": "updated", "Skipped": "skipped"}
   var devices                 # list of TuyaDevice
   var by_ep                   # {lower-case Matter endpoint name: TuyaBinding}
@@ -1617,12 +1660,25 @@ class TuyaLocal
   var scan, scan_result       # running discovery (TuyaScan) and last result (list)
   var cloud, cloud_t          # running cloud import (TuyaCloud) and millis of the next request
   var web_msg                 # message to show on the web page
+  var running                 # true once started: tuya.json loaded, devices connecting
+  var wait                    # why the driver is not started yet ("disabled", "waiting for Zigbee"...)
+  var inert                   # true: second instance (old autoexec.be lines), does nothing
 
+  # Instantiated at boot by the firmware (Berry init code, like Matter), with nothing heavy:
+  # the driver only starts in every_second(), once enabled and Zigbee, the network and Matter
+  # are ready (see start_wait()).
   def init()
+    import global
     self.devices = []
     self.by_ep = {}
     self.t_sync = tasmota.millis()
-    self.load_config()
+    self.running = false
+    self.wait = "starting"
+    if global.contains("tuya_local") && global.tuya_local != nil
+      self.inert = true
+      tasmota.log("TUY: driver already started by the firmware: remove the tuya_local lines from autoexec.be", 1)
+      return
+    end
     tasmota.add_driver(self)
     tasmota.add_rule("MtrReceived", /v -> self.on_matter(v), self)
     tasmota.add_cmd("TuyaStatus", /cmd, idx, payload -> self.cmd_status(payload))
@@ -1635,9 +1691,85 @@ class TuyaLocal
     tasmota.add_cmd("TuyaImport", /c, i, p -> self.run_cmd("TuyaImport", / -> self.import_args(p)))
     tasmota.add_cmd("TuyaCloud", /c, i, p -> self.run_cmd("TuyaCloud", / -> self.cloud_json(p)))
     tasmota.add_cmd("TuyaMatter", /c, i, p -> self.run_cmd("TuyaMatter", / -> self.matter_cmd(p)))
+    tasmota.add_cmd("TuyaEnable", /c, i, p -> self.run_cmd("TuyaEnable", / -> self.enable_cmd(p)))
     # web page: the driver starts after the web server, which therefore does not call web_add_handler()
     import webserver
     if webserver.state() > 0  self.web_add_handler()  end
+  end
+
+  ###################### start and enable ######################
+  # enabled by the checkbox of the web page or TuyaEnable 1 (kept in _persist.json, like a setting)
+  def enabled()
+    import persist
+    return persist.find("tuya_local", false) == true
+  end
+
+  # why the driver cannot start yet, or nil when it can
+  def start_wait()
+    import global
+    if !self.enabled()  return "disabled"  end
+    if global.contains("zigbee") && global.zigbee != nil && global.zigbee.started() == false
+      return "waiting for Zigbee"
+    end
+    if TuyaScan.local_ip() == ""  return "waiting for the network"  end
+    var md = global.contains("matter_device") ? global.matter_device : nil
+    if md != nil && md.plugins_config != nil && md.started != true  return "waiting for Matter"  end
+    var h = tasmota.memory().find("heap_free", 0)
+    if h < self.START_MIN_HEAP  return f"waiting for memory ({h} KB, {self.START_MIN_HEAP} KB needed)"  end
+    return nil
+  end
+
+  def every_second()
+    if self.running  return  end
+    var why = self.start_wait()
+    if why != self.wait && why != nil && why != "disabled"  tasmota.log("TUY: " + why, 2)  end
+    self.wait = why
+    if why == nil
+      self.running = true
+      tasmota.log("TUY: starting, free memory " + str(tasmota.memory().find("heap_free", 0)) + " KB", 2)
+      self.load_config()
+    end
+  end
+
+  def stop()
+    for d: self.devices  d.close("driver disabled")  end
+    self.devices = []
+    self.by_ep = {}
+    self.running = false
+    self.wait = "disabled"
+  end
+
+  def set_enabled(on)
+    import persist
+    persist.tuya_local = on
+    persist.save()
+    if on
+      self.wait = "starting"                    # started by every_second() when ready
+    elif self.running
+      self.stop()
+    else
+      self.wait = "disabled"
+    end
+  end
+
+  # "running", "disabled" or what the driver waits for
+  def state()
+    if self.running  return "running"  end
+    return (self.wait != nil) ? self.wait : "starting"
+  end
+
+  # TuyaEnable [0|1]
+  def enable_cmd(p)
+    import string
+    var s = string.tolower(self.trim(str(p)))
+    if s == "1" || s == "on" || s == "true"
+      self.set_enabled(true)
+    elif s == "0" || s == "off" || s == "false"
+      self.set_enabled(false)
+    elif s != ""
+      raise "tuya_error", "syntax: TuyaEnable [0|1]"
+    end
+    return {"Enabled": self.enabled(), "State": self.state()}
   end
 
   # Configuration -> Tuya Local page
@@ -1792,6 +1924,7 @@ class TuyaLocal
   # state of a tuya.json entry, for the web page
   def state_of(c)
     if c.find("enabled", true) == false  return "disabled"  end
+    if !self.running  return "stopped"  end
     var id = str(c.find("id", ""))
     for d: self.devices
       if d.id == id  return (d.state == d.ST_READY) ? "connected" : "disconnected"  end
@@ -2063,6 +2196,7 @@ class TuyaLocal
   def matter_create(only)
     import global
     import string
+    if !self.running  raise "tuya_error", "Tuya Local is not running: " + self.state()  end
     var miss = self.matter_missing()
     if miss == nil  raise "tuya_error", "Matter is not enabled"  end
     var want = nil
@@ -2091,7 +2225,7 @@ class TuyaLocal
   def load_config()
     import string
     import json
-    for d: self.devices  d.close("rechargement")  end
+    for d: self.devices  d.close("reload")  end
     self.devices = []
     self.by_ep = {}
     var conf
@@ -2257,6 +2391,7 @@ class TuyaLocal
   end
 
   def cmd_reload()
+    if !self.running  return tasmota.resp_cmnd_str("Tuya Local is not running: " + self.state())  end
     self.load_config()
     tasmota.resp_cmnd_done()
   end
@@ -2315,5 +2450,6 @@ class TuyaLocal
       end
     end
     if size(msg) > 0  tasmota.web_send_decimal(msg)  end
+    TuyaWeb.main_button(self)
   end
 end

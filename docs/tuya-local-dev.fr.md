@@ -41,7 +41,7 @@ dans le firmware (une directive `#@ solidify:<Classe>,weak` par classe).
 | `TuyaImport` | conversion des appareils de tinytuya ou du cloud en entrées de `tuya.json`, déduction des liaisons | fonctions statiques |
 | `TuyaCloud` | requêtes signées vers l'API OpenAPI de Tuya | **créée à la demande**, libérée à la fin |
 | `TuyaWeb` | page Configuration → Tuya Local | fonctions statiques |
-| `TuyaLocal` | le driver Tasmota : configuration, boucle, commandes, événements | une instance, créée par `autoexec.be` |
+| `TuyaLocal` | le driver Tasmota : configuration, boucle, commandes, événements | une instance, créée au démarrage par le code d'initialisation Berry du firmware |
 
 `TuyaLocal.every_50ms()` fait tourner les connexions, la recherche en cours, l'import cloud en
 cours (une requête par seconde) et le renvoi vers Matter (toutes les 30 s).
@@ -65,8 +65,9 @@ environ 17 Ko sur les 40 Ko qu'il occupait avec 12 appareils. Solidifié, ce cod
 **Contraintes**, vérifiées par le banc de test :
 
 - **aucun code au premier niveau** hors des classes : la solidification exécute le fichier sans
-  `tasmota`. Le driver est instancié par `autoexec.be` (`global.tuya_local = TuyaLocal()`),
-  qui charge encore `tuya_local.be` si le firmware ne contient pas le driver ;
+  `tasmota`. Le driver est instancié par le code d'initialisation Berry du firmware
+  (`global.tuya_local = TuyaLocal()`, voir plus bas) ; sur un firmware sans le driver intégré,
+  `autoexec.be` peut encore charger `tuya_local.be` et l'instancier ;
 - **imports dans les méthodes** (`import string`, `json`, `crypto`, `webserver`...) : un import
   de premier niveau n'existe pas dans le firmware ;
 - **classes en lecture seule** : une `static var` ne peut pas être écrite
@@ -76,6 +77,32 @@ environ 17 Ko sur les 40 Ko qu'il occupait avec 12 appareils. Solidifié, ce cod
 - un `tuya_local.be` chargé par `load()` remplace le driver solidifié (ses classes deviennent
   des globales qui masquent les classes natives), ce qui permet d'essayer une version sans
   reflasher.
+
+### Démarrage au boot, sans autoexec.be
+
+`patches/tuya-local-autostart.patch` ajoute au code d'initialisation Berry de Tasmota
+(`be_berry_init_code`, `xdrv_52_7_berry_embedded.ino`), juste après le
+`global.matter_device = matter.Device()` de Matter :
+`try global.tuya_local = TuyaLocal() except .. as e, m tasmota.log(...) end`. Comme pour Matter,
+l'instance existe toujours, et le travail est différé :
+
+- `TuyaLocal.init()` est léger : commandes, règle, enregistrement du driver (page web, bouton de
+  la page d'accueil) et rien d'autre ; `tuya.json` n'est pas lu. Une seconde instance (anciennes
+  lignes d'`autoexec.be`) trouve `global.tuya_local` déjà défini, reste **inerte** (`inert`,
+  n'enregistre rien) et journalise un avertissement ;
+- `enabled()` : `persist.tuya_local` (`_persist.json`), réglé par la case de la page ou
+  `TuyaEnable 0|1` (`set_enabled()`) ; la désactivation ferme les connexions (`stop()`) ;
+- `every_second()` démarre le driver (`running`, `load_config()`) dès que `start_wait()` renvoie
+  `nil` : activé, `zigbee.started()` différent de `false` (`nil` : pas de Zigbee), une adresse
+  IP (`TuyaScan.local_ip()`), `matter_device.started` si Matter est activé (`plugins_config`
+  non `nil`), et `START_MIN_HEAP` (45 Ko) libres. Sinon `wait` garde la raison, journalisée une
+  fois à chaque changement ;
+- page d'accueil : `web_sensor()` appelle `TuyaWeb.main_button()`, dans la zone des capteurs
+  que le navigateur rafraîchit, comme les boutons de Zigbee : `<button disabled>` grisé (⏳ et
+  une ligne « Tuya Local : <raison> ») pendant l'attente, puis un lien vers `/tuya` ; rien si
+  le driver est désactivé ;
+- tant que le driver ne tourne pas : appareils affichés ⏸ (`state_of()` → `stopped`), pas de
+  liste Matter, `TuyaReload`, le rechargement de la page et `TuyaMatter` refusés.
 
 ## 3. Synchronisation avec Matter
 
@@ -89,8 +116,8 @@ environ 17 Ko sur les 40 Ko qu'il occupait avec 12 appareils. Solidifié, ce cod
   seule fois. `TuyaLocal.sync_pending()` lui renvoie l'**état complet** toutes les 30 s
   (`SYNC_RETRY`), et toute nouvelle valeur de l'appareil aussi. Dès que l'endpoint accepte :
   `TUY: Matter endpoint '<ep>' available, state sent`.
-- Sans Matter (firmware sans `USE_MATTER_DEVICE`, ou Matter désactivé : pas de globale
-  `matter_device`) : `TuyaBinding.push()` n'envoie rien et ne met jamais une liaison en
+- Sans Matter (firmware sans `USE_MATTER_DEVICE` : pas de globale `matter_device` ; ou Matter
+  désactivé : `matter_device` sans configuration, `plugins_config` à `nil`) : `TuyaBinding.push()` n'envoie rien et ne met jamais une liaison en
   attente, donc pas de `MtrUpdate` toutes les 30 s ; la page affiche « Matter is not enabled »
   et `TuyaMatter` répond cette erreur. Le contrôle se fait à l'exécution : le driver est le même
   dans tous les firmwares.
@@ -254,14 +281,16 @@ Tasmota et de son BearSSL :
    les déclare), en lecture seule comme en flash.
 
 Les mêmes scénarios sont joués sur les deux. Simulations (`harness.be`, `webserver.be`,
-`crypto.be`) : `tasmota` (temps, règles, commandes, mémoire libre, adresses), `tcpclientasync`,
-`udp`, `webclient` (réponses préparées par chemin), `webserver`, `matter_device`. Les faux
+`crypto.be`, `persist.be`) : `tasmota` (temps, règles, commandes, mémoire libre, adresses),
+`tcpclientasync`, `udp`, `webclient` (réponses préparées par chemin), `webserver`, `persist`,
+`zigbee` (`started()`), `matter_device`. Les faux
 appareils (`fake_tuya.py`) et les annonces UDP (`udp_broadcast()`, vérifiées par
 `decrypt_udp()`) sont construits avec TinyTuya.
 
 | N° | Scénario |
 |---|---|
-| 1 | connexion, négociation de clé, état initial (6 appareils, 3.3 / 3.4 / 3.5, passerelle) ; réponse `Done` acceptée |
+| 0 | démarrage au boot : désactivé (aucune connexion, pas de bouton), `TuyaEnable 1`, attente de Zigbee (bouton grisé), seconde instance inerte |
+| 1 | démarrage une fois Zigbee prêt, connexion, négociation de clé, état initial (6 appareils, 3.3 / 3.4 / 3.5, passerelle) ; réponse `Done` acceptée ; bouton actif sur la page d'accueil |
 | 2 à 5 | Matter → ventilateur 3.5, ampoule CCT 3.3, projecteur RGB 3.4, passerelle Zigbee |
 | 6 | relevés `SENSOR` et page d'accueil |
 | 7 | `TuyaSend`, `TuyaStatus` |
@@ -274,7 +303,7 @@ appareils (`fake_tuya.py`) et les annonces UDP (`udp_broadcast()`, vérifiées p
 | 18 | page web : liste, édition (clé masquée puis conservée), suppression, liste des endpoints Matter (✅ et numéro, cases à cocher), création d'une sélection seulement, refus sans case cochée, `TuyaMatter <noms>`, recherche |
 | 19 | `TuyaSend ... toggle` |
 | 20 | identifiants du cloud enregistrés : case de la page, secret jamais affiché, `TuyaCloud` sans argument, effacement |
-| 21 | firmware sans Matter : pas de `MtrUpdate`, rien en attente, la page et `TuyaMatter` le signalent |
+| 21 | firmware sans Matter, ou Matter désactivé : pas de `MtrUpdate`, rien en attente, la page et `TuyaMatter` le signalent ; `TuyaEnable 0` ferme les connexions |
 
 Le workflow lance le banc avant la compilation ; il crée `/tuya.json`, `/tuya.json.bak`,
 `/devices.json` et `/tuya_cloud.json`, que le test écrit.
@@ -330,10 +359,11 @@ la configuration simplifiée ajoute 0,7 à 1,3 Ko au repos.
 |---|---|
 | `berry/tuya_local.be` | le driver (9 classes) |
 | `patches/berry-solidify-all-classes.patch` | enregistrement de toutes les classes solidifiées |
+| `patches/tuya-local-autostart.patch` | driver instancié au démarrage par le code d'initialisation Berry |
 | `platformio_override.ini` | `custom_berry_solidify` |
 | `berry/test/run_tests.sh` | construction des deux interpréteurs, solidification, scénarios |
-| `berry/test/harness.be`, `webserver.be`, `crypto.be` | simulations de Tasmota |
-| `berry/test/fake_tuya.py`, `test_tuya_local.py` | faux appareils, annonces UDP, 21 scénarios |
+| `berry/test/harness.be`, `webserver.be`, `crypto.be`, `persist.be` | simulations de Tasmota |
+| `berry/test/fake_tuya.py`, `test_tuya_local.py` | faux appareils, annonces UDP, 22 scénarios (0 à 21) |
 | `.github/workflows/build.yml` | fichiers écrits par les tests |
 | `docs/tuya-local.fr.md` / `.en.md` | documentation d'utilisation |
 | `docs/tuya-local-examples.fr.md` / `.en.md` | exemples de commandes et d'événements |

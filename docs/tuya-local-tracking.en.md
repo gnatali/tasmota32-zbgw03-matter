@@ -16,11 +16,11 @@ Wi-Fi devices and the Zigbee sub-devices of the Tuya gateway, and expose them to
 |---|---|
 | Berry crypto: `USE_BERRY_CRYPTO_AES_CBC` + `berry-aes-gcm-128-aad.patch` | ✅ built, in service on the gateway |
 | `berry/tuya_local.be` driver: protocols 3.3 / 3.4 / 3.5, Tuya gateway (`cid`) | ✅ **tested on the real devices**: 5 Wi-Fi devices and 7 sub-devices connected, correct values |
-| Test bench (21 scenarios) in the workflow | ✅ passes locally (source and solidified) |
+| Test bench (22 scenarios) in the workflow | ✅ passes locally (source and solidified) |
 | **Simplified configuration**: `/tuya` web page, UDP discovery, `devices.json` and cloud import, types deduced from the DPs, API (`TuyaConfig`, `TuyaAdd`, `TuyaDel`, `TuyaScan`, `TuyaImport`, `TuyaCloud`, `TuyaMatter`) | ✅ test bench; ✅ build (run 13, 2050 KB); ✅ discovery on the gateway (3 devices); ⏳ cloud import on the gateway (fix of run 16, not flashed yet) |
 | **Driver solidification** (`custom_berry_solidify`, `berry-solidify-all-classes.patch`) | ✅ test bench: source **and** solidified driver; ✅ firmware build (2015 KB); ✅ on the gateway: **48 KB free with the 12 devices connected** (34 KB before), the driver uses ~23 KB instead of ~40 |
 | User documentation `docs/tuya-local.{en,fr}.md` | ✅ |
-| Delayed start in `autoexec.be` (crash at boot) | ✅ fixed and documented |
+| Start at boot without `autoexec.be` (enable checkbox, waits for Zigbee) | ✅ test bench; ⏳ gateway (run 19) |
 | **Memory** with the 12 devices connected: 34 KB free with the driver loaded from the file system, **48 KB** with the solidified driver | ✅ ~14 KB of extra margin |
 | Matter endpoints and tests in Google Home | ✅ 5 endpoints created (`Entrée-Porche`, `Ventilateur`, `Lumière ventilateur`, `Récepteur radio 1` and `4`), in Google Home after `Restart 1`; 61 KB free |
 | Pergola 1 and 2 (RGB floodlights) | ⏳ not found by the scan: IP and version unknown, disabled in `tuya.json` |
@@ -153,6 +153,20 @@ Wi-Fi devices and the Zigbee sub-devices of the Tuya gateway, and expose them to
     RAM unchanged (DRAM 66,076 bytes); it brings entries 12, 13, 15 and 16 to the gateway (run
     17, started by Guillaume on commit `36389bb`, had 12 and 13 but not 15). To be flashed.
 
+17. **Start like Matter, without `autoexec.be`; greyed-out button while waiting** (8 November):
+    `patches/tuya-local-autostart.patch` instantiates the driver in Tasmota's Berry init code,
+    right after Matter. The instance is light; the driver only starts once enabled (**Tuya
+    Local enable** checkbox on its page, or `TuyaEnable 0|1`, kept in `_persist.json`) and
+    once Zigbee is started, the network is up, Matter is started (if enabled) and 45 KB are
+    free. Meanwhile, the main page shows a greyed-out **⏳ Tuya Local** button and what it
+    waits for, in the sensor area refreshed by the browser, like Zigbee's buttons; then an
+    active **🔌 Tuya Local** button. An old `autoexec.be` creates an inert second instance and
+    a warning. Also fixed: with Matter disabled, `matter_device` exists without configuration,
+    so `push()` now also checks `plugins_config` (entry 16 only covered a firmware without
+    Matter). Scenarios 0 and 1 (start), 12 and 21 adapted: 22/22 in both modes. On the
+    gateway: **enable the driver once** after flashing (the setting starts unset), and remove
+    the `tuya_start()` lines from `autoexec.be`.
+
 ## Measurements on the gateway
 
 | Situation | `Heap` (`Status 4`) |
@@ -236,8 +250,8 @@ température et d'humidité (`temp` DP 103 and `humidity` DP 101, divider 100).
 ## Next steps (by priority)
 
 1. ~~**Solidify the driver**~~: done and measured, 48 KB free with the 12 devices instead of
-   34 (see the measurements). The 60 KB threshold of `autoexec.be` is still right (71 KB
-   before the driver starts, ~23 KB used afterwards).
+   34 (see the measurements). The driver now starts by itself (entry 17) with at least 45 KB
+   free (71 KB before the driver starts, ~23 KB used afterwards).
 2. **Matter**: create the endpoints one by one, with **exactly** the `ep` name (accents
    included), and test both directions with Google Home, reading `Heap` after each:
    - ✅ `Entrée-Porche`: v.Light 2 CT;
@@ -314,6 +328,7 @@ température et d'humidité (`temp` DP 103 and `humidity` DP 101, divider 100).
 | `devices.json`, `snapshot.json` | Guillaume's PC (output of `tinytuya wizard` / `scan`) | local keys, ids, IPs, versions |
 | `/tuya.json` | gateway file system | real configuration, **with the keys** |
 | `/tuya_cloud.json` | gateway file system | Tuya cloud credentials, if saved from the page |
-| `/autoexec.be` | gateway file system | delayed start of the driver (`/tuya_local.be` is no longer needed with the solidified driver) |
+| `/autoexec.be` | gateway file system | user rules only: the driver no longer needs it (entry 17); remove the old `tuya_start()` lines |
+| `/_persist.json` | gateway file system | `tuya_local`: driver enabled (checkbox / `TuyaEnable`) |
 
 To resume development, ask Guillaume for the files the task needs. Never commit them.

@@ -44,7 +44,7 @@ into the firmware (one `#@ solidify:<Class>,weak` directive per class).
 | `TuyaImport` | turns tinytuya or cloud devices into `tuya.json` entries, deduces bindings | static functions |
 | `TuyaCloud` | signed requests to Tuya's OpenAPI | **created on demand**, released at the end |
 | `TuyaWeb` | Configuration → Tuya Local page | static functions |
-| `TuyaLocal` | the Tasmota driver: configuration, loop, commands, events | one instance, created by `autoexec.be` |
+| `TuyaLocal` | the Tasmota driver: configuration, loop, commands, events | one instance, created at boot by the firmware's Berry init code |
 
 `TuyaLocal.every_50ms()` runs the connections, the current discovery, the current cloud import
 (one request per second) and the resend to Matter (every 30 s).
@@ -68,8 +68,9 @@ into the firmware (one `#@ solidify:<Class>,weak` directive per class).
 **Constraints**, checked by the test bench:
 
 - **no top-level code** outside classes: solidification runs the file without `tasmota`. The
-  driver is instantiated by `autoexec.be` (`global.tuya_local = TuyaLocal()`), which still loads
-  `tuya_local.be` if the firmware does not include the driver;
+  driver is instantiated by the firmware's Berry init code (`global.tuya_local = TuyaLocal()`,
+  see below); on a firmware without the built-in driver, `autoexec.be` can still load
+  `tuya_local.be` and instantiate it;
 - **imports inside methods** (`import string`, `json`, `crypto`, `webserver`...): a top-level
   import does not exist in the firmware;
 - **read-only classes**: a `static var` cannot be written
@@ -78,6 +79,31 @@ into the firmware (one `#@ solidify:<Class>,weak` directive per class).
   reference value `0xCBF43926`);
 - a `tuya_local.be` loaded with `load()` overrides the solidified driver (its classes become
   globals that hide the native classes), so a new version can be tried without reflashing.
+
+### Start at boot, without autoexec.be
+
+`patches/tuya-local-autostart.patch` adds to Tasmota's Berry init code
+(`be_berry_init_code`, `xdrv_52_7_berry_embedded.ino`), right after Matter's
+`global.matter_device = matter.Device()`:
+`try global.tuya_local = TuyaLocal() except .. as e, m tasmota.log(...) end`. As with Matter,
+the instance always exists, and the work is deferred:
+
+- `TuyaLocal.init()` is light: commands, rule, driver registration (web page, main page button)
+  and nothing else; `tuya.json` is not read. A second instance (old `autoexec.be` lines) sees
+  `global.tuya_local` already set, stays **inert** (`inert`, registers nothing) and logs a
+  warning;
+- `enabled()`: `persist.tuya_local` (`_persist.json`), set by the page's checkbox or
+  `TuyaEnable 0|1` (`set_enabled()`); disabling closes the connections (`stop()`);
+- `every_second()` starts the driver (`running`, `load_config()`) once `start_wait()` returns
+  `nil`: enabled, `zigbee.started()` not `false` (`nil`: no Zigbee), an IP address
+  (`TuyaScan.local_ip()`), `matter_device.started` if Matter is enabled (`plugins_config` not
+  `nil`), and `START_MIN_HEAP` (45 KB) free. Otherwise `wait` holds the reason, logged once
+  when it changes;
+- main page: `web_sensor()` calls `TuyaWeb.main_button()`, in the sensor area that the browser
+  refreshes, like Zigbee's buttons: greyed-out `<button disabled>` (⏳ and a "Tuya Local:
+  <reason>" row) while waiting, then a link to `/tuya`; nothing when disabled;
+- while the driver is not running: devices shown ⏸ (`state_of()` → `stopped`), no Matter list,
+  `TuyaReload`, the page's reload and `TuyaMatter` refused.
 
 ## 3. Synchronisation with Matter
 
@@ -90,8 +116,8 @@ into the firmware (one `#@ solidify:<Class>,weak` directive per class).
   `TuyaLocal.sync_pending()` resends it the **full state** every 30 s (`SYNC_RETRY`), and so does
   any new value from the device. As soon as the endpoint accepts:
   `TUY: Matter endpoint '<ep>' available, state sent`.
-- No Matter (firmware without `USE_MATTER_DEVICE`, or Matter disabled: no `matter_device`
-  global): `TuyaBinding.push()` sends nothing and never makes a binding pending, so no
+- No Matter (firmware without `USE_MATTER_DEVICE`: no `matter_device` global; or Matter
+  disabled: `matter_device` without configuration, `plugins_config` `nil`): `TuyaBinding.push()` sends nothing and never makes a binding pending, so no
   `MtrUpdate` every 30 s; the page shows "Matter is not enabled" and `TuyaMatter` answers that
   error. The check is made at run time: the driver is the same in every firmware.
 - In Google Home, a new endpoint stays **offline until Tasmota's `Restart 1`** (the controller
@@ -249,14 +275,16 @@ and BearSSL:
    native classes are linked into the interpreter (`be_modtab.c` recompiled with a `modules.h`
    that declares them), read-only as in flash.
 
-The same scenarios run on both. Mocks (`harness.be`, `webserver.be`, `crypto.be`): `tasmota`
-(time, rules, commands, free memory, addresses), `tcpclientasync`, `udp`, `webclient` (responses
-prepared per path), `webserver`, `matter_device`. The fake devices (`fake_tuya.py`) and the UDP
+The same scenarios run on both. Mocks (`harness.be`, `webserver.be`, `crypto.be`,
+`persist.be`): `tasmota` (time, rules, commands, free memory, addresses), `tcpclientasync`,
+`udp`, `webclient` (responses prepared per path), `webserver`, `persist`, `zigbee`
+(`started()`), `matter_device`. The fake devices (`fake_tuya.py`) and the UDP
 announcements (`udp_broadcast()`, checked with `decrypt_udp()`) are built with TinyTuya.
 
 | No. | Scenario |
 |---|---|
-| 1 | connection, key negotiation, initial state (6 devices, 3.3 / 3.4 / 3.5, gateway); `Done` answer accepted |
+| 0 | start at boot: disabled (nothing connects, no button), `TuyaEnable 1`, waiting for Zigbee (greyed-out button), second instance inert |
+| 1 | start once Zigbee is ready, connection, key negotiation, initial state (6 devices, 3.3 / 3.4 / 3.5, gateway); `Done` answer accepted; active main page button |
 | 2 to 5 | Matter → 3.5 fan, 3.3 CCT bulb, 3.4 RGB floodlight, Zigbee gateway |
 | 6 | `SENSOR` readings and main page |
 | 7 | `TuyaSend`, `TuyaStatus` |
@@ -269,7 +297,7 @@ announcements (`udp_broadcast()`, checked with `decrypt_udp()`) are built with T
 | 18 | web page: list, editing (masked key then kept), deletion, Matter endpoint list (✅ and number, checkboxes), creation of a selection only, none ticked refused, `TuyaMatter <names>`, discovery |
 | 19 | `TuyaSend ... toggle` |
 | 20 | saved cloud credentials: page checkbox, secret never shown, `TuyaCloud` without argument, erasing |
-| 21 | firmware without Matter: no `MtrUpdate`, nothing pending, page and `TuyaMatter` report it |
+| 21 | firmware without Matter, or Matter disabled: no `MtrUpdate`, nothing pending, page and `TuyaMatter` report it; `TuyaEnable 0` closes the connections |
 
 The workflow runs the bench before compiling; it creates `/tuya.json`, `/tuya.json.bak`,
 `/devices.json` and `/tuya_cloud.json`, which the test writes.
@@ -325,10 +353,11 @@ simplified configuration adds 0.7 to 1.3 KB at rest.
 |---|---|
 | `berry/tuya_local.be` | the driver (9 classes) |
 | `patches/berry-solidify-all-classes.patch` | registration of all solidified classes |
+| `patches/tuya-local-autostart.patch` | driver instantiated at boot by Berry's init code |
 | `platformio_override.ini` | `custom_berry_solidify` |
 | `berry/test/run_tests.sh` | builds the two interpreters, solidification, scenarios |
-| `berry/test/harness.be`, `webserver.be`, `crypto.be` | Tasmota mocks |
-| `berry/test/fake_tuya.py`, `test_tuya_local.py` | fake devices, UDP announcements, 21 scenarios |
+| `berry/test/harness.be`, `webserver.be`, `crypto.be`, `persist.be` | Tasmota mocks |
+| `berry/test/fake_tuya.py`, `test_tuya_local.py` | fake devices, UDP announcements, 22 scenarios (0 to 21) |
 | `.github/workflows/build.yml` | files written by the tests |
 | `docs/tuya-local.en.md` / `.fr.md` | user guide |
 | `docs/tuya-local-examples.fr.md` / `.en.md` | command and event examples |

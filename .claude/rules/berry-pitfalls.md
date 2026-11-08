@@ -23,7 +23,8 @@ paths:
 - `tcpclientasync.connected()` returns `nil` while connecting, then `true` or `false`.
 - **Solidified driver** (`custom_berry_solidify`, classes in flash):
   - no top-level code outside the classes: solidification runs the file (without `tasmota`),
-    and `autoexec.be` instantiates the driver (`global.tuya_local = TuyaLocal()`);
+    and the firmware's Berry init code instantiates the driver (`global.tuya_local =
+    TuyaLocal()`, `patches/tuya-local-autostart.patch`, like Matter's `matter_device`);
   - `import string` / `json` / `crypto` **in every method** that uses them: a top-level import
     does not exist in the firmware;
   - a solidified class is **read-only**: no write to a `static var`
@@ -40,7 +41,12 @@ paths:
   a desktop screen (screenshot with Tasmota's CSS).
 - File larger than the free RAM (tinytuya's `devices.json`): read it in chunks
   (`readbytes(512)`, `TuyaImport.each_object`), never `read()` in one go.
-- **Never start the driver directly in `autoexec.be`**: without PSRAM, loading it while Zigbee
-  and Matter start crashes the ESP32. After 4 quick crashes, the boot-loop protection starts
-  **without Berry, hence without Matter**, and **disables all rules**. Start it 30 s after boot
-  (see `docs/tuya-local.en.md`). `SetOption153 1` disables `autoexec.be`.
+- **Start at boot**: `TuyaLocal.init()` runs in Berry's init code, before the network, Zigbee and
+  Matter: it must stay light (no file, no connection, no `persist`). The real start is in
+  `every_second()` (`start_wait()`: enabled, Zigbee started, network, Matter started, memory).
+  Loading the driver while Zigbee and Matter start crashed the ESP32 (no PSRAM); after 4 quick
+  crashes, the boot-loop protection starts **without Berry, hence without Matter**, and
+  **disables all rules**. `TuyaEnable 0` (or `tuya_local` set to `false` in `_persist.json`)
+  keeps the driver stopped.
+- Matter disabled (`SetOption151 0`): `matter_device` still exists, without configuration
+  (`plugins_config` is `nil`) and without the `MtrUpdate` command.

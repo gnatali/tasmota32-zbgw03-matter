@@ -16,11 +16,11 @@ Tuya Wi-Fi et les sous-appareils Zigbee de la passerelle Tuya, et les présenter
 |---|---|
 | Crypto Berry : `USE_BERRY_CRYPTO_AES_CBC` + correctif `berry-aes-gcm-128-aad.patch` | ✅ compilé, en service sur la passerelle |
 | Driver `berry/tuya_local.be` : protocoles 3.3 / 3.4 / 3.5, passerelle Tuya (`cid`) | ✅ **testé sur les vrais appareils** : 5 appareils Wi-Fi et 7 sous-appareils connectés, valeurs correctes |
-| Banc de test (21 scénarios) dans le workflow | ✅ passe en local (source et solidifié) |
+| Banc de test (22 scénarios) dans le workflow | ✅ passe en local (source et solidifié) |
 | **Configuration simplifiée** : page web `/tuya`, recherche UDP, import `devices.json` et cloud, types déduits des DP, API (`TuyaConfig`, `TuyaAdd`, `TuyaDel`, `TuyaScan`, `TuyaImport`, `TuyaCloud`, `TuyaMatter`) | ✅ banc de test ; ✅ build (exécution 13, 2050 Ko) ; ✅ recherche sur la passerelle (3 appareils) ; ⏳ import cloud sur la passerelle (correctif de l'exécution 16, pas encore flashé) |
 | **Solidification du driver** (`custom_berry_solidify`, correctif `berry-solidify-all-classes.patch`) | ✅ banc de test : driver source **et** driver solidifié ; ✅ build du firmware (2015 Ko) ; ✅ sur la passerelle : **48 Ko libres avec les 12 appareils connectés** (34 Ko avant), le driver consomme ~23 Ko au lieu de ~40 |
 | Documentation utilisateur `docs/tuya-local.{en,fr}.md` | ✅ |
-| Chargement différé dans `autoexec.be` (plantage au démarrage) | ✅ corrigé et documenté |
+| Démarrage au boot sans `autoexec.be` (case d'activation, attente de Zigbee) | ✅ banc de test ; ⏳ passerelle (exécution 19) |
 | **Mémoire** avec les 12 appareils connectés : 34 Ko libres avec le driver chargé depuis le système de fichiers, **48 Ko** avec le driver solidifié | ✅ ~14 Ko de marge en plus |
 | Endpoints Matter et essais dans Google Home | ✅ 5 endpoints créés (`Entrée-Porche`, `Ventilateur`, `Lumière ventilateur`, `Récepteur radio 1` et `4`), dans Google Home après `Restart 1` ; 61 Ko libres |
 | Pergola 1 et 2 (projecteurs RGB) | ⏳ absentes du scan : IP et version inconnues, désactivées dans `tuya.json` |
@@ -158,6 +158,21 @@ Tuya Wi-Fi et les sous-appareils Zigbee de la passerelle Tuya, et les présenter
     (l'exécution 17, lancée par Guillaume sur le commit `36389bb`, avait 12 et 13 mais pas 15).
     À flasher.
 
+17. **Démarrage comme Matter, sans `autoexec.be` ; bouton grisé pendant l'attente**
+    (8 novembre) : `patches/tuya-local-autostart.patch` instancie le driver dans le code
+    d'initialisation Berry de Tasmota, juste après Matter. L'instance est légère ; le driver ne
+    démarre qu'une fois activé (case **Tuya Local enable** de sa page, ou `TuyaEnable 0|1`,
+    gardé dans `_persist.json`) et une fois Zigbee démarré, le réseau disponible, Matter démarré
+    (s'il est activé) et 45 Ko libres. En attendant, la page d'accueil affiche un bouton
+    **⏳ Tuya Local** grisé et ce qu'il attend, dans la zone des capteurs rafraîchie par le
+    navigateur, comme les boutons de Zigbee ; puis un bouton actif **🔌 Tuya Local**. Un ancien
+    `autoexec.be` crée une seconde instance inerte et un avertissement. Corrigé aussi : avec
+    Matter désactivé, `matter_device` existe sans configuration, donc `push()` vérifie aussi
+    `plugins_config` (l'entrée 16 ne couvrait qu'un firmware sans Matter). Scénarios 0 et 1
+    (démarrage), 12 et 21 adaptés : 22/22 dans les deux modes. Sur la passerelle : **activer
+    le driver une fois** après le flash (le réglage part non défini), et retirer les lignes
+    `tuya_start()` d'`autoexec.be`.
+
 ## Mesures sur la passerelle
 
 | Situation | `Heap` (`Status 4`) |
@@ -241,8 +256,8 @@ endpoints Matter `z_light2` ou `z_light1`.
 ## Prochaines étapes (par priorité)
 
 1. ~~**Solidifier le driver**~~ : fait et mesuré, 48 Ko libres avec les 12 appareils au lieu
-   de 34 (voir les mesures). Le seuil de 60 Ko d'`autoexec.be` reste adapté (71 Ko avant le
-   démarrage du driver, ~23 Ko consommés ensuite).
+   de 34 (voir les mesures). Le driver démarre désormais seul (entrée 17) avec au moins 45 Ko
+   libres (71 Ko avant le démarrage du driver, ~23 Ko consommés ensuite).
 2. **Matter** : créer les endpoints un par un, avec **exactement** le nom de `ep` (accents
    compris), et tester les deux sens avec Google Home en relevant `Heap` après chacun :
    - ✅ `Entrée-Porche` : v.Light 2 CT ;
@@ -322,7 +337,8 @@ endpoints Matter `z_light2` ou `z_light1`.
 | `devices.json`, `snapshot.json` | PC de Guillaume (sortie de `tinytuya wizard` / `scan`) | clés locales, identifiants, IP, versions |
 | `/tuya.json` | système de fichiers de la passerelle | configuration réelle, **avec les clés** |
 | `/tuya_cloud.json` | système de fichiers de la passerelle | identifiants du cloud Tuya, s'ils ont été enregistrés depuis la page |
-| `/autoexec.be` | système de fichiers de la passerelle | démarrage différé du driver (`/tuya_local.be` n'est plus nécessaire avec le driver solidifié) |
+| `/autoexec.be` | système de fichiers de la passerelle | règles de l'utilisateur seulement : le driver n'en a plus besoin (entrée 17) ; retirer les anciennes lignes `tuya_start()` |
+| `/_persist.json` | système de fichiers de la passerelle | `tuya_local` : driver activé (case / `TuyaEnable`) |
 
 Pour reprendre le développement, demander à Guillaume les fichiers dont la tâche a besoin.
 Ne jamais les committer.

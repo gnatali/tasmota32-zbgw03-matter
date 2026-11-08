@@ -60,41 +60,22 @@ et mettre à jour `tuya.json`.
    (solidifié) : son code est en flash, au lieu d'être compilé en RAM au chargement. Il n'y a
    plus de fichier `tuya_local.be` à envoyer (en supprimer une ancienne copie est sans
    risque : il n'est chargé que si le firmware ne contient pas le driver).
-2. **Outils → Gestion des fichiers** : envoyer `tuya.json`.
-3. Créer (ou compléter) `autoexec.be` pour démarrer le driver **30 secondes après le
-   démarrage**, et seulement s'il reste assez de mémoire :
-
-   ```berry
-   def tuya_start()
-     import global
-     var free = tasmota.memory()['heap_free']
-     if free < 60
-       tasmota.log(f"TUY: driver not started, not enough free memory ({free} KB)", 2)
-       return
-     end
-     tasmota.log(f"TUY: starting the driver, free memory {free} KB", 2)
-     # firmware sans le driver integre : charger le fichier tuya_local.be
-     if !global.contains("TuyaLocal")  load("tuya_local.be")  end
-     global.tuya_local = TuyaLocal()
-   end
-   tasmota.set_timer(30000, tuya_start)
-   ```
-
-   Le driver est une classe : c'est `TuyaLocal()` qui le démarre, et `global.tuya_local`
-   le garde accessible depuis la console Berry (`tuya_local.devices`...). Un ancien
-   `autoexec.be` qui se contente de `load("tuya_local.be")` ne démarre plus le driver.
-
-   **Ne pas** démarrer le driver directement au lancement d'`autoexec.be` : sur la ZB-GW03
-   (sans PSRAM), le faire pendant que Zigbee et Matter démarrent a fait planter l'ESP32. Après
-   quatre plantages rapides, la protection contre les boucles de redémarrage de Tasmota
-   démarre **sans Berry** (donc sans Matter : `Br` répond `Unknown`) et **désactive toutes
-   les règles** (à réactiver ensuite avec `Rule1 1`...). En cas de souci, `SetOption153 1`
-   empêche le lancement d'`autoexec.be` au démarrage suivant.
-
-4. `Restart 1`. Au bout de 30 secondes, la console affiche :
+2. **Outils → Gestion des fichiers** : envoyer `tuya.json` (ou créer les appareils plus tard
+   depuis la page : recherche et import).
+3. **Activer le driver**, comme Matter : **Configuration → 🔌 Tuya Local**, cocher **Tuya Local
+   enable**, **💾 Save** (ou la commande `TuyaEnable 1`). Le réglage est gardé d'un redémarrage
+   à l'autre (`_persist.json`). **Aucun `autoexec.be` n'est nécessaire** : le firmware instancie
+   le driver au démarrage, comme le `matter_device` de Matter, et le driver attend lui-même le
+   bon moment.
+4. À chaque démarrage, le driver ne se connecte aux appareils qu'une fois **Zigbee démarré** (ou
+   absent), le **réseau** disponible, **Matter** démarré (s'il est activé) et au moins **45 Ko**
+   de mémoire libres. En attendant, la page d'accueil affiche un bouton **⏳ Tuya Local** grisé
+   avec ce qu'il attend (comme les boutons de Zigbee pendant son initialisation) ; le bouton
+   devient ensuite **🔌 Tuya Local** et ouvre la page. La console affiche :
 
    ```
-   TUY: starting the driver, free memory 74 KB
+   TUY: waiting for Zigbee
+   TUY: starting, free memory 72 KB
    TUY: 5 device(s), 16 Matter endpoint(s)
    TUY: Ventilateur (192.168.1.18) connected, protocol 3.5
    ...
@@ -104,11 +85,29 @@ et mettre à jour `tuya.json`.
    mémoire libre (`Heap` dans `Status 4`) une fois tous les appareils connectés : la
    ZB-GW03 n'a pas de PSRAM.
 
+**Avec un `autoexec.be` qui démarrait le driver** (`tuya_start()`, `global.tuya_local =
+TuyaLocal()`, `load("tuya_local.be")`) : supprimer ces lignes, puis activer le driver comme
+ci-dessus. Si elles restent, elles créent une seconde instance qui ne fait rien, sinon journaliser
+`TUY: driver already started by the firmware: remove the tuya_local lines from autoexec.be`,
+et `tuya_local` dans la console Berry désigne alors cette instance inactive. De toute façon, il
+ne faut pas démarrer le driver directement dans `autoexec.be` : sur la ZB-GW03 (sans PSRAM), le
+charger pendant que Zigbee et Matter démarraient a fait planter l'ESP32 ; après quatre
+plantages rapides, la protection contre les boucles de redémarrage de Tasmota démarre **sans
+Berry** (donc sans Matter) et **désactive toutes les règles**.
+
+Pour arrêter le driver : décocher la case (ou `TuyaEnable 0`) : les connexions sont fermées
+aussitôt.
+
 ## Page web : ajouter et gérer les appareils
 
-**Configuration → 🔌 Tuya Local** (`/tuya`). Comme le reste de Tasmota, la page est en anglais,
-avec la mise en page des pages de Tasmota (340 px de large) et des pictogrammes pour les actions.
-Les messages des commandes, les réponses et le journal sont aussi en anglais.
+**Configuration → 🔌 Tuya Local** (`/tuya`), ou le bouton **🔌 Tuya Local** de la page d'accueil
+une fois le driver démarré. Comme le reste de Tasmota, la page est en anglais, avec la mise en
+page des pages de Tasmota (340 px de large) et des pictogrammes pour les actions. Les messages
+des commandes, les réponses et le journal sont aussi en anglais.
+
+- **Tuya Local** : case **Tuya Local enable** et état du driver (🟢 démarré, ⏳ ce qu'il
+  attend, ⚪ désactivé). Tant que le driver ne tourne pas, les appareils affichent ⏸ et la
+  section Matter est vide.
 
 - **Tuya devices** : nom, IP, version et état de chaque entrée de `tuya.json` (🟢 connecté,
   🔴 déconnecté, ⚪ désactivé, ⚠ incomplet). **📝** ouvre l'entrée en JSON (même format que le
@@ -232,7 +231,8 @@ La signification des DP de chaque appareil se trouve dans `mapping` de `devices.
 |---|---|
 | `TuyaStatus [appareil]` | État des connexions et dernières valeurs de chaque appareil (ou d'un seul) |
 | `TuyaSend <appareil>,<dp>,<valeur>` | Envoie une valeur, par exemple `TuyaSend Ventilateur,60,true` ou `TuyaSend Ventilateur,62,3`. Le DP peut aussi être un code (`TuyaSend Lampe,switch_led,true`) si l'appareil a une table `codes` (import). `toggle` inverse un DP booléen : `TuyaSend Entrée-Porche,20,toggle` |
-| `TuyaReload` | Relit `tuya.json` et reconnecte les appareils |
+| `TuyaEnable [0\|1]` | Active ou désactive le driver (gardé d'un redémarrage à l'autre), comme la case de la page ; sans argument, donne l'état : `{"TuyaEnable":{"Enabled":true,"State":"running"}}` (`State` : `running`, `disabled`, `waiting for Zigbee`...) |
+| `TuyaReload` | Relit `tuya.json` et reconnecte les appareils (driver démarré seulement) |
 | `TuyaConfig [appareil]` | Configuration (`tuya.json`) **sans les clés**, ou celle d'un appareil |
 | `TuyaAdd <json>` | Ajoute ou remplace un appareil (même format qu'une entrée de `devices`) ; `"key":"***"` ou sans clé : clé conservée |
 | `TuyaDel <appareil>` | Supprime un appareil |

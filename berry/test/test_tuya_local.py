@@ -185,8 +185,43 @@ def main():
     h = Harness()
     ok = 0
 
-    # 1. connection, negotiation and initial state of all devices
-    out = h.pump(h.send("ADV 50"))
+    # 0. start at boot, like Matter: the firmware instantiates the driver, which does nothing
+    #    until enabled, then waits for Zigbee; greyed-out main page button meanwhile
+    def page(method, args):
+        out = h.pump(h.send("HTTP %s /tuya %s" % (method, json.dumps(args))))
+        return json.loads([l for l in out if l.startswith("PAGE ")][-1][5:]), out
+
+    def resp(out, name):
+        r = [l for l in out if l.startswith("RESP ")]
+        assert r, out
+        return json.loads(r[-1][5:])[name]
+    out = h.send("ADV 3000")
+    assert not [l for l in out if l.startswith(("CONNECT", "TX"))], out
+    assert resp(h.send("CMD TuyaEnable"), "TuyaEnable") == {"Enabled": False, "State": "disabled"}
+    assert not [l for l in h.send("SENSOR") if "Tuya Local" in l]           # disabled: no button
+    html, _ = page("GET", {})
+    assert "name='enable'><b>Tuya Local enable" in html and "Tuya Local is not running" in html, html
+    out = h.send("CMD TuyaEnable 1")
+    assert resp(out, "TuyaEnable") == {"Enabled": True, "State": "starting"}, out
+    assert 'PERSIST {"tuya_local":true}' in out, out
+    out = h.send("ADV 3000")                                               # Zigbee not started yet
+    assert not [l for l in out if l.startswith(("CONNECT", "TX"))], out
+    assert any("TUY: waiting for Zigbee" in l for l in out), out
+    web = [l for l in h.send("SENSOR") if "Tuya Local" in l]
+    assert web and "<button disabled" in web[-1] and "waiting for Zigbee" in web[-1], web
+    assert "&#x23F8;" in page("GET", {})[0]                                # devices: driver not running
+    out = h.send("NEWDRV")                                                 # old autoexec.be lines
+    assert any("remove the tuya_local lines from autoexec.be" in l for l in out), out
+    nd = [l for l in out if l.startswith("NEWDRV ")][0].split()
+    assert nd[1] == "true" and nd[2] == "1", nd                            # inert, not registered
+    h.send("ZIGBEE 1")
+    ok += 1
+    print("OK 0 start at boot: disabled, enabled, waiting for Zigbee (greyed button), second instance inert")
+
+    # 1. start (Zigbee ready): connection, negotiation and initial state of all devices
+    out = h.pump(h.send("SECOND"))                                         # starts: tuya.json loaded
+    assert any("TUY: starting, free memory" in l for l in out), out
+    out += h.pump(h.send("ADV 50"))
     errs = [l for l in out if l.startswith("LOG 1") or " error: " in l]
     assert not errs, errs
     up = mtr_updates(out)
@@ -205,7 +240,10 @@ def main():
     for ip in ("10.0.0.18", "10.0.0.80", "10.0.0.15", "10.0.0.31"):
         assert any(e[0] == "session" for e in DEVS[ip].log), ip    # 3.4/3.5 negotiation done
     ok += 1
-    print("OK 1 connection + negotiation + initial state (6 devices, 3.3/3.4/3.5, gateway)")
+    assert resp(h.send("CMD TuyaEnable"), "TuyaEnable")["State"] == "running"
+    web = [l for l in h.send("SENSOR") if "Tuya Local" in l]
+    assert web and "<a href='/tuya'><button>&#x1F50C; Tuya Local</button></a>" in web[-1], web
+    print("OK 1 start, connection + negotiation + initial state (6 devices, 3.3/3.4/3.5, gateway), active button")
 
     # 2. Matter -> 3.5 fan: 50 % speed then off
     out = h.pump(h.send('MTR {"ep1":{"Ep":1,"Name":"Ventilateur","FanMode":2,"FanSpeed":50,"FanSpeed255":128}}'))
@@ -331,7 +369,10 @@ def main():
     with open("/tuya.json", "w") as f:
         json.dump(cfg, f)
     h = Harness()
-    out = h.pump(h.send("ADV 50"))
+    h.send("ZIGBEE 1")
+    h.send("CMD TuyaEnable 1")
+    out = h.pump(h.send("SECOND"))                     # new driver instance: enabled, Zigbee ready
+    out += h.pump(h.send("ADV 50"))
     assert any("Matter endpoint 'Inconnu': Invalid Device" in l for l in out), [l for l in out if "LOG" in l]
     ok += 1
     print("OK 12 missing Matter endpoint reported")
@@ -360,10 +401,6 @@ def main():
     print("OK 13 Matter endpoint created later: state sent without a restart")
 
     # 14. API: configuration without the keys, add, key kept, TuyaSend by code, delete
-    def resp(out, name):
-        r = [l for l in out if l.startswith("RESP ")]
-        assert r, out
-        return json.loads(r[-1][5:])[name]
     out = h.send("CMD TuyaConfig")
     conf = resp(out, "TuyaConfig")
     assert len(conf["devices"]) == 6 and all(d["key"] == "***" for d in conf["devices"]), conf
@@ -518,9 +555,6 @@ def main():
     print("OK 17 cloud import: TinyTuya signature, 64-bit timestamp, key and DPs, errors and memory guard")
 
     # 18. web page: list, editing (key masked then kept), deletion, Matter endpoints
-    def page(method, args):
-        out = h.pump(h.send("HTTP %s /tuya %s" % (method, json.dumps(args))))
-        return json.loads([l for l in out if l.startswith("PAGE ")][-1][5:]), out
     btn, _ = page_btn(h)
     assert "action='tuya'" in btn
     html, _ = page("GET", {})
@@ -628,13 +662,25 @@ def main():
     assert "Matter is not enabled" in html and "name='m0'" not in html, html
     assert resp(h.send("CMD TuyaMatter"), "TuyaMatter")["Error"] == "Matter is not enabled"
     h.send("MATTERON")
+    h.send("MATTEROFF")                                 # Matter built in but disabled: same
+    out = h.pump(h.send("CMD TuyaSend Lampe test,20,toggle"))
+    out += h.pump(h.send("ADV 31000"))
+    assert not [l for l in out if l.startswith("CMD MtrUpdate")], out
+    assert "Matter is not enabled" in page("GET", {})[0]
+    h.send("MATTERON")
     out = h.pump(h.send("CMD TuyaSend Lampe test,20,toggle"))
     assert "Power" in find(mtr_updates(out), "Lampe test"), mtr_updates(out)
     ok += 1
-    print("OK 21 firmware without Matter: no MtrUpdate, page and TuyaMatter report it")
+    print("OK 21 firmware without Matter or Matter disabled: no MtrUpdate, page and TuyaMatter report it")
+
+    # disabling stops the driver: connections closed, no main page button
+    out = h.send("CMD TuyaEnable 0")
+    assert resp(out, "TuyaEnable") == {"Enabled": False, "State": "disabled"}, out
+    assert [l for l in out if l.startswith("CLOSE")], out
+    assert not [l for l in h.send("SENSOR") if "Tuya Local" in l]
 
     h.close()
-    print("%d/21 scenarios OK" % ok)
+    print("%d/22 scenarios OK" % ok)
 
 
 if __name__ == "__main__":

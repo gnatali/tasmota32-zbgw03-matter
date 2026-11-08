@@ -53,6 +53,20 @@ mosquitto_pub -h broker -t 'cmnd/<topic>/TuyaSend' -m 'Ventilateur,62,3'
 
 ## 2. Reading state
 
+**Enable the driver** (like the **Tuya Local enable** checkbox of the page; kept across
+restarts), then its state:
+
+```
+TuyaEnable 1
+TuyaEnable
+```
+```json
+{"TuyaEnable":{"Enabled":true,"State":"waiting for Zigbee"}}
+{"TuyaEnable":{"Enabled":true,"State":"running"}}
+```
+
+`TuyaEnable 0` stops it (connections closed): `{"TuyaEnable":{"Enabled":false,"State":"disabled"}}`.
+
 **State of all devices**:
 
 ```
@@ -238,7 +252,9 @@ and on the main page:
 
 | Message | Meaning |
 |---|---|
-| `TUY: starting the driver, free memory 73 KB` | `autoexec.be` starts the driver |
+| `TUY: waiting for Zigbee` | driver enabled, waiting for Zigbee (then the network, Matter, memory) |
+| `TUY: starting, free memory 73 KB` | the driver starts (at boot, or once enabled) |
+| `TUY: driver already started by the firmware: remove the tuya_local lines from autoexec.be` | an old `autoexec.be` creates a second, idle instance |
 | `TUY: 3 device(s), 5 Matter endpoint(s)` | configuration loaded |
 | `TUY: Ventilateur (192.168.1.20) connected, protocol 3.5` | connected |
 | `TUY: Ventilateur (192.168.1.20) disconnected: no more replies` | device silent for 35 s; automatic reconnection |
@@ -281,20 +297,11 @@ Rule3 on Time#Minute=1380 do TuyaSend Ventilateur,60,false endon
 
 ## 10. Berry scripts
 
-**Complete `autoexec.be`**: delayed driver start, then Zigbee ↔ Tuya links.
+**`autoexec.be` with Zigbee ↔ Tuya links** (the driver itself needs no `autoexec.be`: the
+firmware starts it).
 
 ```berry
-def tuya_start()
-  import global
-  var free = tasmota.memory()['heap_free']
-  if free < 60
-    tasmota.log(f"TUY: driver not started, not enough free memory ({free} KB)", 2)
-    return
-  end
-  tasmota.log(f"TUY: starting the driver, free memory {free} KB", 2)
-  if !global.contains("TuyaLocal")  load("tuya_local.be")  end
-  global.tuya_local = TuyaLocal()
-
+def tuya_links()
   # single press on button 0x922D: toggle the Entree-Porche light
   tasmota.add_rule("ZbReceived#0x922D#Power=2", def (v)
     tasmota.cmd("TuyaSend Entrée-Porche,20,toggle")
@@ -307,7 +314,7 @@ def tuya_start()
     end
   end)
 end
-tasmota.set_timer(30000, tuya_start)
+tuya_links()
 ```
 
 Beware of loops: if the Zigbee light in turn controls Entrée-Porche, only relay when the state
