@@ -142,10 +142,10 @@ Tuya Wi-Fi et les sous-appareils Zigbee de la passerelle Tuya, et les présenter
     **➕ Create and restart** ne crée que les endpoints cochés (aucun coché : refus).
     `TuyaMatter [nom,nom]` fait de même par commande. Scénario 18 complété (20/20 dans les deux
     modes), page vérifiée à 340 px. **Pas de build**.
-    **À vérifier** : la capture de Guillaume listait comme manquants des endpoints qui
-    existaient déjà dans Configuration → Matter (`Entrée-Porche`, `Ventilateur`, `Récepteur
-    radio 1` à `4`...) : la nouvelle liste affiche le numéro de chaque endpoint trouvé, ce qui
-    montrera si le driver lit correctement la configuration de Matter sur la passerelle.
+    **Vérifié** : la capture de Guillaume listait comme manquants des endpoints créés plus tôt
+    (`Entrée-Porche`, `Ventilateur`, `Récepteur radio 1` à `4`...) : il les avait supprimés à
+    la main dans Configuration → Matter. La liste était juste : le driver lit correctement la
+    configuration de Matter sur la passerelle.
 
 16. **Sans Matter : pas de `MtrUpdate`** (8 novembre) : la détection de Matter se fait à
     l'exécution (le driver est le même dans tous les firmwares). Sans la globale

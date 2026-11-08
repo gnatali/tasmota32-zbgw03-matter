@@ -139,10 +139,10 @@ Wi-Fi devices and the Zigbee sub-devices of the Tuya gateway, and expose them to
     checkbox when it is missing (header checkbox for all); **➕ Create and restart** creates
     the ticked ones only (nothing ticked: refused). `TuyaMatter [name,name]` does the same by
     command. Scenario 18 extended (20/20 in both modes), page checked at 340 px. **No build**.
-    **To check**: Guillaume's screenshot listed as missing endpoints that already existed in
-    Configuration → Matter (`Entrée-Porche`, `Ventilateur`, `Récepteur radio 1` to `4`...): the
-    new list shows each endpoint's number when it is found, which will show whether the
-    driver reads Matter's configuration correctly on the gateway.
+    **Checked**: Guillaume's screenshot listed as missing endpoints created earlier
+    (`Entrée-Porche`, `Ventilateur`, `Récepteur radio 1` to `4`...): he had deleted them by hand
+    in Configuration → Matter. The list was right: the driver reads Matter's configuration
+    correctly on the gateway.
 
 16. **No Matter: no `MtrUpdate`** (8 November): Matter detection is made at run time (the
     driver is the same in every firmware). Without the `matter_device` global (firmware built
