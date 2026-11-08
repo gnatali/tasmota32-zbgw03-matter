@@ -182,7 +182,8 @@ Tuya Wi-Fi et les sous-appareils Zigbee de la passerelle Tuya, et les présenter
     `true`, le banc ne pouvait donc pas le voir. Correctif : Matter est considéré comme démarré
     dès que son serveur UDP existe (`matter_device.udp_server`) ; le faux Matter se comporte
     maintenant comme Tasmota (`started` laissé à `nil`), et le scénario 0 vérifie l'attente de
-    Matter (`MATTERUDP 0/1`). 22/22 dans les deux modes.
+    Matter (`MATTERUDP 0/1`). 22/22 dans les deux modes. Build : exécution 20 (commit
+    `9b579c3`), firmware de 2 112 271 octets (même taille que l'exécution 19) ; à flasher.
 
 ## Mesures sur la passerelle
 

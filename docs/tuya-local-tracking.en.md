@@ -175,6 +175,8 @@ Wi-Fi devices and the Zigbee sub-devices of the Tuya gateway, and expose them to
     it. Fix: Matter is considered started once its UDP server exists
     (`matter_device.udp_server`); the fake Matter now behaves like Tasmota (`started` left
     `nil`), and scenario 0 checks the wait for Matter (`MATTERUDP 0/1`). 22/22 in both modes.
+    Build: run 20 (commit `9b579c3`), 2,112,271-byte firmware (same size as run 19); to be
+    flashed.
 
 ## Measurements on the gateway
 
