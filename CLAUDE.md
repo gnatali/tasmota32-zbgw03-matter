@@ -1,31 +1,44 @@
-# CLAUDE.md : passerelle ZB-GW03 (Tasmota, Zigbee, Ethernet, Matter, Tuya en local)
+# CLAUDE.md: ZB-GW03 gateway (Tasmota, Zigbee, Ethernet, Matter, local Tuya)
 
-Firmware Tasmota de la passerelle eWeLink ZB-GW03 (Zigbee, Ethernet, Matter, appareils Tuya en local).
+Tasmota firmware for the eWeLink ZB-GW03 gateway (Zigbee, Ethernet, Matter, local Tuya devices).
 
-## 1. Règle de taille (permanente)
+## 1. Size rule (permanent)
 
-* **Ce fichier ne dépasse jamais 150 lignes.** Il ne contient que des directives courtes et
-  l'index des modules : ni détails, ni tutoriels, ni documentation volumineuse.
-* Si un ajout risque de dépasser la limite : **s'arrêter**, créer un module dans
-  `.claude/rules/` et ne mettre ici qu'une ligne d'index qui pointe vers lui.
-* Cette règle ne change que sur demande explicite de Guillaume.
+* **This file never exceeds 150 lines.** It only holds short directives and the module index:
+  no details, tutorials or large documentation.
+* If an addition might exceed the limit: **stop**, create a module in `.claude/rules/` and only
+  put here an index line pointing to it.
+* This rule only changes at Guillaume's explicit request.
 
-## 2. Modules `.claude/rules/` (chargés par Claude Code)
+## 2. Language (permanent)
 
-* Les instructions détaillées vont dans un module de `.claude/rules/`, un sujet par fichier.
-* Claude Code charge ces modules lui-même :
-  * un module **sans** en-tête `paths:` est chargé à chaque session (ex. `projet.md`) ;
-  * un module **avec** un en-tête `paths:` (motifs glob) n'est chargé que lorsqu'un fichier
-    correspondant est lu ou modifié. Tout nouveau module spécialisé en a un.
-* Ne pas utiliser d'import `@chemin` ici : il charge le fichier dès le démarrage. L'index
-  ci-dessous utilise de simples liens Markdown.
+* **Code comments, documentation, commit messages, this file and `.claude/rules/` are written
+  in English.**
+* User documentation (`README.md`, `docs/*.en.md`) is written in English, the reference, and
+  **translated into French** (`README.fr.md`, `docs/*.fr.md`). Any change to one is carried
+  over to the other in the same commit.
+* The driver's interface (web page, command responses, errors, logs) is in English, like
+  Tasmota.
+* User data keeps its language: device and Matter endpoint names (`Ventilateur`,
+  `Lumière <name>`...) are French, as Google Home shows them.
+* Conversations with Guillaume are in French.
 
-## 3. Index des modules
+## 3. `.claude/rules/` modules (loaded by Claude Code)
 
-* [`projet.md`](.claude/rules/projet.md) : contexte, matériel (pas de PSRAM, RAM critique), structure du dépôt, chantier en cours.
-* [`build.md`](.claude/rules/build.md) : build GitHub Actions, lancement manuel, artefacts, correctifs.
-* [`tests-tuya.md`](.claude/rules/tests-tuya.md) : banc de test du driver Tuya.
-* [`berry-pieges.md`](.claude/rules/berry-pieges.md) : pièges de Berry sous Tasmota, driver solidifié, démarrage différé.
-* [`secrets.md`](.claude/rules/secrets.md) : clés et identifiants Tuya hors du dépôt.
+* Detailed instructions go into a `.claude/rules/` module, one topic per file.
+* Claude Code loads these modules itself:
+  * a module **without** a `paths:` header is loaded in every session;
+  * a module **with** a `paths:` header (glob patterns) is only loaded when a matching file is
+    read or edited. Every new specialised module has one.
+* Do not use `@path` imports here: they load the file at startup. The index below uses plain
+  Markdown links.
 
-Voir aussi : suivi du chantier Tuya dans [`docs/tuya-local-suivi.fr.md`](docs/tuya-local-suivi.fr.md).
+## 4. Module index
+
+* [`project.md`](.claude/rules/project.md): context, hardware (no PSRAM, critical RAM), repository layout, current work.
+* [`build.md`](.claude/rules/build.md): GitHub Actions build, manual runs, artifacts, patches.
+* [`tests-tuya.md`](.claude/rules/tests-tuya.md): Tuya driver test bench.
+* [`berry-pitfalls.md`](.claude/rules/berry-pitfalls.md): Berry pitfalls under Tasmota, solidified driver, web page layout, delayed start.
+* [`secrets.md`](.claude/rules/secrets.md): Tuya keys and ids stay out of the repository.
+
+See also: Tuya work tracking in [`docs/tuya-local-tracking.en.md`](docs/tuya-local-tracking.en.md).

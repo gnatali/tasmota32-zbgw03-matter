@@ -1,16 +1,16 @@
-# Harnais de test : simule `tasmota` et `tcpclientasync`, pilote par des lignes sur stdin
-#   RX <ip> <hex>     octets recus de l'appareil
-#   OPEN <ip>         la connexion TCP aboutit        DROP <ip>   l'appareil coupe
-#   ADV <ms>          avance le temps (every_50ms appele toutes les 50 ms)
-#   MTR <json>        evenement MtrReceived            CMD <nom> <payload>  commande Tasmota
+# Test harness: mocks `tasmota` and `tcpclientasync`, driven by lines on stdin
+#   RX <ip> <hex>     bytes received from the device
+#   OPEN <ip>         the TCP connection succeeds      DROP <ip>   the device disconnects
+#   ADV <ms>          advances time (every_50ms called every 50 ms)
+#   MTR <json>        MtrReceived event                CMD <name> <payload>  Tasmota command
 #   SENSOR            json_append() + web_sensor()     END
-#   EPADD <nom>       cree l'endpoint Matter <nom> (absent au depart : "Inconnu")
-#   UDP <port> <ip> <hex>   paquet UDP recu sur <port>     HEAP <Ko>   memoire libre simulee
-#   HTTPSRESP <chemin> <code> <corps>   reponse du faux cloud Tuya pour <chemin>
-#   HTTP <GET|POST> <chemin> <json des arguments>   requete a la page web du driver (PAGE ...)
-#   WEBBTN            bouton de la page Configuration
-# Sorties : CONNECT, TX, CLOSE, CMD (MtrUpdate), PUB, RESP, APPEND, WEB, LOG, UDPBIND, UDPTX,
-#   UDPCLOSE, HTTPS, MATTERADD, PAGE ; READY apres chaque ligne
+#   EPADD <name>      creates Matter endpoint <name> (missing at first: "Inconnu")
+#   UDP <port> <ip> <hex>   UDP packet received on <port>     HEAP <KB>   simulated free memory
+#   HTTPSRESP <path> <code> <body>   response of the fake Tuya cloud for <path>
+#   HTTP <GET|POST> <path> <json of the arguments>   request to the driver's web page (PAGE ...)
+#   WEBBTN            button of the Configuration page
+# Outputs: CONNECT, TX, CLOSE, CMD (MtrUpdate), PUB, RESP, APPEND, WEB, LOG, UDPBIND, UDPTX,
+#   UDPCLOSE, HTTPS, MATTERADD, PAGE; READY after each line
 import json
 import string
 import webserver
@@ -32,7 +32,7 @@ class MockTasmota
     print("CMD " + c)
     var p = json.load(c[10 ..])
     if self.missing.contains(p["Name"])  return {"MtrUpdate": "Invalid Device"}  end
-    if p["Name"] == "Ventilateur"  return {"MtrUpdate": "Done"}  end     # v_fan : pas d'etat publie
+    if p["Name"] == "Ventilateur"  return {"MtrUpdate": "Done"}  end     # v_fan: no published state
     return {"MtrUpdate": p}
   end
   def resp_cmnd(s)  print("RESP " + s)  end
@@ -57,7 +57,7 @@ class tcpclientasync
   def available()  return size(self.inbox)  end
   def readbytes()  var b = self.inbox  self.inbox = bytes()  return b  end
   def write(b)
-    # ecrit au plus 64 octets a la fois, pour tester les ecritures partielles
+    # writes at most 64 bytes at a time, to test partial writes
     var n = size(b) > 64 ? 64 : size(b)
     print("TX " + self.ip + " " + b[0 .. n - 1].tohex())
     return n
@@ -68,7 +68,7 @@ class tcpclientasync
   end
 end
 
-# UDP : un faux socket par port, paquets recus pousses par le harnais
+# UDP: one fake socket per port, received packets pushed by the harness
 class udp
   static var socks = {}
   var port, inbox, remote_ip, remote_port
@@ -93,7 +93,7 @@ class udp
   end
 end
 
-# client HTTPS : reponses preparees par chemin, requetes affichees avec leurs en-tetes
+# HTTPS client: responses prepared per path, requests printed with their headers
 class webclient
   static var responses = {}
   var url, headers, resp
@@ -110,7 +110,7 @@ class webclient
   def close()  end
 end
 
-# Matter : configuration des endpoints, comme matter_device de Tasmota
+# Matter: endpoint configuration, like Tasmota's matter_device
 class MockMatter
   var plugins_config, next_ep
   def init()  self.plugins_config = {"1": {"type": "v_light2", "name": "Porche"}}  self.next_ep = 2  end
@@ -125,9 +125,9 @@ class MockMatter
 end
 matter_device = MockMatter()
 
-# Le driver est instancie ici comme dans autoexec.be : le fichier ne contient que les classes.
-# Interpreteur avec le driver solidifie : les classes sont deja natives. Sinon, le source est
-# compile en mode strict, comme load() dans Tasmota.
+# The driver is instantiated here as in autoexec.be: the file only contains the classes.
+# Interpreter with the solidified driver: the classes are already native. Otherwise the source
+# is compiled in strict mode, like load() in Tasmota.
 import global
 if !global.contains("TuyaLocal")
   import strict

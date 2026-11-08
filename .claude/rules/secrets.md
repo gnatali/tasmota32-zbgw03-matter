@@ -6,9 +6,9 @@ paths:
 ---
 # Secrets
 
-Les clés locales Tuya (`key`), les identifiants (`id`, `node_id`/`cid`) et le vrai
-`tuya.json` **ne vont jamais dans le dépôt** (`.gitignore` couvre `tuya.json`). Ils restent sur
-le PC de Guillaume (`devices.json` et `snapshot.json` de TinyTuya) et sur la passerelle
-(`/tuya.json`). De même pour l'Access ID et l'Access Secret du cloud Tuya (`/tuya_cloud.json`
-sur la passerelle, couvert par `.gitignore`). Avant chaque commit qui touche `berry/` ou
-`docs/`, vérifier qu'aucune clé ni aucun identifiant réel n'y figure. Les tests utilisent des valeurs fictives.
+Tuya local keys (`key`), ids (`id`, `node_id`/`cid`) and the real `tuya.json` **never go into
+the repository** (`.gitignore` covers `tuya.json`). They stay on Guillaume's PC (TinyTuya's
+`devices.json` and `snapshot.json`) and on the gateway (`/tuya.json`). The same goes for the
+Tuya cloud Access ID and Access Secret (`/tuya_cloud.json` on the gateway, covered by
+`.gitignore`). Before every commit touching `berry/` or `docs/`, check that no real key or id
+is in it. Tests use fake values.

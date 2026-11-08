@@ -1,7 +1,7 @@
-# Berry : AES_GCM accepte les cles de 16 octets (AES-128) en plus des cles de 32 octets,
-# et des donnees authentifiees optionnelles (AAD) : AES_GCM(cle, iv [, aad]).
-# Necessaire au protocole local Tuya 3.5 (AES-128-GCM, en-tete du paquet en AAD).
-# Compatible avec l'existant : sans 4e argument, le comportement est inchange.
+# Berry: AES_GCM accepts 16-byte keys (AES-128) as well as 32-byte keys, and optional
+# additional authenticated data (AAD): AES_GCM(key, iv [, aad]).
+# Needed by the Tuya local protocol 3.5 (AES-128-GCM, packet header as AAD).
+# Backward compatible: without a 4th argument, the behaviour is unchanged.
 diff --git a/tasmota/tasmota_xdrv_driver/xdrv_52_3_berry_crypto.ino b/tasmota/tasmota_xdrv_driver/xdrv_52_3_berry_crypto.ino
 index 3c4cffab4..cd966c66a 100644
 --- a/tasmota/tasmota_xdrv_driver/xdrv_52_3_berry_crypto.ino

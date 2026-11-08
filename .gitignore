@@ -3,7 +3,7 @@
 .pio/
 __pycache__/
 
-# configuration Tuya reelle (cles locales) : uniquement sur la passerelle
+# real Tuya configuration (local keys) and cloud credentials: on the gateway only
 /tuya.json
 /tuya_cloud.json
 berry/tuya.json

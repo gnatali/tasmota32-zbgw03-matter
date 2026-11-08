@@ -1,5 +1,5 @@
-# Module `crypto` de test : meme API que Tasmota, sur les fonctions natives BearSSL
-# de l'interpreteur de test (_aes_cbc, _gcm, _hmac_sha256, _md5, _random)
+# Test `crypto` module: same API as Tasmota's, on the native BearSSL functions of the test
+# interpreter (_aes_cbc, _gcm, _hmac_sha256, _md5, _random)
 var crypto = module("crypto")
 
 class AES_CBC

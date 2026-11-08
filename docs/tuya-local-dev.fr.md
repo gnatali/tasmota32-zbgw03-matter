@@ -1,6 +1,7 @@
 # Driver Tuya local : documentation technique
 
-*English version: [tuya-local-dev.en.md](tuya-local-dev.en.md)*
+*English version (reference): [tuya-local-dev.en.md](tuya-local-dev.en.md). Ce document en est
+la traduction française.*
 
 Ce document décrit ce qui a été développé les 6 et 7 novembre 2026 sur la branche
 `tuya-local-crypto` (PR #7) : solidification du driver dans le firmware, synchronisation avec
@@ -214,9 +215,9 @@ Reprise de `tinytuya.Cloud` (`Cloud.py`) :
   page à 600 px), les en-têtes de tableau en `font-size:smaller` (`TuyaWeb.th`). Pictogrammes
   HTML pour les actions, comme Tasmota (📝 modifier, 🔥 supprimer, comme le gestionnaire de
   fichiers) : états des appareils dans `TuyaWeb.STATES` (🟢 🔴 ⚪ ⚠), ✅/🆕 pour la recherche.
-- Langue : page, réponses, erreurs et journal en anglais (comme Tasmota) ; les commentaires du
-  code restent en français, ainsi que les noms des endpoints Matter déduits à l'import
-  (`Lumière <nom>`, `<nom> humidité`), qui sont ceux que Google Home affiche.
+- Langue : page, réponses, erreurs, journal et commentaires du code en anglais (comme
+  Tasmota) ; les noms des endpoints Matter déduits à l'import restent en français
+  (`Lumière <nom>`, `<nom> humidité`), car ce sont ceux que Google Home affiche.
 - `TuyaWeb.post()` : actions `save`, `del`, `reload`, `scan`, `import`, `cloud`, `matter`, puis
   redirection vers `/tuya` (ou `/?rst=` pour redémarrer après la création d'endpoints).
 - Endpoints Matter : `matter_missing()` compare les noms des liaisons à ceux de
@@ -326,4 +327,4 @@ la configuration simplifiée ajoute 0,7 à 1,3 Ko au repos.
 | `.github/workflows/build.yml` | fichiers écrits par les tests |
 | `docs/tuya-local.fr.md` / `.en.md` | documentation d'utilisation |
 | `docs/tuya-local-examples.fr.md` / `.en.md` | exemples de commandes et d'événements |
-| `docs/tuya-local-suivi.fr.md` | suivi du chantier, mesures |
+| `docs/tuya-local-tracking.{en,fr}.md` | suivi du chantier, mesures |

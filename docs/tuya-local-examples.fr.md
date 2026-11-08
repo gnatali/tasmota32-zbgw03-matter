@@ -1,6 +1,6 @@
 # Driver Tuya local : exemples de commandes et d'événements
 
-*English version: [tuya-local-examples.en.md](tuya-local-examples.en.md)*
+*English version (reference): [tuya-local-examples.en.md](tuya-local-examples.en.md)*
 
 Exemples d'utilisation du driver Tuya local de la ZB-GW03 : commandes, réponses, événements,
 règles et scripts Berry. Les identifiants, adresses et réponses sont fictifs mais ont le format

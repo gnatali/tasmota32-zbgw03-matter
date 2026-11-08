@@ -1,7 +1,7 @@
-"""Faux appareils Tuya (protocoles 3.3, 3.4, 3.5 et passerelle Zigbee 3.3) pour les tests.
+"""Fake Tuya devices (protocols 3.3, 3.4, 3.5 and 3.3 Zigbee gateway) for the tests.
 
-Construit sur les primitives de TinyTuya (pack/unpack, AESCipher) : c'est la reference
-independante contre laquelle le driver Berry est teste.
+Built on TinyTuya's primitives (pack/unpack, AESCipher): it is the independent reference the
+Berry driver is tested against.
 """
 import json
 import os
@@ -31,7 +31,7 @@ class FakeDevice:
         self.rx = b""
         self.remote_nonce = None
         self.client_nonce = None
-        self.log = []          # (cmd, json) recus apres dechiffrement
+        self.log = []          # (cmd, json) received after decryption
         self.hb = 0
 
     @property
@@ -44,7 +44,7 @@ class FakeDevice:
 
     # ---------- reception ----------
     def feed(self, data):
-        """Recoit des octets du client, renvoie la liste des trames de reponse."""
+        """Receives bytes from the client, returns the list of response frames."""
         self.rx += data
         out = []
         while True:
@@ -63,7 +63,7 @@ class FakeDevice:
     def handle(self, frame):
         hk = self.key if self.version >= 3.4 else None
         msg = unpack_message(frame, hmac_key=hk, no_retcode=True)
-        assert msg.crc_good, "CRC/HMAC/tag invalide cote appareil (cmd %d)" % msg.cmd
+        assert msg.crc_good, "invalid CRC/HMAC/tag on the device side (cmd %d)" % msg.cmd
         payload = msg.payload
         cipher = AESCipher(self.key)
         if self.version == 3.4:
@@ -108,9 +108,9 @@ class FakeDevice:
             return [self.reply(cmd, b"", header=False), self.push(push)]
         return []
 
-    # ---------- emission ----------
+    # ---------- transmission ----------
     def push(self, obj):
-        """Trame de mise a jour spontanee (STATUS 0x08)."""
+        """Spontaneous update frame (STATUS 0x08)."""
         return self.reply(CT.STATUS, json.dumps(obj).encode(), header=True)
 
     def reply(self, cmd, payload, header):
@@ -131,7 +131,7 @@ class FakeDevice:
         m = TuyaMessage(self.seq, cmd, 0, struct.pack(">I", 0) + body, 0, True, H.PREFIX_55AA_VALUE, False)
         return pack_message(m)
 
-    # ---------- negociation de cle de session ----------
+    # ---------- session key negotiation ----------
     def nego_start(self, client_nonce):
         assert len(client_nonce) == 16
         self.client_nonce = client_nonce
@@ -146,7 +146,7 @@ class FakeDevice:
         return [pack_message(m, hmac_key=self.real_key)]
 
     def nego_finish(self, payload):
-        assert payload[:32] == _hmac(self.real_key, self.remote_nonce), "HMAC de fin de negociation invalide"
+        assert payload[:32] == _hmac(self.real_key, self.remote_nonce), "invalid HMAC at the end of the negotiation"
         x = bytes(a ^ b for a, b in zip(self.client_nonce, self.remote_nonce))
         c = AESCipher(self.real_key)
         if self.version == 3.4:
@@ -157,13 +157,13 @@ class FakeDevice:
         return []
 
 
-# ---- annonces UDP (decouverte), comme les envoient les appareils -----------------------------
+# ---- UDP announcements (discovery), as the devices send them --------------------------------
 from tinytuya.core.udp_helper import udpkey, decrypt_udp  # noqa: E402
 
 
 def udp_broadcast(version, info):
-    """Annonce UDP d'un appareil : 3.1 en clair (port 6666), 3.3 en AES-ECB (6667),
-    3.5 en trame 6699 AES-GCM (7000). Verifiee avec decrypt_udp() de TinyTuya."""
+    """UDP announcement of a device: 3.1 in clear text (port 6666), 3.3 in AES-ECB (6667),
+    3.5 as a 6699 AES-GCM frame (7000). Checked with TinyTuya's decrypt_udp()."""
     js = json.dumps(info).encode()
     if version == 3.1:
         pkt = pack_message(TuyaMessage(0, 0, None, b"\0\0\0\0" + js, 0, True, H.PREFIX_55AA_VALUE, None))
@@ -172,5 +172,5 @@ def udp_broadcast(version, info):
         pkt = pack_message(TuyaMessage(0, 0x13, None, b"\0\0\0\0" + enc, 0, True, H.PREFIX_55AA_VALUE, None))
     else:
         pkt = pack_message(TuyaMessage(0, 0x23, 0, js, 0, True, H.PREFIX_6699_VALUE, True), hmac_key=udpkey)
-    assert json.loads(decrypt_udp(pkt)) == info, "annonce UDP non reconnue par TinyTuya"
+    assert json.loads(decrypt_udp(pkt)) == info, "UDP announcement not recognised by TinyTuya"
     return pkt

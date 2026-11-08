@@ -1,6 +1,6 @@
 # Appareils Tuya en local (équivalent de LocalTuya)
 
-*English version: [tuya-local.en.md](tuya-local.en.md)*
+*English version (reference): [tuya-local.en.md](tuya-local.en.md)*
 
 Le driver Berry `berry/tuya_local.be` pilote les appareils Tuya **sans les flasher et sans le
 cloud**, directement sur le réseau local, et les présente à **Matter** (Google Home, Apple

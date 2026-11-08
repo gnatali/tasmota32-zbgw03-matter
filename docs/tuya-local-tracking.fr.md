@@ -1,6 +1,8 @@
 # Suivi du chantier : appareils Tuya en local
 
-Dernière mise à jour : **6 novembre 2026**. Branche `tuya-local-crypto`, PR #7 (non fusionnée).
+*English version (reference): [tuya-local-tracking.en.md](tuya-local-tracking.en.md)*
+
+Dernière mise à jour : **8 novembre 2026**. Branche `tuya-local-crypto`, PR #7 (non fusionnée).
 
 ## Objectif
 
@@ -14,12 +16,12 @@ Tuya Wi-Fi et les sous-appareils Zigbee de la passerelle Tuya, et les présenter
 |---|---|
 | Crypto Berry : `USE_BERRY_CRYPTO_AES_CBC` + correctif `berry-aes-gcm-128-aad.patch` | ✅ compilé, en service sur la passerelle |
 | Driver `berry/tuya_local.be` : protocoles 3.3 / 3.4 / 3.5, passerelle Tuya (`cid`) | ✅ **testé sur les vrais appareils** : 5 appareils Wi-Fi et 7 sous-appareils connectés, valeurs correctes |
-| Banc de test (19 scénarios) dans le workflow | ✅ passe en local (source et solidifié) |
-| **Configuration simplifiée** : page web `/tuya`, recherche UDP, import `devices.json` et cloud, types déduits des DP, API (`TuyaConfig`, `TuyaAdd`, `TuyaDel`, `TuyaScan`, `TuyaImport`, `TuyaCloud`, `TuyaMatter`) | ✅ banc de test ; ✅ build (exécution 13, 2050 Ko) ; ⏳ essai sur la passerelle (dont HTTPS vers le cloud Tuya) |
-| **Solidification du driver** (`custom_berry_solidify`, correctif `berry-solidify-all-classes.patch`) | ✅ banc de test : 12/12 sur le driver source **et** sur le driver solidifié ; ✅ build du firmware (2015 Ko) ; ✅ sur la passerelle : **48 Ko libres avec les 12 appareils connectés** (34 Ko avant), le driver consomme ~23 Ko au lieu de ~40 |
-| Documentation utilisateur `docs/tuya-local.fr.md` | ✅ |
+| Banc de test (20 scénarios) dans le workflow | ✅ passe en local (source et solidifié) |
+| **Configuration simplifiée** : page web `/tuya`, recherche UDP, import `devices.json` et cloud, types déduits des DP, API (`TuyaConfig`, `TuyaAdd`, `TuyaDel`, `TuyaScan`, `TuyaImport`, `TuyaCloud`, `TuyaMatter`) | ✅ banc de test ; ✅ build (exécution 13, 2050 Ko) ; ✅ recherche sur la passerelle (3 appareils) ; ⏳ import cloud sur la passerelle (correctif de l'exécution 16, pas encore flashé) |
+| **Solidification du driver** (`custom_berry_solidify`, correctif `berry-solidify-all-classes.patch`) | ✅ banc de test : driver source **et** driver solidifié ; ✅ build du firmware (2015 Ko) ; ✅ sur la passerelle : **48 Ko libres avec les 12 appareils connectés** (34 Ko avant), le driver consomme ~23 Ko au lieu de ~40 |
+| Documentation utilisateur `docs/tuya-local.{en,fr}.md` | ✅ |
 | Chargement différé dans `autoexec.be` (plantage au démarrage) | ✅ corrigé et documenté |
-| **Mémoire** avec les 12 appareils connectés : 34 Ko libres avec le driver chargé depuis le système de fichiers, **48 Ko** avec le driver solidifié | ✅ ~14 Ko de marge en plus ; coût des endpoints Matter à mesurer |
+| **Mémoire** avec les 12 appareils connectés : 34 Ko libres avec le driver chargé depuis le système de fichiers, **48 Ko** avec le driver solidifié | ✅ ~14 Ko de marge en plus |
 | Endpoints Matter et essais dans Google Home | ✅ 5 endpoints créés (`Entrée-Porche`, `Ventilateur`, `Lumière ventilateur`, `Récepteur radio 1` et `4`), dans Google Home après `Restart 1` ; 61 Ko libres |
 | Pergola 1 et 2 (projecteurs RGB) | ⏳ absentes du scan : IP et version inconnues, désactivées dans `tuya.json` |
 | Migration des contrôleurs LED Zigbee Bureau et Salon sur la ZB-GW03 | ⏳ décidée, pas faite |
@@ -47,7 +49,7 @@ Tuya Wi-Fi et les sous-appareils Zigbee de la passerelle Tuya, et les présenter
    `custom_berry_solidify = ../berry/tuya_local.be`. Ce qu'il a fallu changer :
    - le script de Tasmota (`pio-tools/solidify-from-url.py`) n'enregistrait dans
      `be_modtab.c` que la **première** classe d'un fichier : correctif
-     `berry-solidify-all-classes.patch`, pour les cinq classes du driver ;
+     `berry-solidify-all-classes.patch`, pour toutes les classes du driver ;
    - une classe solidifiée est en lecture seule : la table CRC, calculée au premier appel
      dans une `static var`, est remplacée par une table constante de 16 entrées (CRC par
      quartet, vérifiée contre `zlib.crc32` et la valeur de référence `0xCBF43926`) ;
@@ -123,6 +125,15 @@ Tuya Wi-Fi et les sous-appareils Zigbee de la passerelle Tuya, et les présenter
     déduits à l'import inchangés (français). Tests et docs FR/EN adaptés (20/20 dans les deux
     modes). **Pas de build** : à lancer avec la prochaine modification. Le `autoexec.be` de la
     doc journalise aussi en anglais (celui de la passerelle reste valable tel quel).
+
+14. **Règle de langue** (8 novembre) : commentaires du code, documentation, messages de commit,
+    `CLAUDE.md` et `.claude/rules/` sont désormais **en anglais** ; la documentation
+    utilisateur est rédigée en anglais (référence) et traduite en français (`README.fr.md`,
+    `docs/*.fr.md`). Tous les commentaires du driver, le banc de test, le workflow, la
+    configuration de compilation et les en-têtes des correctifs ont été traduits ; ce suivi
+    est devenu `tuya-local-tracking.fr.md`, traduction de `tuya-local-tracking.en.md`. Modules
+    de règles renommés : `project.md`, `berry-pitfalls.md`. Aucun changement fonctionnel
+    (20/20 dans les deux modes) ; **pas de build**.
 
 ## Mesures sur la passerelle
 
@@ -225,12 +236,13 @@ endpoints Matter `z_light2` ou `z_light1`.
      envoie 22, les prises 11) ;
    - limiter `publish_result` (un message MQTT par changement, la pince en envoie souvent).
 4. **Valider la configuration simplifiée** sur la passerelle (après flash) : page
-   Configuration → Tuya local, recherche (les 3 appareils doivent apparaître), `Heap` pendant
+   Configuration → Tuya Local, recherche (les 3 appareils doivent apparaître), `Heap` pendant
    et après, import du `devices.json` (puis import cloud, qui exerce le HTTPS vers Tuya : à
-   tester avec au moins 35 Ko libres), création des endpoints Matter depuis la page.
-5. **Pergola 1 et 2** : les allumer, lancer la recherche de la page Tuya local (ou `tinytuya scan`),
-   renseigner `ip` et `version`,
-   puis retirer `"enabled": false`.
+   tester avec au moins 35 Ko libres, avec le correctif de l'exécution 16 ou plus récent),
+   création des endpoints Matter depuis la page, identifiants du cloud enregistrés, mise en
+   page sur un écran d'ordinateur.
+5. **Pergola 1 et 2** : les allumer, lancer la recherche de la page Tuya Local (ou
+   `tinytuya scan`), renseigner `ip` et `version`, puis retirer `"enabled": false`.
 6. **Migrer Bureau et Salon** sur la ZB-GW03 (procédure dans `docs/tuya-local.fr.md`).
 7. **Fusionner la PR #7** une fois Matter validé, puis créer un tag `v*` pour publier la
    release.
@@ -239,7 +251,7 @@ endpoints Matter `z_light2` ou `z_light1`.
 
 - **`MtrUpdate` répond `Done`** pour un endpoint qui ne publie pas d'état (`v_fan`) : le driver
   le prenait pour un refus (`TUY: endpoint Matter 'Ventilateur' : Done (nouvel essai toutes les
-  30 s)`) et renvoyait l'état du ventilateur toutes les 30 s. Corrigé (réponses de
+  30 s)`, journal de l'époque, désormais en anglais) et renvoyait l'état du ventilateur toutes les 30 s. Corrigé (réponses de
   `Matter_zz_Device.MtrUpdate` : l'état, ou `Done`, sinon un message d'erreur), scénario 1
   complété. Build : exécution 14 (commit `b8b2789`), 18/18 dans les deux modes, firmware de
   2 099 215 octets ; à flasher.
@@ -286,6 +298,7 @@ endpoints Matter `z_light2` ou `z_light1`.
 |---|---|---|
 | `devices.json`, `snapshot.json` | PC de Guillaume (sortie de `tinytuya wizard` / `scan`) | clés locales, identifiants, IP, versions |
 | `/tuya.json` | système de fichiers de la passerelle | configuration réelle, **avec les clés** |
+| `/tuya_cloud.json` | système de fichiers de la passerelle | identifiants du cloud Tuya, s'ils ont été enregistrés depuis la page |
 | `/autoexec.be` | système de fichiers de la passerelle | démarrage différé du driver (`/tuya_local.be` n'est plus nécessaire avec le driver solidifié) |
 
 Pour reprendre le développement, demander à Guillaume les fichiers dont la tâche a besoin.

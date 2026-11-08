@@ -3,7 +3,7 @@
   {
    "name": "Ventilateur",
    "id": "xxxxxx...",
-   "key": "cle_locale_16car",
+   "key": "local_key_16chars",
    "ip": "192.168.1.18",
    "version": "3.5",
    "matter": [
@@ -25,7 +25,7 @@
   {
    "name": "Récepteur radio",
    "id": "xxxxxx...",
-   "key": "cle_locale_16car",
+   "key": "local_key_16chars",
    "ip": "192.168.1.15",
    "version": "3.5",
    "matter": [
@@ -54,7 +54,7 @@
   {
    "name": "Entrée-Porche",
    "id": "xxxxxx...",
-   "key": "cle_locale_16car",
+   "key": "local_key_16chars",
    "ip": "192.168.1.174",
    "version": "3.3",
    "matter": [
@@ -71,7 +71,7 @@
   {
    "name": "Pergola 2",
    "id": "xxxxxx...",
-   "key": "cle_locale_16car",
+   "key": "local_key_16chars",
    "ip": "",
    "version": "3.3",
    "enabled": false,
@@ -89,7 +89,7 @@
   {
    "name": "Pergola 1",
    "id": "xxxxxx...",
-   "key": "cle_locale_16car",
+   "key": "local_key_16chars",
    "ip": "",
    "version": "3.3",
    "enabled": false,
@@ -107,7 +107,7 @@
   {
    "name": "A:Eau B:Chfg C:Cuisine",
    "id": "xxxxxx...",
-   "key": "cle_locale_16car",
+   "key": "local_key_16chars",
    "ip": "192.168.1.80",
    "version": "3.5",
    "sensors": {
@@ -181,7 +181,7 @@
   {
    "name": "Gateway",
    "id": "xxxxxx...",
-   "key": "cle_locale_16car",
+   "key": "local_key_16chars",
    "ip": "192.168.1.180",
    "version": "3.3",
    "children": [

@@ -1,43 +1,43 @@
-#- tuya_local.be : pilotage local des appareils Tuya Wi-Fi depuis Tasmota (equivalent de LocalTuya)
+#- tuya_local.be: local control of Tuya Wi-Fi devices from Tasmota (LocalTuya equivalent)
 
-  - Protocoles locaux Tuya 3.3, 3.4 et 3.5 (TCP 6668), sans le cloud
-  - Sous-appareils Zigbee d'une passerelle Tuya (champ "cid")
-  - Pont vers Matter : endpoints virtuels (v_relay, v_light2, v_fan...) pilotes par
-    l'evenement MtrReceived et mis a jour par la commande MtrUpdate
-  - Valeurs de mesure (pince amperemetrique...) dans les releves Tasmota et la page web
+  - Tuya local protocols 3.3, 3.4 and 3.5 (TCP 6668), without the cloud
+  - Zigbee sub-devices of a Tuya gateway ("cid" field)
+  - Bridge to Matter: virtual endpoints (v_relay, v_light2, v_fan...) driven by the
+    MtrReceived event and updated with the MtrUpdate command
+  - Measurements (clamp meter...) in Tasmota's sensor telemetry and web page
 
-  Configuration : fichier /tuya.json (voir tuya.example.json et docs/tuya-local.fr.md), ou
-  page web Configuration -> Tuya local (/tuya)
-  Commandes : TuyaStatus [appareil], TuyaSend <appareil>,<dp ou code>,<valeur|toggle>, TuyaReload,
-    TuyaConfig [appareil], TuyaAdd <json>, TuyaDel <appareil>, TuyaScan [s],
-    TuyaImport [fichier] [all|id,...], TuyaCloud [json], TuyaMatter
+  Configuration: /tuya.json file (see tuya.example.json and docs/tuya-local.en.md), or the
+  Configuration -> Tuya Local web page (/tuya)
+  Commands: TuyaStatus [device], TuyaSend <device>,<dp or code>,<value|toggle>, TuyaReload,
+    TuyaConfig [device], TuyaAdd <json>, TuyaDel <device>, TuyaScan [s],
+    TuyaImport [file] [all|id,...], TuyaCloud [json], TuyaMatter
 
-  Necessite un firmware avec USE_BERRY_CRYPTO_AES_CBC (3.3, 3.4) et le correctif
-  AES_GCM 128 bits avec AAD (3.5).
+  Requires a firmware with USE_BERRY_CRYPTO_AES_CBC (3.3, 3.4) and the 128-bit AES_GCM with
+  AAD patch (3.5).
 
-  Solidifie dans le firmware (custom_berry_solidify) : les classes sont alors en flash, en
-  lecture seule, et deviennent des classes natives. D'ou trois regles :
-  - pas de code au premier niveau hors des classes : le driver est instancie par autoexec.be
-    (`global.tuya_local = TuyaLocal()`), pas par ce fichier ;
-  - les modules (string, json, crypto) sont importes dans les methodes qui s'en servent ;
-  - pas d'ecriture dans une variable statique (`static var`) : constantes uniquement.
-  Le fichier reste chargeable tel quel avec load("tuya_local.be") sur un firmware qui ne
-  l'embarque pas (meme instanciation ensuite).
+  Solidified into the firmware (custom_berry_solidify): the classes are then in flash,
+  read-only, and become native classes. Hence three rules:
+  - no top-level code outside the classes: the driver is instantiated by autoexec.be
+    (`global.tuya_local = TuyaLocal()`), not by this file;
+  - modules (string, json, crypto) are imported in the methods that use them;
+  - no write to a static variable (`static var`): constants only.
+  The file can still be loaded as is with load("tuya_local.be") on a firmware that does not
+  embed it (same instantiation afterwards).
 -#
 
 #################################################################################
-# TuyaCodec : primitives du protocole (sans etat)
+# TuyaCodec: protocol primitives (stateless)
 #################################################################################
 #@ solidify:TuyaCodec,weak
 class TuyaCodec
-  # CRC-32 (polynome 0xEDB88320) par quartet : table constante de 16 entrees, sans calcul
-  # au premier appel (une classe solidifiee est en lecture seule)
+  # CRC-32 (polynomial 0xEDB88320) by nibble: constant 16-entry table, nothing computed
+  # on first call (a solidified class is read-only)
   static var CRC_NIBBLE = [0x00000000, 0x1DB71064, 0x3B6E20C8, 0x26D930AC, 0x76DC4190, 0x6B6B51F4,
                            0x4DB26158, 0x5005713C, 0xEDB88320, 0xF00F9344, 0xD6D6A3E8, 0xCB61B38C,
                            0x9B64C2B0, 0x86D3D2D4, 0xA00AE278, 0xBDBDF21C]
-  # commandes envoyees sans l'en-tete de version "3.x" + 12 octets nuls
+  # commands sent without the "3.x" version header + 12 null bytes
   static var NO_HEADER = [3, 4, 5, 9, 10, 16, 18, 64]
-  # cle des annonces UDP (decouverte) : md5("yGAdlopoPVldABfn"), comme tinytuya
+  # UDP announcement key (discovery): md5("yGAdlopoPVldABfn"), as in tinytuya
   static var UDP_KEY = bytes("6c1ec8e2bb9bb59ab50b0daf649b410a")
 
   static def crc32(b, len)
@@ -74,7 +74,7 @@ class TuyaCodec
     return b[0 .. sz - n - 1]
   end
 
-  # AES-128-ECB, bloc par bloc, avec AES-CBC et un IV nul
+  # AES-128-ECB, block by block, with AES-CBC and a null IV
   static def ecb(key, data, enc)
     import crypto
     var out = bytes()
@@ -92,7 +92,7 @@ class TuyaCodec
     return out
   end
 
-  # trame 6699 (3.5) : AES-128-GCM, en-tete (octets 4 a 17) en donnees authentifiees
+  # 6699 frame (3.5): AES-128-GCM, header (bytes 4 to 17) as authenticated data
   static def frame_6699(seq, cmd, plain, k)
     import crypto
     var b = bytes()
@@ -111,8 +111,8 @@ class TuyaCodec
     return b
   end
 
-  # annonce UDP d'un appareil (ports 6666, 6667, 7000) -> map JSON, ou nil
-  # 55AA : en clair (3.1) ou AES-ECB avec UDP_KEY (3.3) ; 6699 : AES-GCM avec UDP_KEY (3.5)
+  # UDP announcement of a device (ports 6666, 6667, 7000) -> JSON map, or nil
+  # 55AA: clear text (3.1) or AES-ECB with UDP_KEY (3.3); 6699: AES-GCM with UDP_KEY (3.5)
   static def decode_udp(pkt)
     import crypto
     import json
@@ -124,8 +124,8 @@ class TuyaCodec
     if pfx == 0x000055AA
       var total = 16 + pkt.get(12, -4)
       if total > n || total < 28  return nil  end
-      p = pkt[20 .. total - 9]                        # apres le code retour, avant CRC + suffixe
-      if size(p) > 0 && p[0] != 0x7B                  # pas '{' : chiffre
+      p = pkt[20 .. total - 9]                        # after the return code, before CRC + suffix
+      if size(p) > 0 && p[0] != 0x7B                  # no '{': encrypted
         if size(p) % 16 != 0  return nil  end
         p = TuyaCodec.unpad(TuyaCodec.ecb(k, p, false))
       end
@@ -135,12 +135,12 @@ class TuyaCodec
       var g = crypto.AES_GCM(k, pkt[18 .. 29], pkt[4 .. 17])
       p = g.decrypt(pkt[30 .. total - 21])
       if g.tag() != pkt[total - 20 .. total - 5]  return nil  end
-      if size(p) > 4 && p[0] != 0x7B && p[4] == 0x7B  p = p[4 ..]  end   # code retour
+      if size(p) > 4 && p[0] != 0x7B && p[4] == 0x7B  p = p[4 ..]  end   # return code
     else
       return nil
     end
     var sz = size(p)
-    while sz > 0 && p[sz - 1] == 0  sz -= 1  end     # octets nuls de fin (appli)
+    while sz > 0 && p[sz - 1] == 0  sz -= 1  end     # trailing null bytes (app)
     if sz == 0  return nil  end
     var m = json.load(p[0 .. sz - 1].asstring())
     return (type(m) == 'instance' && classname(m) == 'map') ? m : nil
@@ -154,15 +154,15 @@ class TuyaCodec
 end
 
 #################################################################################
-# TuyaBinding : liaison entre des DP Tuya et un endpoint Matter virtuel
+# TuyaBinding: link between Tuya DPs and a virtual Matter endpoint
 #################################################################################
 #@ solidify:TuyaBinding,weak
 class TuyaBinding
-  var node            # TuyaNode (appareil ou sous-appareil) qui porte les DP
-  var ep              # nom de l'endpoint Matter
+  var node            # TuyaNode (device or sub-device) that holds the DPs
+  var ep              # Matter endpoint name
   var type            # relay, relay_power, light0..3, fan, temp, humidity
   var c               # configuration (map)
-  var pending         # true : le dernier MtrUpdate a ete refuse (endpoint absent), a renvoyer
+  var pending         # true: the last MtrUpdate was refused (endpoint missing), to be resent
 
   def init(node, conf)
     self.node = node
@@ -179,7 +179,7 @@ class TuyaBinding
     return self.c.find(k, dflt)
   end
 
-  # Matter -> Tuya : attributs MtrReceived -> map de DP a envoyer
+  # Matter -> Tuya: MtrReceived attributes -> map of DPs to send
   def to_tuya(a)
     import string
     var t = self.type
@@ -236,8 +236,8 @@ class TuyaBinding
         end
       end
       if t == "light2" && a.contains("CT")
-        var cmin = self.num("ct_min", 153)       # mireds de la valeur Tuya 1000 (froid)
-        var cmax = self.num("ct_max", 500)       # mireds de la valeur Tuya 0 (chaud)
+        var cmin = self.num("ct_min", 153)       # mireds of Tuya value 1000 (cold)
+        var cmax = self.num("ct_max", 500)       # mireds of Tuya value 0 (warm)
         var ct = int(a["CT"])
         if ct < cmin  ct = cmin  end
         if ct > cmax  ct = cmax  end
@@ -261,7 +261,7 @@ class TuyaBinding
     return 1 + ((v - lo) * 253 + (hi - lo) / 2) / (hi - lo)
   end
 
-  # couleur Tuya (colour_data_v2) : "hhhhssssvvvv", h 0..360, s et v 0..1000
+  # Tuya colour (colour_data_v2): "hhhhssssvvvv", h 0..360, s and v 0..1000
   def hsv_get()
     var s = self.node.dps.find(self.dp("dp_colour", 24))
     if type(s) == 'string' && size(s) == 12
@@ -270,9 +270,9 @@ class TuyaBinding
     return [0, 1000, 1000]
   end
 
-  # Tuya -> Matter : envoie a l'endpoint les attributs touches par `changed` (map de DP).
-  # Si l'endpoint refuse (absent, cree apres le driver...), la liaison passe en attente et
-  # TuyaLocal lui renvoie l'etat complet toutes les SYNC_RETRY ms. Renvoie false si refuse.
+  # Tuya -> Matter: sends the endpoint the attributes touched by `changed` (map of DPs).
+  # If the endpoint refuses (missing, created after the driver...), the binding becomes pending
+  # and TuyaLocal resends it the full state every SYNC_RETRY ms. Returns false if refused.
   def push(changed)
     import json
     var r = self.to_matter(changed)
@@ -280,7 +280,7 @@ class TuyaBinding
     r["Name"] = self.ep
     var res = tasmota.cmd("MtrUpdate " + json.dump(r), true)
     var v = (type(res) == 'instance') ? res.find("MtrUpdate") : nil
-    # accepte : l'etat de l'endpoint, ou "Done" pour un endpoint qui n'en publie pas (v_fan)
+    # accepted: the endpoint's state, or "Done" for an endpoint that publishes none (v_fan)
     if type(v) == 'instance' || v == "Done"
       if self.pending
         tasmota.log(f"TUY: Matter endpoint '{self.ep}' available, state sent", 2)
@@ -288,7 +288,7 @@ class TuyaBinding
       end
       return true
     end
-    if !self.pending                  # "Invalid Device", "Invalid attribute '...'" ou rien : signale une fois
+    if !self.pending                  # "Invalid Device", "Invalid attribute '...'" or nothing: reported once
       var why = (v != nil) ? v : res
       tasmota.log(f"TUY: Matter endpoint '{self.ep}': {why} (retry every 30 s)", 2)
       self.pending = true
@@ -296,7 +296,7 @@ class TuyaBinding
     return false
   end
 
-  # Tuya -> Matter : etat courant -> attributs MtrUpdate (nil si rien ne concerne cet endpoint)
+  # Tuya -> Matter: current state -> MtrUpdate attributes (nil if nothing concerns this endpoint)
   def to_matter(changed)
     var t = self.type
     var st = self.node.dps
@@ -367,17 +367,17 @@ class TuyaBinding
 end
 
 #################################################################################
-# TuyaNode : un appareil logique (appareil Wi-Fi ou sous-appareil de passerelle)
+# TuyaNode: a logical device (Wi-Fi device or gateway sub-device)
 #################################################################################
 #@ solidify:TuyaNode,weak
 class TuyaNode
-  var name, id, cid          # cid : identifiant du sous-appareil (nil pour un appareil Wi-Fi)
-  var conn                   # TuyaDevice qui porte la connexion TCP
-  var dps                    # dernier etat connu {"1": true, ...}
-  var bindings               # list de TuyaBinding
-  var sensors                # {"label": [dp, diviseur, unite]} : releves Tasmota
-  var seen                   # millis de la derniere reception
-  var codes                  # {"switch_led": 20, ...} (import) : TuyaSend par code, ou nil
+  var name, id, cid          # cid: sub-device id (nil for a Wi-Fi device)
+  var conn                   # TuyaDevice that holds the TCP connection
+  var dps                    # last known state {"1": true, ...}
+  var bindings               # list of TuyaBinding
+  var sensors                # {"label": [dp, divider, unit]}: Tasmota sensor readings
+  var seen                   # millis of the last reception
+  var codes                  # {"switch_led": 20, ...} (import): TuyaSend by code, or nil
 
   def init(conn, conf)
     self.conn = conn
@@ -393,7 +393,7 @@ class TuyaNode
     end
   end
 
-  # nouvelles valeurs recues de l'appareil
+  # new values received from the device
   def update(dps)
     import json
     var changed = {}
@@ -410,7 +410,7 @@ class TuyaNode
     tasmota.publish_result(json.dump({"Tuya": {"Name": self.name, "Dps": changed}}), "RESULT")
     for b: self.bindings
       if b.pending
-        b.push(self.dps)                # endpoint en attente : etat complet
+        b.push(self.dps)                # pending endpoint: full state
       else
         b.push(changed)
       end
@@ -425,7 +425,7 @@ class TuyaNode
 end
 
 #################################################################################
-# TuyaDevice : connexion TCP vers un appareil Wi-Fi (ou une passerelle) et protocole
+# TuyaDevice: TCP connection to a Wi-Fi device (or a gateway) and protocol
 #################################################################################
 #@ solidify:TuyaDevice,weak
 class TuyaDevice : TuyaNode
@@ -462,7 +462,7 @@ class TuyaDevice : TuyaNode
   def is_gateway()  return size(self.children) > 0  end
   def v34()  return self.ver == "3.4" || self.ver == "3.5"  end
 
-  ###################### connexion ######################
+  ###################### connection ######################
   def close(reason)
     if self.tcp  self.tcp.close()  end
     self.tcp = nil
@@ -535,7 +535,7 @@ class TuyaDevice : TuyaNode
       self.parse()
       if self.tcp == nil  return  end
     end
-    # emission en attente
+    # pending transmission
     self.flush()
     if self.state == self.ST_NEGO && now - self.t_state > 5000
       self.close("no reply to key negotiation")
@@ -562,7 +562,7 @@ class TuyaDevice : TuyaNode
     end
   end
 
-  ###################### emission ######################
+  ###################### transmission ######################
   def time_str()  return str(tasmota.rtc()['utc'])  end
 
   def query()
@@ -581,7 +581,7 @@ class TuyaDevice : TuyaNode
     end
   end
 
-  # envoi de DP vers un appareil ou un sous-appareil (node)
+  # sends DPs to a device or a sub-device (node)
   def set_dps(node, dps)
     import json
     if self.state != self.ST_READY
@@ -654,7 +654,7 @@ class TuyaDevice : TuyaNode
       if n < 4  return  end
       var pfx = self.rx.get(0, -4)
       if pfx != 0x000055AA && pfx != 0x00006699
-        # resynchronisation : on cherche le prochain prefixe
+        # resynchronisation: look for the next prefix
         var i = 1
         while i <= n - 4
           var p = self.rx.get(i, -4)
@@ -688,7 +688,7 @@ class TuyaDevice : TuyaNode
     end
   end
 
-  # decode une trame complete -> (cmd, payload en clair sans code retour)
+  # decodes a complete frame -> (cmd, clear payload without return code)
   def decode(frame)
     import crypto
     var k = self.sess_key != nil ? self.sess_key : self.key
@@ -712,7 +712,7 @@ class TuyaDevice : TuyaNode
     else
       if TuyaCodec.crc32(signed, size(signed)) != frame.get(total - 8, -4)  raise "crc_error", "invalid CRC"  end
     end
-    var body = (total - end_len > 20) ? frame[20 .. total - end_len - 1] : bytes()     # apres le code retour
+    var body = (total - end_len > 20) ? frame[20 .. total - end_len - 1] : bytes()     # after the return code
     if size(body) == 0  return [cmd, body]  end
     if use_hmac
       body = TuyaCodec.unpad(TuyaCodec.ecb(k, body, false))
@@ -764,7 +764,7 @@ class TuyaDevice : TuyaNode
     node.update(dps)
   end
 
-  ###################### negociation de cle (3.4 / 3.5) ######################
+  ###################### key negotiation (3.4 / 3.5) ######################
   def nego_step2(p)
     import crypto
     if self.state != self.ST_NEGO || size(p) < 48
@@ -799,14 +799,14 @@ class TuyaDevice : TuyaNode
 end
 
 #################################################################################
-# TuyaScan : decouverte des appareils Wi-Fi sur le reseau local (comme tinytuya scan)
-# Instanciee a la demande (TuyaScan), liberee a la fin : rien en RAM le reste du temps.
+# TuyaScan: discovery of Wi-Fi devices on the local network (like tinytuya scan)
+# Instantiated on demand (TuyaScan), released at the end: nothing in RAM the rest of the time.
 #################################################################################
 #@ solidify:TuyaScan,weak
 class TuyaScan
-  static var PORTS = [6666, 6667, 7000]     # 3.1 en clair, 3.3 chiffre, 3.5 (appli)
-  static var REQUEST_EVERY = 6000           # ms entre deux demandes aux appareils 3.5
-  var socks                   # list de udp
+  static var PORTS = [6666, 6667, 7000]     # 3.1 in clear text, 3.3 encrypted, 3.5 (app)
+  static var REQUEST_EVERY = 6000           # ms between two requests to 3.5 devices
+  var socks                   # list of udp
   var found                   # {"id": {"id", "ip", "version", "product_key"}}
   var t_end, t_req, ip
 
@@ -823,7 +823,7 @@ class TuyaScan
     end
     self.t_end = tasmota.millis() + ms
     self.t_req = 0
-    var e = tasmota.eth()                     # Ethernet, sinon Wi-Fi
+    var e = tasmota.eth()                     # Ethernet, otherwise Wi-Fi
     self.ip = (e != nil) ? e.find("ip", "") : ""
     if self.ip == "" || self.ip == "0.0.0.0"
       var w = tasmota.wifi()
@@ -831,7 +831,7 @@ class TuyaScan
     end
   end
 
-  # appelee toutes les 50 ms ; false quand la recherche est finie
+  # called every 50 ms; false when the discovery is over
   def loop()
     var now = tasmota.millis()
     if now >= self.t_req && size(self.socks) > 0
@@ -850,8 +850,8 @@ class TuyaScan
     return now < self.t_end
   end
 
-  # les appareils 3.5 ne s'annoncent qu'a la demande : trame 6699 REQ_DEVINFO (0x25) diffusee
-  # sur le port 7000, comme l'appli Tuya et tinytuya scan
+  # 3.5 devices only announce themselves on request: 6699 REQ_DEVINFO (0x25) frame broadcast
+  # on port 7000, like the Tuya app and tinytuya scan
   def request()
     import json
     var q = bytes().fromstring(json.dump({"from": "app", "ip": self.ip}))
@@ -865,7 +865,7 @@ class TuyaScan
     except .. as e, msg
       return
     end
-    if m == nil || m.contains("from")  return  end     # notre propre demande
+    if m == nil || m.contains("from")  return  end     # our own request
     var id = m.find("gwId", m.find("devId"))
     if id == nil  return  end
     id = str(id)
@@ -887,26 +887,26 @@ class TuyaScan
 end
 
 #################################################################################
-# TuyaImport : appareils de tinytuya (devices.json) ou du cloud -> entrees de tuya.json
-# Fonctions statiques uniquement.
+# TuyaImport: tinytuya devices (devices.json) or cloud devices -> tuya.json entries
+# Static functions only.
 #################################################################################
 #@ solidify:TuyaImport,weak
 class TuyaImport
-  # type du driver -> type d'endpoint Matter virtuel
+  # driver type -> virtual Matter endpoint type
   static var MATTER_TYPES = {"relay": "v_relay", "relay_power": "v_relay_power", "light0": "v_light0",
                              "light1": "v_light1", "light2": "v_light2", "light3": "v_light3",
                              "fan": "v_fan", "temp": "v_temp", "humidity": "v_humidity"}
-  static var MAX_OBJECT = 8192      # octets : au-dela, l'objet JSON est ignore (RAM)
+  static var MAX_OBJECT = 8192      # bytes: beyond this, the JSON object is skipped (RAM)
 
-  # appelle cb(objet) pour chaque objet d'un tableau JSON, lu par morceaux de 512 octets :
-  # le devices.json de tinytuya (avec les mappings) peut depasser la RAM libre
+  # calls cb(object) for each object of a JSON array, read in 512-byte chunks:
+  # tinytuya's devices.json (with the mappings) can exceed the free RAM
   static def each_object(fname, cb)
     import json
     var f = open(fname, "r")
     var depth = 0
     var in_str = false
     var esc = false
-    var acc = nil                 # bytes de l'objet en cours, nil hors objet
+    var acc = nil                 # bytes of the current object, nil outside an object
     var skip = false
     var count = 0
     try
@@ -987,7 +987,7 @@ class TuyaImport
     return (m != nil) ? string.tolower(str(m.find("type", ""))) : ""
   end
 
-  # diviseur d'un DP entier : 10^scale (et mA -> A pour le courant)
+  # divider of an integer DP: 10^scale (and mA -> A for the current)
   static def div(mapping, dp, ma)
     var v = TuyaImport.values(mapping, dp)
     var d = 1
@@ -997,7 +997,7 @@ class TuyaImport
     return d
   end
 
-  # nom d'endpoint Matter : 32 octets au plus, sans couper un caractere UTF-8
+  # Matter endpoint name: 32 bytes at most, without splitting a UTF-8 character
   static def ep_name(s)
     var b = bytes().fromstring(s)
     if size(b) <= 32  return s  end
@@ -1006,7 +1006,7 @@ class TuyaImport
     return b[0 .. n - 1].asstring()
   end
 
-  # liaisons Matter et releves deduits de la categorie Tuya et des codes de DP
+  # Matter bindings and sensor readings deduced from the Tuya category and the DP codes
   # -> [matter (list), sensors (map)]
   static def auto(name, category, mapping)
     var c = TuyaImport.codes(mapping)
@@ -1016,7 +1016,7 @@ class TuyaImport
     var fan_cat = (cat == "fs" || cat == "fsd" || cat == "fskg")
     var speed = c.find("fan_speed", c.find("fan_speed_percent"))
     if fan_cat || speed != nil
-      # ventilateur : marche/arret + vitesse entiere ; vitesse en enumeration : marche/arret seul
+      # fan: on/off + integer speed; enumerated speed: on/off only
       var on = c.find("switch", c.find("fan_switch", c.find("switch_fan")))
       if on != nil
         if speed != nil && TuyaImport.dtype(mapping, speed) == "integer"
@@ -1033,7 +1033,7 @@ class TuyaImport
     end
     var led = c.find("switch_led")
     if led != nil
-      # lumiere : couleur (v2) > temperature de couleur (v2) > variateur > marche/arret
+      # light: colour (v2) > colour temperature (v2) > dimmer > on/off
       var b = {"ep": TuyaImport.ep_name(name), "type": "light0", "dp": led}
       var bri = c.find("bright_value_v2", c.find("bright_value"))
       if bri != nil
@@ -1054,7 +1054,7 @@ class TuyaImport
       matter.push(b)
       return [matter, sensors]
     end
-    # interrupteurs et prises : switch, switch_1 ... switch_8 ; prise avec mesures : relay_power
+    # switches and plugs: switch, switch_1 ... switch_8; plug with metering: relay_power
     var sw = []
     if c.contains("switch")  sw.push(["", c["switch"]])  end
     var i = 1
@@ -1075,7 +1075,7 @@ class TuyaImport
     else
       for x: sw  matter.push({"ep": TuyaImport.ep_name(name + x[0]), "type": "relay", "dp": x[1]})  end
     end
-    # capteurs de temperature et d'humidite
+    # temperature and humidity sensors
     var tc = c.find("va_temperature", c.find("temp_current"))
     var hc = c.find("va_humidity", c.find("humidity_value"))
     if size(matter) == 0 && tc != nil
@@ -1084,7 +1084,7 @@ class TuyaImport
     if size(matter) <= 1 && hc != nil
       matter.push({"ep": TuyaImport.ep_name(name + " humidité"), "type": "humidity", "dp": hc, "div": TuyaImport.div(mapping, hc, false)})
     end
-    # compteurs d'energie : toutes les mesures entieres avec une unite
+    # energy meters: all integer measurements with a unit
     if cat == "zndb" || cat == "dlq"
       for code: c.keys()
         var dp = c[code]
@@ -1097,8 +1097,8 @@ class TuyaImport
     return [matter, sensors]
   end
 
-  # appareil tinytuya ou cloud -> entree de tuya.json (nil sans cle locale)
-  # scan : {"id": resultat de TuyaScan} pour l'IP et la version
+  # tinytuya or cloud device -> tuya.json entry (nil without a local key)
+  # scan: {"id": TuyaScan result} for the IP and the version
   static def entry(d, scan)
     var id = d.find("id")
     var key = d.find("key", d.find("local_key"))
@@ -1112,7 +1112,7 @@ class TuyaImport
     var ver = d.find("version")
     ver = (ver == nil) ? "" : str(ver)
     if ver == "" && s != nil  ver = s["version"]  end
-    var e = {"name": name, "id": id, "key": key, "ip": ip, "version": ver}   # "" : inconnues
+    var e = {"name": name, "id": id, "key": key, "ip": ip, "version": ver}   # "": unknown
     var a = TuyaImport.auto(name, d.find("category"), d.find("mapping"))
     var c = TuyaImport.codes(d.find("mapping"))
     if size(a[0]) > 0  e["matter"] = a[0]  end
@@ -1125,13 +1125,13 @@ class TuyaImport
       e["cid"] = str(d.find("node_id", ""))
       e["parent"] = str(d.find("parent", d.find("gateway_id", "")))
     elif ip == ""
-      e["enabled"] = false                    # IP inconnue : a completer (recherche)
+      e["enabled"] = false                    # unknown IP: to be completed (discovery)
     end
     return e
   end
 
-  # fusionne les entrees dans conf ; un appareil deja configure (meme id) garde ses liaisons,
-  # seuls sa cle, son IP et sa version sont mis a jour -> {"Added": [], "Updated": [], "Skipped": []}
+  # merges the entries into conf; an already configured device (same id) keeps its bindings,
+  # only its key, IP and version are updated -> {"Added": [], "Updated": [], "Skipped": []}
   static def merge(conf, entries)
     var r = {"Added": [], "Updated": [], "Skipped": []}
     var devs = conf["devices"]
@@ -1154,7 +1154,7 @@ class TuyaImport
         r["Updated"].push(cur.find("name", e["id"]))
       end
     end
-    # sous-appareils : rattaches a leur passerelle si elle est configuree
+    # sub-devices: attached to their gateway if it is configured
     for e: entries
       if !e.contains("cid") continue end
       var i = TuyaImport.find(devs, e["parent"])
@@ -1179,7 +1179,7 @@ class TuyaImport
     return r
   end
 
-  # index d'un appareil par id ou par nom (sans casse), ou nil
+  # index of a device by id or by name (case-insensitive), or nil
   static def find(devs, ref)
     import string
     if ref == nil  return nil  end
@@ -1195,8 +1195,8 @@ class TuyaImport
 end
 
 #################################################################################
-# TuyaCloud : cles locales et DP depuis le cloud Tuya (API OpenAPI, comme tinytuya wizard)
-# Une requete HTTPS par etape, instanciee a la demande. Les identifiants ne sont pas stockes.
+# TuyaCloud: local keys and DPs from the Tuya cloud (OpenAPI, like tinytuya wizard)
+# One HTTPS request per step, instantiated on demand. Credentials are saved by TuyaLocal, on request only.
 #################################################################################
 #@ solidify:TuyaCloud,weak
 class TuyaCloud
@@ -1220,8 +1220,8 @@ class TuyaCloud
     self.out = []
   end
 
-  # signature Tuya OpenAPI (nouvel algorithme), requete GET sans corps ni en-tete signe :
-  # HMAC-SHA256(secret, client_id + [access_token] + t + "GET\n" + sha256("") + "\n\n" + chemin)
+  # Tuya OpenAPI signature (new algorithm), GET request without body or signed header:
+  # HMAC-SHA256(secret, client_id + [access_token] + t + "GET\n" + sha256("") + "\n\n" + path)
   static def sign(key, secret, token, t, path)
     import crypto
     import string
@@ -1235,9 +1235,9 @@ class TuyaCloud
     return str(u) + "000"
   end
 
-  # entiers de plus de 9 chiffres -> chaines. Toute reponse du cloud porte l'heure en ms
-  # ("t":1794092132086), qui depasse les entiers 32 bits de Berry : json.load renverrait nil.
-  # Seules les valeurs d'une cle ("cle":123...) sont touchees, pas le JSON echappe des "values".
+  # integers of more than 9 digits -> strings. Every cloud response carries the time in ms
+  # ("t":1794092132086), which exceeds Berry's 32-bit integers: json.load would return nil.
+  # Only the values of a key ("key":123...) are touched, not the escaped JSON of "values".
   static def quote_big(s)
     import string
     var out = []
@@ -1273,7 +1273,7 @@ class TuyaCloud
     if self.token != nil
       wc.add_header("access_token", self.token)
     else
-      wc.add_header("secret", self.secret)    # comme tinytuya pour la demande de jeton
+      wc.add_header("secret", self.secret)    # like tinytuya for the token request
     end
     var code = wc.GET()
     var s = (code == 200) ? wc.get_string() : nil
@@ -1288,7 +1288,7 @@ class TuyaCloud
     return m["result"]
   end
 
-  # "status" et "functions" des specifications -> mapping au format tinytuya
+  # specification "status" and "functions" -> mapping in tinytuya's format
   static def mapping(r)
     import json
     var dps = {}
@@ -1309,8 +1309,8 @@ class TuyaCloud
     return dps
   end
 
-  # une requete par appel : jeton, puis pour chaque appareil details (cle) et specifications (DP)
-  # -> true tant qu'il reste des requetes
+  # one request per call: token, then for each device its details (key) and specifications (DPs)
+  # -> true while requests remain
   def next()
     if self.token == nil
       self.token = self.request("/v1.0/token?grant_type=1")["access_token"]
@@ -1339,13 +1339,13 @@ class TuyaCloud
 end
 
 #################################################################################
-# TuyaWeb : page Configuration -> Tuya Local (/tuya). Fonctions statiques uniquement.
-# Mise en page des pages de Tasmota (comme Matter) : texte de 320 px, en-tetes de tableau en
-# petit, pictogrammes HTML pour les actions. Interface en anglais, comme Tasmota.
+# TuyaWeb: Configuration -> Tuya Local page (/tuya). Static functions only.
+# Layout of Tasmota's pages (like Matter's): 320 px text, small table headers,
+# HTML pictograms for the actions. Interface in English, like Tasmota.
 #################################################################################
 #@ solidify:TuyaWeb,weak
 class TuyaWeb
-  # etat d'un appareil (TuyaLocal.state_of) -> pictogramme et libelle
+  # device state (TuyaLocal.state_of) -> pictogram and label
   static var STATES = {"connected": ["&#x1F7E2;", "connected"], "disconnected": ["&#x1F534;", "disconnected"],
                        "disabled": ["&#x26AA;", "disabled"], "ignored": ["&#x26A0;", "incomplete, ignored"]}
   static var REGIONS = [["eu", "Central Europe"], ["we", "Western Europe"], ["us", "Western America"],
@@ -1524,7 +1524,7 @@ class TuyaWeb
     webserver.content_send("</fieldset><p></p>")
   end
 
-  # formulaires (POST /tuya) -> action, message pour la page suivante, redirection
+  # forms (POST /tuya) -> action, message for the next page, redirect
   static def post(drv)
     import webserver
     import json
@@ -1563,25 +1563,25 @@ class TuyaWeb
 end
 
 #################################################################################
-# TuyaLocal : driver Tasmota
+# TuyaLocal: Tasmota driver
 #################################################################################
 #@ solidify:TuyaLocal,weak
 class TuyaLocal
   static var CONFIG = "/tuya.json"
-  static var CLOUD_CONF = "/tuya_cloud.json"   # identifiants du cloud, si enregistres (jamais dans tuya.json)
-  static var SYNC_RETRY = 30000   # ms entre deux renvois aux endpoints Matter qui ont refuse
-  # memoire libre minimale (Ko) pour lancer : une recherche, un import de fichier, un import cloud
-  # (HTTPS : le client TLS de Tasmota reserve a lui seul 16 Ko)
+  static var CLOUD_CONF = "/tuya_cloud.json"   # cloud credentials, if saved (never in tuya.json)
+  static var SYNC_RETRY = 30000   # ms between two resends to Matter endpoints that refused
+  # minimum free memory (KB) to start: a discovery, a file import, a cloud import
+  # (HTTPS: Tasmota's TLS client alone reserves 16 KB)
   static var SCAN_MIN_HEAP = 15
   static var IMPORT_MIN_HEAP = 20
   static var CLOUD_MIN_HEAP = 35
   static var LABELS = {"Added": "added", "Updated": "updated", "Skipped": "skipped"}
-  var devices                 # list de TuyaDevice
-  var by_ep                   # {nom d'endpoint Matter en minuscules: TuyaBinding}
-  var t_sync                  # millis du dernier renvoi
-  var scan, scan_result       # recherche en cours (TuyaScan) et dernier resultat (list)
-  var cloud, cloud_t          # import cloud en cours (TuyaCloud) et millis de la prochaine requete
-  var web_msg                 # message a afficher sur la page web
+  var devices                 # list of TuyaDevice
+  var by_ep                   # {lower-case Matter endpoint name: TuyaBinding}
+  var t_sync                  # millis of the last resend
+  var scan, scan_result       # running discovery (TuyaScan) and last result (list)
+  var cloud, cloud_t          # running cloud import (TuyaCloud) and millis of the next request
+  var web_msg                 # message to show on the web page
 
   def init()
     self.devices = []
@@ -1600,12 +1600,12 @@ class TuyaLocal
     tasmota.add_cmd("TuyaImport", /c, i, p -> self.run_cmd("TuyaImport", / -> self.import_args(p)))
     tasmota.add_cmd("TuyaCloud", /c, i, p -> self.run_cmd("TuyaCloud", / -> self.cloud_json(p)))
     tasmota.add_cmd("TuyaMatter", /c, i, p -> self.run_cmd("TuyaMatter", / -> self.matter_cmd()))
-    # page web : le driver demarre apres le serveur web, qui n'appelle donc pas web_add_handler()
+    # web page: the driver starts after the web server, which therefore does not call web_add_handler()
     import webserver
     if webserver.state() > 0  self.web_add_handler()  end
   end
 
-  # page Configuration -> Tuya local
+  # Configuration -> Tuya Local page
   def web_add_config_button()
     TuyaWeb.button()
   end
@@ -1615,7 +1615,7 @@ class TuyaLocal
     webserver.on("/tuya", / -> TuyaWeb.post(self), webserver.HTTP_POST)
   end
 
-  # commande -> reponse JSON {"<commande>": resultat} ou {"<commande>": {"Error": "..."}}
+  # command -> JSON response {"<command>": result} or {"<command>": {"Error": "..."}}
   def run_cmd(name, f)
     import json
     var r
@@ -1630,7 +1630,7 @@ class TuyaLocal
     tasmota.resp_cmnd(json.dump(o))
   end
 
-  # resultat d'une operation en arriere-plan : journal, MQTT (RESULT) et page web
+  # result of a background operation: log, MQTT (RESULT) and web page
   def report(name, r)
     import json
     var o = {}
@@ -1656,8 +1656,8 @@ class TuyaLocal
     if h < min  raise "tuya_error", f"not enough free memory: {h} KB, {min} KB needed"  end
   end
 
-  ###################### fichier de configuration ######################
-  # /tuya.json -> map ; absent ou vide : configuration vide ; invalide : erreur (jamais ecrase)
+  ###################### configuration file ######################
+  # /tuya.json -> map; missing or empty: empty configuration; invalid: error (never overwritten)
   def read_conf()
     import json
     var s
@@ -1677,7 +1677,7 @@ class TuyaLocal
     return conf
   end
 
-  # ecrit /tuya.json, l'ancienne version etant gardee dans /tuya.json.bak
+  # writes /tuya.json, the previous version being kept in /tuya.json.bak
   def write_conf(conf)
     import json
     try
@@ -1694,7 +1694,7 @@ class TuyaLocal
     fo.close()
   end
 
-  # TuyaConfig [appareil] : configuration sans les cles
+  # TuyaConfig [device]: configuration without the keys
   def masked_conf(ref)
     var conf = self.read_conf()
     for d: conf["devices"]
@@ -1717,8 +1717,8 @@ class TuyaLocal
     return self.save_device(d, nil)
   end
 
-  # ajoute ou remplace un appareil (designe par ref, sinon par son id) -> nom de l'appareil.
-  # Cle absente, vide ou "***" : la cle enregistree est conservee.
+  # adds or replaces a device (designated by ref, otherwise by its id) -> device name.
+  # Missing, empty or "***" key: the saved key is kept.
   def save_device(d, ref)
     if str(d.find("name", "")) == "" || str(d.find("id", "")) == ""  raise "tuya_error", "name and id required"  end
     var conf = self.read_conf()
@@ -1742,7 +1742,7 @@ class TuyaLocal
     return d["name"]
   end
 
-  # TuyaDel <appareil> -> nom de l'appareil supprime
+  # TuyaDel <device> -> name of the deleted device
   def del_device(ref)
     var conf = self.read_conf()
     var i = TuyaImport.find(conf["devices"], ref)
@@ -1754,7 +1754,7 @@ class TuyaLocal
     return name
   end
 
-  # etat d'une entree de tuya.json, pour la page web
+  # state of a tuya.json entry, for the web page
   def state_of(c)
     if c.find("enabled", true) == false  return "disabled"  end
     var id = str(c.find("id", ""))
@@ -1764,8 +1764,8 @@ class TuyaLocal
     return "ignored"
   end
 
-  ###################### recherche et import ######################
-  # TuyaScan [s] : recherche sur le reseau local, resultat publie a la fin
+  ###################### discovery and import ######################
+  # TuyaScan [s]: discovery on the local network, result published at the end
   def start_scan(sec)
     if self.scan != nil  raise "tuya_error", "discovery already running"  end
     self.check_heap(self.SCAN_MIN_HEAP)
@@ -1789,7 +1789,7 @@ class TuyaLocal
     return m
   end
 
-  # TuyaImport [fichier] [all|id,id...]
+  # TuyaImport [file] [all|id,id...]
   def import_args(p)
     import string
     var fname = nil
@@ -1805,8 +1805,8 @@ class TuyaLocal
     return self.import_file(fname, filter)
   end
 
-  # import du devices.json de tinytuya. Par defaut : les appareils trouves par la recherche ou
-  # deja configures ; "all" : tous ; "id,id" : ceux-la
+  # import of tinytuya's devices.json. By default: the devices found by the discovery or
+  # already configured; "all": all of them; "id,id": those
   def import_file(fname, filter)
     import string
     if fname == nil || fname == ""  fname = "/devices.json"  end
@@ -1856,7 +1856,7 @@ class TuyaLocal
   end
 
   # TuyaCloud {"region":"eu","id":"<Access ID>","secret":"<Access Secret>"[,"devices":["id",...]][,"save":true|false]}
-  # TuyaCloud sans argument : identifiants enregistres
+  # TuyaCloud without argument: saved credentials
   def cloud_json(p)
     import json
     var a = (self.trim(str(p)) == "") ? {} : json.load(str(p))
@@ -1866,7 +1866,7 @@ class TuyaLocal
     return self.cloud_start(a)
   end
 
-  # identifiants du cloud enregistres : {"region","id","secret"} ou nil
+  # saved cloud credentials: {"region","id","secret"} or nil
   def cloud_saved()
     import json
     var c
@@ -1886,8 +1886,8 @@ class TuyaLocal
     f.close()
   end
 
-  # a : {"region","id","secret","devices","save"}. Id ou secret vides : ceux enregistres.
-  # "save" true : enregistre les identifiants ; false : les efface (sans id ni secret, rien d'autre).
+  # a: {"region","id","secret","devices","save"}. Empty id or secret: the saved ones.
+  # "save" true: saves the credentials; false: erases them (without id or secret, nothing else).
   def cloud_start(a)
     import json
     import string
@@ -1921,7 +1921,7 @@ class TuyaLocal
     return msg + note
   end
 
-  # import cloud : par defaut, les appareils trouves par la derniere recherche
+  # cloud import: by default, the devices found by the last discovery
   def start_cloud(region, key, secret, ids)
     if self.cloud != nil  raise "tuya_error", "cloud import already running"  end
     if self.scan != nil  raise "tuya_error", "discovery running: retry when it ends"  end
@@ -1938,7 +1938,7 @@ class TuyaLocal
     return f"cloud import started for {size(ids)} device(s)"
   end
 
-  # une requete du cloud par seconde (chacune bloque le temps de la poignee de main TLS)
+  # one cloud request per second (each one blocks during the TLS handshake)
   def cloud_step()
     var more
     try
@@ -1973,8 +1973,8 @@ class TuyaLocal
     self.report("TuyaCloud", r)
   end
 
-  ###################### endpoints Matter ######################
-  # liaisons sans endpoint Matter du meme nom ; nil si Matter n'est pas actif
+  ###################### Matter endpoints ######################
+  # bindings without a Matter endpoint of the same name; nil if Matter is not enabled
   def matter_missing()
     import global
     import string
@@ -2001,7 +2001,7 @@ class TuyaLocal
     return miss
   end
 
-  # cree les endpoints Matter virtuels manquants -> noms crees (Restart 1 ensuite pour Google Home)
+  # creates the missing virtual Matter endpoints -> created names (then Restart 1 for Google Home)
   def matter_create()
     import global
     var miss = self.matter_missing()
@@ -2089,8 +2089,8 @@ class TuyaLocal
     end
   end
 
-  # renvoie l'etat complet aux endpoints Matter qui ont refuse un MtrUpdate : un endpoint cree
-  # alors que le driver tourne recoit ainsi l'etat de l'appareil sans redemarrage
+  # resends the full state to the Matter endpoints that refused an MtrUpdate: an endpoint created
+  # while the driver runs thus gets the device's state without a restart
   def sync_pending()
     for d: self.devices
       for n: d.nodes()
@@ -2101,7 +2101,7 @@ class TuyaLocal
     end
   end
 
-  # evenement MtrReceived : {"ep9":{"Ep":9,"Name":"Lumiere","Power":1}}
+  # MtrReceived event: {"ep9":{"Ep":9,"Name":"Lumiere","Power":1}}
   def on_matter(v)
     import string
     import json
@@ -2132,7 +2132,7 @@ class TuyaLocal
     return nil
   end
 
-  # TuyaSend <appareil>,<dp ou code>,<valeur JSON | toggle>   ex : TuyaSend Ventilateur,60,true
+  # TuyaSend <device>,<dp or code>,<JSON value | toggle>   e.g. TuyaSend Ventilateur,60,true
   def cmd_send(payload)
     import string
     import json
@@ -2144,12 +2144,12 @@ class TuyaLocal
     if v == nil  v = a[2]  end
     var dp = self.trim(a[1])
     var num = int(dp)
-    if str(num) != dp                         # code de DP (switch_led...) : "codes" de l'import
+    if str(num) != dp                         # DP code (switch_led...): "codes" from the import
       var c = (n.codes != nil) ? n.codes.find(dp) : nil
       if c == nil  return tasmota.resp_cmnd_str("Unknown DP: " + dp)  end
       num = int(c)
     end
-    if string.tolower(self.trim(a[2])) == "toggle"   # inverse un DP booleen (bouton Zigbee...)
+    if string.tolower(self.trim(a[2])) == "toggle"   # inverts a boolean DP (Zigbee button...)
       var cur = n.dps.find(str(num))
       if type(cur) != 'bool'
         return tasmota.resp_cmnd_str(cur == nil ? "toggle: DP state unknown" : "toggle: DP not boolean")
@@ -2193,7 +2193,7 @@ class TuyaLocal
     tasmota.resp_cmnd_done()
   end
 
-  # mesures (capteurs) dans le releve SENSOR
+  # measurements (sensors) in the SENSOR telemetry
   def json_append()
     import json
     var parts = []
@@ -2216,8 +2216,8 @@ class TuyaLocal
     end
   end
 
-  # entier Tuya / diviseur (puissance de 10) en decimal exact : 2268703 / 100 -> "22687.03"
-  # (pas de flottant : Berry calcule en simple precision sur l'ESP32)
+  # Tuya integer / divider (power of 10) as an exact decimal: 2268703 / 100 -> "22687.03"
+  # (no float: Berry computes in single precision on the ESP32)
   def scaled(v, div)
     import string
     if div == nil || div <= 1  return str(v)  end

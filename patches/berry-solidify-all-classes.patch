@@ -1,9 +1,9 @@
-# Berry : custom_berry_solidify enregistre toutes les classes d'un fichier, et pas seulement
-# la premiere. pio-tools/solidify-from-url.py ne retenait que la premiere directive
-# `#@ solidify:` d'un fichier de classes : les autres classes etaient solidifiees, mais
-# absentes de be_modtab.c, donc introuvables par leur nom a l'execution. Le driver
-# berry/tuya_local.be en a cinq (TuyaCodec, TuyaBinding, TuyaNode, TuyaDevice, TuyaLocal),
-# qui s'appellent entre elles par leur nom global.
+# Berry: custom_berry_solidify registers every class of a file, not only the first one.
+# pio-tools/solidify-from-url.py only kept the first `#@ solidify:` directive of a class
+# file: the other classes were solidified, but missing from be_modtab.c, hence not found by
+# name at run time. The berry/tuya_local.be driver has nine of them (TuyaCodec, TuyaBinding,
+# TuyaNode, TuyaDevice, TuyaScan, TuyaImport, TuyaCloud, TuyaWeb, TuyaLocal), which call each
+# other by their global name.
 diff --git a/pio-tools/solidify-from-url.py b/pio-tools/solidify-from-url.py
 index cda0a56c0..89c995a17 100644
 --- a/pio-tools/solidify-from-url.py

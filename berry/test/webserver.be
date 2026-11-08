@@ -1,5 +1,5 @@
-# Module `webserver` de test : routes enregistrees, page rendue dans un tampon, arguments
-# fournis par le harnais (commande HTTP). Meme API que le module de Tasmota pour le driver.
+# Test `webserver` module: registered routes, page rendered into a buffer, arguments supplied
+# by the harness (HTTP command). Same API as Tasmota's module, as far as the driver uses it.
 var webserver = module("webserver")
 webserver.HTTP_GET = 1
 webserver.HTTP_POST = 2

@@ -9,8 +9,9 @@ page), direct links with Zigbee, and the test bench that covers all of it. The u
 [tuya-local.en.md](tuya-local.en.md); command and event examples are in
 [tuya-local-examples.en.md](tuya-local-examples.en.md).
 
-The driver's web page, responses and console messages are in English, like Tasmota; code
-comments are in French.
+The driver's web page, responses and console messages are in English, like Tasmota, and so are
+the code comments. This English documentation is the reference; it is translated into French
+([tuya-local-dev.fr.md](tuya-local-dev.fr.md)).
 
 ## Contents
 
@@ -322,4 +323,4 @@ simplified configuration adds 0.7 to 1.3 KB at rest.
 | `.github/workflows/build.yml` | files written by the tests |
 | `docs/tuya-local.en.md` / `.fr.md` | user guide |
 | `docs/tuya-local-examples.fr.md` / `.en.md` | command and event examples |
-| `docs/tuya-local-suivi.fr.md` | project tracking, measurements (French) |
+| `docs/tuya-local-tracking.{en,fr}.md` | project tracking, measurements |

@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 env:
-  # Commit Tasmota de reference (branche development, 16.0.0.2)
+  # Reference Tasmota commit (development branch, 16.0.0.2)
   TASMOTA_REF: a281cece518b0031e22f2317ca7dbc530c934da1
   PIO_ENV: tasmota32-zbgw03-matter
 
@@ -35,10 +35,10 @@ jobs:
 
       - run: pip install platformio tinytuya
 
-      # Tests du driver Berry tuya_local.be : interpreteur Berry et BearSSL de Tasmota,
-      # faux appareils Tuya construits sur TinyTuya (le test ecrit /tuya.json, /tuya.json.bak et
-      # /devices.json). Joues sur le
-      # driver source puis sur le driver solidifie comme au build (custom_berry_solidify)
+      # Tests of the tuya_local.be Berry driver: Tasmota's Berry interpreter and BearSSL, fake
+      # Tuya devices built on TinyTuya (the test writes /tuya.json, /tuya.json.bak, /devices.json
+      # and /tuya_cloud.json). Run on the source driver, then on the driver solidified as in the
+      # build (custom_berry_solidify)
       - run: |
           sudo touch /tuya.json /tuya.json.bak /devices.json /tuya_cloud.json
           sudo chmod 666 /tuya.json /tuya.json.bak /devices.json /tuya_cloud.json
@@ -48,9 +48,9 @@ jobs:
           cp platformio_override.ini tasmota/
           cp user_config_override.h tasmota/tasmota/
 
-      # Correctifs appliques au code de Tasmota (patches/*.patch). Le code Berry de Matter
-      # est regenere a partir des sources .be pendant la compilation : un correctif d'un
-      # fichier .be est donc bien pris en compte.
+      # Patches applied to Tasmota's code (patches/*.patch). Matter's Berry code is regenerated
+      # from the .be sources during compilation: a patch to a .be file is therefore taken into
+      # account.
       - run: |
           for p in patches/*.patch; do
             git -C tasmota apply --verbose "../$p"
@@ -67,8 +67,8 @@ jobs:
       - if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          # .bin : mise a jour (fichier ou OTA) ; .factory.bin : premiere installation par
-          # le port serie, a l'adresse 0x0
+          # .bin: update (file or OTA); .factory.bin: first installation through the serial
+          # port, at address 0x0
           files: |
             tasmota/build_output/firmware/${{ env.PIO_ENV }}.bin
             tasmota/build_output/firmware/${{ env.PIO_ENV }}.factory.bin

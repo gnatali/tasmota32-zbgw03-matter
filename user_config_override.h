@@ -1,16 +1,16 @@
-// Copie dans tasmota/user_config_override.h avant la compilation par le workflow GitHub.
+// Copied to tasmota/user_config_override.h before compilation by the GitHub workflow.
 
 #ifndef _USER_CONFIG_OVERRIDE_H_
 #define _USER_CONFIG_OVERRIDE_H_
 
-// eWeLink ZB-GW03 : le module Zigbee est un EFR32MG21 (Silicon Labs, firmware EmberZNet),
-// qui parle EZSP. Le build ZBBridge Pro suppose un CC2652P (Texas Instruments, ZNP).
-// Les deux protocoles s'excluent : un seul peut etre compile.
+// eWeLink ZB-GW03: the Zigbee module is an EFR32MG21 (Silicon Labs, EmberZNet firmware),
+// which speaks EZSP. The ZBBridge Pro build assumes a CC2652P (Texas Instruments, ZNP).
+// The two protocols are mutually exclusive: only one can be compiled.
 #undef  USE_ZIGBEE_ZNP
 #define USE_ZIGBEE_EZSP
 
-// Berry : AES-CBC, qui sert aussi a l'AES-ECB (bloc par bloc, IV nul) des protocoles
-// locaux Tuya 3.3 et 3.4
+// Berry: AES-CBC, also used for the AES-ECB (block by block, null IV) of the Tuya local
+// protocols 3.3 and 3.4
 #undef  USE_BERRY_CRYPTO_AES_CBC
 #define USE_BERRY_CRYPTO_AES_CBC
 
