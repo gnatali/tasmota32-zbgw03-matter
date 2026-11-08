@@ -90,6 +90,10 @@ into the firmware (one `#@ solidify:<Class>,weak` directive per class).
   `TuyaLocal.sync_pending()` resends it the **full state** every 30 s (`SYNC_RETRY`), and so does
   any new value from the device. As soon as the endpoint accepts:
   `TUY: Matter endpoint '<ep>' available, state sent`.
+- No Matter (firmware without `USE_MATTER_DEVICE`, or Matter disabled: no `matter_device`
+  global): `TuyaBinding.push()` sends nothing and never makes a binding pending, so no
+  `MtrUpdate` every 30 s; the page shows "Matter is not enabled" and `TuyaMatter` answers that
+  error. The check is made at run time: the driver is the same in every firmware.
 - In Google Home, a new endpoint stays **offline until Tasmota's `Restart 1`** (the controller
   only subscribes to new endpoints when it reconnects), whatever state the driver sends.
 
@@ -265,6 +269,7 @@ announcements (`udp_broadcast()`, checked with `decrypt_udp()`) are built with T
 | 18 | web page: list, editing (masked key then kept), deletion, Matter endpoint list (✅ and number, checkboxes), creation of a selection only, none ticked refused, `TuyaMatter <names>`, discovery |
 | 19 | `TuyaSend ... toggle` |
 | 20 | saved cloud credentials: page checkbox, secret never shown, `TuyaCloud` without argument, erasing |
+| 21 | firmware without Matter: no `MtrUpdate`, nothing pending, page and `TuyaMatter` report it |
 
 The workflow runs the bench before compiling; it creates `/tuya.json`, `/tuya.json.bak`,
 `/devices.json` and `/tuya_cloud.json`, which the test writes.
@@ -323,7 +328,7 @@ simplified configuration adds 0.7 to 1.3 KB at rest.
 | `platformio_override.ini` | `custom_berry_solidify` |
 | `berry/test/run_tests.sh` | builds the two interpreters, solidification, scenarios |
 | `berry/test/harness.be`, `webserver.be`, `crypto.be` | Tasmota mocks |
-| `berry/test/fake_tuya.py`, `test_tuya_local.py` | fake devices, UDP announcements, 20 scenarios |
+| `berry/test/fake_tuya.py`, `test_tuya_local.py` | fake devices, UDP announcements, 21 scenarios |
 | `.github/workflows/build.yml` | files written by the tests |
 | `docs/tuya-local.en.md` / `.fr.md` | user guide |
 | `docs/tuya-local-examples.fr.md` / `.en.md` | command and event examples |

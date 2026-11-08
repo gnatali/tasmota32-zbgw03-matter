@@ -89,6 +89,11 @@ environ 17 Ko sur les 40 Ko qu'il occupait avec 12 appareils. Solidifié, ce cod
   seule fois. `TuyaLocal.sync_pending()` lui renvoie l'**état complet** toutes les 30 s
   (`SYNC_RETRY`), et toute nouvelle valeur de l'appareil aussi. Dès que l'endpoint accepte :
   `TUY: Matter endpoint '<ep>' available, state sent`.
+- Sans Matter (firmware sans `USE_MATTER_DEVICE`, ou Matter désactivé : pas de globale
+  `matter_device`) : `TuyaBinding.push()` n'envoie rien et ne met jamais une liaison en
+  attente, donc pas de `MtrUpdate` toutes les 30 s ; la page affiche « Matter is not enabled »
+  et `TuyaMatter` répond cette erreur. Le contrôle se fait à l'exécution : le driver est le même
+  dans tous les firmwares.
 - Côté Google Home, un nouvel endpoint reste **hors ligne jusqu'au `Restart 1`** de Tasmota (le
   contrôleur ne s'abonne aux nouveaux endpoints qu'à la reconnexion), quel que soit l'état
   envoyé par le driver.
@@ -269,6 +274,7 @@ appareils (`fake_tuya.py`) et les annonces UDP (`udp_broadcast()`, vérifiées p
 | 18 | page web : liste, édition (clé masquée puis conservée), suppression, liste des endpoints Matter (✅ et numéro, cases à cocher), création d'une sélection seulement, refus sans case cochée, `TuyaMatter <noms>`, recherche |
 | 19 | `TuyaSend ... toggle` |
 | 20 | identifiants du cloud enregistrés : case de la page, secret jamais affiché, `TuyaCloud` sans argument, effacement |
+| 21 | firmware sans Matter : pas de `MtrUpdate`, rien en attente, la page et `TuyaMatter` le signalent |
 
 Le workflow lance le banc avant la compilation ; il crée `/tuya.json`, `/tuya.json.bak`,
 `/devices.json` et `/tuya_cloud.json`, que le test écrit.
@@ -327,7 +333,7 @@ la configuration simplifiée ajoute 0,7 à 1,3 Ko au repos.
 | `platformio_override.ini` | `custom_berry_solidify` |
 | `berry/test/run_tests.sh` | construction des deux interpréteurs, solidification, scénarios |
 | `berry/test/harness.be`, `webserver.be`, `crypto.be` | simulations de Tasmota |
-| `berry/test/fake_tuya.py`, `test_tuya_local.py` | faux appareils, annonces UDP, 20 scénarios |
+| `berry/test/fake_tuya.py`, `test_tuya_local.py` | faux appareils, annonces UDP, 21 scénarios |
 | `.github/workflows/build.yml` | fichiers écrits par les tests |
 | `docs/tuya-local.fr.md` / `.en.md` | documentation d'utilisation |
 | `docs/tuya-local-examples.fr.md` / `.en.md` | exemples de commandes et d'événements |

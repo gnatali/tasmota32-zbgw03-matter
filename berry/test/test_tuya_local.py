@@ -617,8 +617,24 @@ def main():
     ok += 1
     print("OK 20 saved cloud credentials: page checkbox, TuyaCloud without argument, erasing")
 
+    # 21. firmware without Matter (or Matter disabled): no MtrUpdate, nothing pending, page and
+    #     TuyaMatter say so; everything comes back with Matter
+    h.send("NOMATTER")
+    out = h.pump(h.send("CMD TuyaSend Lampe test,20,toggle"))
+    out += h.pump(h.send("ADV 31000"))                                 # past SYNC_RETRY
+    assert not [l for l in out if l.startswith("CMD MtrUpdate")], out
+    assert not any("retry every 30 s" in l for l in out), [l for l in out if l.startswith("LOG")]
+    html, _ = page("GET", {})
+    assert "Matter is not enabled" in html and "name='m0'" not in html, html
+    assert resp(h.send("CMD TuyaMatter"), "TuyaMatter")["Error"] == "Matter is not enabled"
+    h.send("MATTERON")
+    out = h.pump(h.send("CMD TuyaSend Lampe test,20,toggle"))
+    assert "Power" in find(mtr_updates(out), "Lampe test"), mtr_updates(out)
+    ok += 1
+    print("OK 21 firmware without Matter: no MtrUpdate, page and TuyaMatter report it")
+
     h.close()
-    print("%d/20 scenarios OK" % ok)
+    print("%d/21 scenarios OK" % ok)
 
 
 if __name__ == "__main__":

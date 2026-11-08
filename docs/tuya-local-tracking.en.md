@@ -16,7 +16,7 @@ Wi-Fi devices and the Zigbee sub-devices of the Tuya gateway, and expose them to
 |---|---|
 | Berry crypto: `USE_BERRY_CRYPTO_AES_CBC` + `berry-aes-gcm-128-aad.patch` | ✅ built, in service on the gateway |
 | `berry/tuya_local.be` driver: protocols 3.3 / 3.4 / 3.5, Tuya gateway (`cid`) | ✅ **tested on the real devices**: 5 Wi-Fi devices and 7 sub-devices connected, correct values |
-| Test bench (20 scenarios) in the workflow | ✅ passes locally (source and solidified) |
+| Test bench (21 scenarios) in the workflow | ✅ passes locally (source and solidified) |
 | **Simplified configuration**: `/tuya` web page, UDP discovery, `devices.json` and cloud import, types deduced from the DPs, API (`TuyaConfig`, `TuyaAdd`, `TuyaDel`, `TuyaScan`, `TuyaImport`, `TuyaCloud`, `TuyaMatter`) | ✅ test bench; ✅ build (run 13, 2050 KB); ✅ discovery on the gateway (3 devices); ⏳ cloud import on the gateway (fix of run 16, not flashed yet) |
 | **Driver solidification** (`custom_berry_solidify`, `berry-solidify-all-classes.patch`) | ✅ test bench: source **and** solidified driver; ✅ firmware build (2015 KB); ✅ on the gateway: **48 KB free with the 12 devices connected** (34 KB before), the driver uses ~23 KB instead of ~40 |
 | User documentation `docs/tuya-local.{en,fr}.md` | ✅ |
@@ -143,6 +143,13 @@ Wi-Fi devices and the Zigbee sub-devices of the Tuya gateway, and expose them to
     Configuration → Matter (`Entrée-Porche`, `Ventilateur`, `Récepteur radio 1` to `4`...): the
     new list shows each endpoint's number when it is found, which will show whether the
     driver reads Matter's configuration correctly on the gateway.
+
+16. **No Matter: no `MtrUpdate`** (8 November): Matter detection is made at run time (the
+    driver is the same in every firmware). Without the `matter_device` global (firmware built
+    without Matter, or Matter disabled), `TuyaBinding.push()` now sends nothing and never makes
+    a binding pending: before, every binding was refused ("Unknown" command) and resent every
+    30 s for nothing. Scenario 21 (21/21 in both modes; it fails without the check). Build:
+    run 17, which also brings entries 12, 13 and 15 to the gateway.
 
 ## Measurements on the gateway
 

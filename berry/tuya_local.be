@@ -275,6 +275,9 @@ class TuyaBinding
   # and TuyaLocal resends it the full state every SYNC_RETRY ms. Returns false if refused.
   def push(changed)
     import json
+    import global
+    # Matter not built into the firmware, or disabled: nothing to update, nothing pending
+    if !global.contains("matter_device") || global.matter_device == nil  return true  end
     var r = self.to_matter(changed)
     if r == nil  return true  end
     r["Name"] = self.ep

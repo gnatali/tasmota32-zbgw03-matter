@@ -161,7 +161,9 @@ ne s'abonne aux nouveaux endpoints qu'à la reconnexion). Le plus simple : crée
 endpoints, puis un seul `Restart 1`.
 
 Côté driver, un endpoint qui n'existe pas encore est signalé une fois, et le driver lui renvoie
-l'état de l'appareil toutes les 30 s jusqu'à ce qu'il l'accepte.
+l'état de l'appareil toutes les 30 s jusqu'à ce qu'il l'accepte. Sans Matter (firmware compilé
+sans, ou Matter désactivé), le driver n'envoie rien à Matter : les appareils restent pilotables
+par commande, règle et page web, et la page affiche « Matter is not enabled ».
 
 | `type` dans `tuya.json` | Endpoint Matter à créer | Attributs échangés |
 |---|---|---|
@@ -307,7 +309,7 @@ Il n'apparaît plus dans Smart Life, et le retirer de `tuya.json` s'il y figurai
 ## Tests
 
 `berry/test/run_tests.sh <dépôt Tasmota>` compile l'interpréteur Berry de Tasmota avec le
-chiffrement BearSSL de Tasmota, et joue 20 scénarios contre de faux appareils Tuya construits
+chiffrement BearSSL de Tasmota, et joue 21 scénarios contre de faux appareils Tuya construits
 sur [TinyTuya](https://github.com/jasonacox/tinytuya) (3.3, 3.4, 3.5, passerelle Zigbee) :
 négociation de clé, commandes Matter, retours d'état, mesures, coupure et reconnexion, trames
 corrompues ou fragmentées, endpoint Matter créé à chaud, API, recherche (annonces au format

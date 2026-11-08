@@ -9,6 +9,7 @@
 #   HTTPSRESP <path> <code> <body>   response of the fake Tuya cloud for <path>
 #   HTTP <GET|POST> <path> <json of the arguments>   request to the driver's web page (PAGE ...)
 #   WEBBTN            button of the Configuration page
+#   NOMATTER / MATTERON   removes / restores matter_device (firmware without Matter)
 # Outputs: CONNECT, TX, CLOSE, CMD (MtrUpdate), PUB, RESP, APPEND, WEB, LOG, UDPBIND, UDPTX,
 #   UDPCLOSE, HTTPS, MATTERADD, PAGE; READY after each line
 import json
@@ -124,6 +125,7 @@ class MockMatter
   end
 end
 matter_device = MockMatter()
+saved_matter = nil
 
 # The driver is instantiated here as in autoexec.be: the file only contains the classes.
 # Interpreter with the solidified driver: the classes are already native. Otherwise the source
@@ -184,6 +186,13 @@ while true
     webserver._out = []
     webserver._routes[a[1] + ":" + a[0]]()
     print("PAGE " + json.dump(webserver._out.concat("")))
+  elif op == "NOMATTER"
+    import global
+    saved_matter = global.matter_device
+    global.matter_device = nil
+  elif op == "MATTERON"
+    import global
+    global.matter_device = saved_matter
   elif op == "WEBBTN"
     webserver._out = []
     drv.web_add_config_button()

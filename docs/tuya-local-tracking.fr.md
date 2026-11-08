@@ -16,7 +16,7 @@ Tuya Wi-Fi et les sous-appareils Zigbee de la passerelle Tuya, et les présenter
 |---|---|
 | Crypto Berry : `USE_BERRY_CRYPTO_AES_CBC` + correctif `berry-aes-gcm-128-aad.patch` | ✅ compilé, en service sur la passerelle |
 | Driver `berry/tuya_local.be` : protocoles 3.3 / 3.4 / 3.5, passerelle Tuya (`cid`) | ✅ **testé sur les vrais appareils** : 5 appareils Wi-Fi et 7 sous-appareils connectés, valeurs correctes |
-| Banc de test (20 scénarios) dans le workflow | ✅ passe en local (source et solidifié) |
+| Banc de test (21 scénarios) dans le workflow | ✅ passe en local (source et solidifié) |
 | **Configuration simplifiée** : page web `/tuya`, recherche UDP, import `devices.json` et cloud, types déduits des DP, API (`TuyaConfig`, `TuyaAdd`, `TuyaDel`, `TuyaScan`, `TuyaImport`, `TuyaCloud`, `TuyaMatter`) | ✅ banc de test ; ✅ build (exécution 13, 2050 Ko) ; ✅ recherche sur la passerelle (3 appareils) ; ⏳ import cloud sur la passerelle (correctif de l'exécution 16, pas encore flashé) |
 | **Solidification du driver** (`custom_berry_solidify`, correctif `berry-solidify-all-classes.patch`) | ✅ banc de test : driver source **et** driver solidifié ; ✅ build du firmware (2015 Ko) ; ✅ sur la passerelle : **48 Ko libres avec les 12 appareils connectés** (34 Ko avant), le driver consomme ~23 Ko au lieu de ~40 |
 | Documentation utilisateur `docs/tuya-local.{en,fr}.md` | ✅ |
@@ -146,6 +146,14 @@ Tuya Wi-Fi et les sous-appareils Zigbee de la passerelle Tuya, et les présenter
     existaient déjà dans Configuration → Matter (`Entrée-Porche`, `Ventilateur`, `Récepteur
     radio 1` à `4`...) : la nouvelle liste affiche le numéro de chaque endpoint trouvé, ce qui
     montrera si le driver lit correctement la configuration de Matter sur la passerelle.
+
+16. **Sans Matter : pas de `MtrUpdate`** (8 novembre) : la détection de Matter se fait à
+    l'exécution (le driver est le même dans tous les firmwares). Sans la globale
+    `matter_device` (firmware compilé sans Matter, ou Matter désactivé), `TuyaBinding.push()`
+    n'envoie plus rien et ne met jamais une liaison en attente : avant, chaque liaison était
+    refusée (commande « Unknown ») et renvoyée toutes les 30 s pour rien. Scénario 21 (21/21
+    dans les deux modes ; il échoue sans le contrôle). Build : exécution 17, qui apporte aussi
+    les entrées 12, 13 et 15 sur la passerelle.
 
 ## Mesures sur la passerelle
 

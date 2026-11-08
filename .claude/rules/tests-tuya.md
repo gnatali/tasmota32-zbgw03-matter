@@ -20,7 +20,7 @@ bash berry/test/run_tests.sh tasmota     # writes /tuya.json(.bak), /devices.jso
   `tcpclientasync`, `udp`, `webclient` (cloud) and `matter_device`, driven line by line by
   `test_tuya_local.py`. The test writes `/tuya.json`, `/tuya.json.bak`, `/devices.json` and
   `/tuya_cloud.json`.
-- The 20 scenarios run **twice**: source driver (compiled by the harness in strict mode), then
+- The 21 scenarios run **twice**: source driver (compiled by the harness in strict mode), then
   the **solidified** driver as in the build (Python port of Berry `berry_port`, `coc` string
   table, read-only native classes linked into a second interpreter). A solidification error or
   a write to a `static var` shows up there without waiting for the PlatformIO build. The

@@ -158,7 +158,9 @@ for 2). Then **`Restart 1`, required**: Google Home shows the new device straigh
 reconnects). Simplest: create all the endpoints, then a single `Restart 1`.
 
 On the driver side, an endpoint that does not exist yet is reported once, and the driver resends
-it the device state every 30 s until it accepts it.
+it the device state every 30 s until it accepts it. Without Matter (firmware built without it, or
+Matter disabled), the driver sends nothing to Matter: the devices are still controlled by
+command, rule and web page, and the page shows "Matter is not enabled".
 
 | `type` in `tuya.json` | Matter endpoint to create | Exchanged attributes |
 |---|---|---|
@@ -302,7 +304,7 @@ It no longer appears in Smart Life; remove it from `tuya.json` if it was there.
 ## Tests
 
 `berry/test/run_tests.sh <Tasmota repository>` compiles Tasmota's Berry interpreter with
-Tasmota's BearSSL encryption, and runs 20 scenarios against fake Tuya devices built on
+Tasmota's BearSSL encryption, and runs 21 scenarios against fake Tuya devices built on
 [TinyTuya](https://github.com/jasonacox/tinytuya) (3.3, 3.4, 3.5, Zigbee gateway): key
 negotiation, Matter commands, state feedback, readings, disconnection and reconnection,
 corrupted or fragmented frames, Matter endpoint created later, API, discovery (announcements in
