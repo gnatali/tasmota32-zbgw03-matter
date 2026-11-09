@@ -219,6 +219,7 @@ Wi-Fi devices and the Zigbee sub-devices of the Tuya gateway, and expose them to
 | … after a discovery then `Br tasmota.gc()` | 55 KB |
 | Run 13, just before the driver starts (`autoexec.be`) | 73 KB |
 | … driver started, 3 devices connected, readings at 5, 10 and 12 min (`STATE`, `Status 4`) | 56, 62, 60 KB |
+| Run 21 (Tasmota 16.0.0.3, driver started at boot without `autoexec.be`), uptime 2 h 47 (number of devices and endpoints to be confirmed) | **46 KB** |
 
 With the 12 devices connected, the driver used about **40 KB** when loaded from the file
 system (74 − 34: code compiled into RAM, device state, buffers), and about **23 KB** solidified

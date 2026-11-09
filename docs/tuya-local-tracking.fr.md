@@ -231,6 +231,7 @@ Tuya Wi-Fi et les sous-appareils Zigbee de la passerelle Tuya, et les présenter
 | … après une recherche puis `Br tasmota.gc()` | 55 Ko |
 | Exécution 13, juste avant le démarrage du driver (`autoexec.be`) | 73 Ko |
 | … driver démarré, 3 appareils connectés, relevés à 5, 10 et 12 min (`STATE`, `Status 4`) | 56, 62, 60 Ko |
+| Exécution 21 (Tasmota 16.0.0.3, driver démarré au boot sans `autoexec.be`), uptime 2 h 47 (nombre d'appareils et d'endpoints à confirmer) | **46 Ko** |
 
 Avec les 12 appareils connectés, le driver consommait environ **40 Ko** chargé depuis le
 système de fichiers (74 − 34 : code compilé en RAM, état des appareils, tampons), et environ
