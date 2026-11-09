@@ -231,7 +231,7 @@ Tuya Wi-Fi et les sous-appareils Zigbee de la passerelle Tuya, et les présenter
 | … après une recherche puis `Br tasmota.gc()` | 55 Ko |
 | Exécution 13, juste avant le démarrage du driver (`autoexec.be`) | 73 Ko |
 | … driver démarré, 3 appareils connectés, relevés à 5, 10 et 12 min (`STATE`, `Status 4`) | 56, 62, 60 Ko |
-| Exécution 21 (Tasmota 16.0.0.3, driver démarré au boot sans `autoexec.be`), uptime 2 h 47 (nombre d'appareils et d'endpoints à confirmer) | **46 Ko** |
+| Exécution 21 (Tasmota 16.0.0.3, driver démarré au boot sans `autoexec.be`), uptime 2 h 47, **11 appareils connectés** (4 connexions TCP : Ventilateur, Entrée-Porche, Récepteur radio, passerelle Tuya avec 7 sous-appareils), 1 endpoint Matter | **46 Ko** |
 
 Avec les 12 appareils connectés, le driver consommait environ **40 Ko** chargé depuis le
 système de fichiers (74 − 34 : code compilé en RAM, état des appareils, tampons), et environ
@@ -242,6 +242,14 @@ soit ~2 Ko par appareil en moyenne : il croît avec le nombre d'appareils connec
 reçus (pince : 22 DP, passerelle : 7 sous-appareils). Avec 3 appareils, 10 Ko (71 → 61).
 Les 48 Ko incluent l'endpoint Matter `Entrée-Porche`. Il n'y a pas eu de mesure après
 `Br tasmota.gc()`.
+
+**Firmware de l'exécution 21** (toutes les fonctions : page, recherche, imports, démarrage au
+boot) : 46 Ko avec 11 appareils connectés (4 connexions TCP, 7 sous-appareils de la passerelle)
+et 1 endpoint Matter, proche des 48 Ko mesurés avec 12 appareils sur le premier firmware
+solidifié (5 connexions TCP) : les fonctions ajoutées depuis coûtent au plus quelques Ko au
+repos. Le driver garde tous les DP reçus, même inutilisés (par exemple le DP 44 du récepteur
+radio et les 11 DP des prises) : l'étape 3 (« ne garder que les DP utilisés ») est là où la RAM
+peut encore être économisée.
 
 **Firmware de l'exécution 13** : la recherche coûte ~2 Ko le temps qu'elle dure, entièrement
 rendus après `Br tasmota.gc()` (pas de fuite). Au repos, le heap **varie de 56 à 62 Ko**

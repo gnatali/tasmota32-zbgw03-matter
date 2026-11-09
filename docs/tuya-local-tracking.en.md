@@ -219,7 +219,7 @@ Wi-Fi devices and the Zigbee sub-devices of the Tuya gateway, and expose them to
 | … after a discovery then `Br tasmota.gc()` | 55 KB |
 | Run 13, just before the driver starts (`autoexec.be`) | 73 KB |
 | … driver started, 3 devices connected, readings at 5, 10 and 12 min (`STATE`, `Status 4`) | 56, 62, 60 KB |
-| Run 21 (Tasmota 16.0.0.3, driver started at boot without `autoexec.be`), uptime 2 h 47 (number of devices and endpoints to be confirmed) | **46 KB** |
+| Run 21 (Tasmota 16.0.0.3, driver started at boot without `autoexec.be`), uptime 2 h 47, **11 devices connected** (4 TCP connections: Ventilateur, Entrée-Porche, Récepteur radio, Tuya gateway with 7 sub-devices), 1 Matter endpoint | **46 KB** |
 
 With the 12 devices connected, the driver used about **40 KB** when loaded from the file
 system (74 − 34: code compiled into RAM, device state, buffers), and about **23 KB** solidified
@@ -229,6 +229,13 @@ system (74 − 34: code compiled into RAM, device state, buffers), and about **2
 grows with the number of connected devices and of received DPs (clamp: 22 DPs, gateway: 7
 sub-devices). With 3 devices, 10 KB (71 → 61). The 48 KB include the `Entrée-Porche` Matter
 endpoint. There was no measurement after `Br tasmota.gc()`.
+
+**Run 21 firmware** (all the features: page, discovery, imports, start at boot): 46 KB with
+11 devices connected (4 TCP connections, 7 gateway sub-devices) and 1 Matter endpoint, close to
+the 48 KB measured with 12 devices on the first solidified firmware (5 TCP connections): the
+features added since then cost at most a few KB at rest. The driver keeps every received DP,
+including unused ones (e.g. the radio receiver's DP 44 and the plugs' 11 DPs): next step 3
+("only keep the DPs used") is where RAM can still be saved.
 
 **Run 13 firmware**: the discovery costs ~2 KB while it runs, all given back after
 `Br tasmota.gc()` (no leak). At rest, the heap **varies from 56 to 62 KB** from one reading
