@@ -263,6 +263,7 @@ Wi-Fi devices and the Zigbee sub-devices of the Tuya gateway, and expose them to
 | … run 21, after opening the Tuya Local page (crash, entry 21) | 29 KB (Berry `HeapUsed` 76 KB) |
 | Run 22 (page reads `tuya.json` entry by entry), same configuration, after boot | **54 KB** (Berry `HeapUsed` 57 KB) |
 | … after several loads of the Tuya Local page | **49 KB** (Berry `HeapUsed` 57 KB): no more crash |
+| Run 23 (only the DPs used, codes out of RAM, disable without deleting), **several devices disabled** (smaller configuration, not directly comparable) | **59 KB** (Berry `HeapUsed` 46 KB) |
 
 With the 12 devices connected, the driver used about **40 KB** when loaded from the file
 system (74 − 34: code compiled into RAM, device state, buffers), and about **23 KB** solidified

@@ -280,6 +280,7 @@ Tuya Wi-Fi et les sous-appareils Zigbee de la passerelle Tuya, et les présenter
 | … exécution 21, après ouverture de la page Tuya Local (plantage, entrée 21) | 29 Ko (`HeapUsed` Berry 76 Ko) |
 | Exécution 22 (page qui lit `tuya.json` entrée par entrée), même configuration, après le démarrage | **54 Ko** (`HeapUsed` Berry 57 Ko) |
 | … après plusieurs chargements de la page Tuya Local | **49 Ko** (`HeapUsed` Berry 57 Ko) : plus de plantage |
+| Exécution 23 (DP utilisés seulement, codes hors RAM, désactivation sans suppression), **plusieurs appareils désactivés** (configuration réduite, pas directement comparable) | **59 Ko** (`HeapUsed` Berry 46 Ko) |
 
 Avec les 12 appareils connectés, le driver consommait environ **40 Ko** chargé depuis le
 système de fichiers (74 − 34 : code compilé en RAM, état des appareils, tampons), et environ
