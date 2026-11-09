@@ -134,6 +134,17 @@ l'instance existe toujours, et le travail est différé :
 
 ## 4. Fichier de configuration et API
 
+- **Désactiver sans supprimer** : `"enabled": false` sur un appareil (ignoré par
+  `load_config()`), un sous-appareil de passerelle (`children`, ignoré par `TuyaDevice.init()`)
+  ou une entrée `matter` (pas de `TuyaBinding`, donc pas de `MtrUpdate` ni de nouvel essai
+  « Invalid Device »). `set_active(noms, on, portée)` l'ajoute ou le retire dans `tuya.json`
+  (portée `"dev"` : appareils et sous-appareils, par nom ou identifiant ; `"ep"` : liaisons, par
+  nom d'endpoint ; `nil` pour `TuyaActive` : appareils d'abord, liaisons si aucun appareil ne
+  correspond), puis `reload()`. Enregistrer, supprimer et importer appellent aussi `reload()`,
+  qui ne recharge que si le driver tourne (un driver désactivé reconnectait les appareils).
+- **Seuls les appareils Wi-Fi ouvrent une connexion** : un `TuyaDevice` (un `tcpclientasync`)
+  par entrée principale de `tuya.json` ; les sous-appareils de passerelle sont des `TuyaNode`
+  qui passent par la connexion de leur passerelle (vérifié par le scénario 1).
 - **DP gardés en RAM** : `TuyaNode.dps` ne garde que les booléens (pour `toggle`) et les DP
   listés dans `keep`, une chaîne courte (`",20,60,62,"`) construite à partir de
   `TuyaBinding.dps_used()` (les DP lus par `to_matter()`, valeurs par défaut comprises), des
@@ -283,10 +294,12 @@ Reprise de `tinytuya.Cloud` (`Cloud.py`) :
   redirection vers `/tuya` (ou `/?rst=` pour redémarrer après la création d'endpoints).
 - Endpoints Matter : `matter_names()` lit `matter_device.plugins_config` (nom en minuscules →
   numéro d'endpoint) ; `matter_status()` donne chaque liaison (une par nom d'endpoint) avec son
-  numéro d'endpoint ou `nil`, que la page liste ; `matter_missing()` garde les `nil`. La page
-  nomme les cases des manquants `m0`, `m1`... (valeur : nom de l'endpoint), et le formulaire
-  passe les noms cochés à `matter_create(only)` (`nil` : tous, comme `TuyaMatter` sans
-  argument), qui appelle
+  numéro d'endpoint ou `nil`, que la page liste, suivie des liaisons désactivées dans
+  `tuya.json` (`matter_disabled()`, lu entrée par entrée) ; `matter_missing()` garde les `nil`.
+  Chaque ligne a une case `m0`, `m1`... (valeur : nom de l'endpoint ; `mn` : leur nombre). Le
+  formulaire passe les noms cochés à `matter_create(only)` (**Create** : seulement les
+  manquants ; `nil` : tous, comme `TuyaMatter` sans argument) ou à `set_active(noms, on, "ep")`
+  (**Disable** / **Enable**). `matter_create` appelle
   `matter_device.bridge_add_endpoint(<type v_...>, {"name": <ep>})` (API interne de Matter, celle
   de sa propre page de configuration).
 
@@ -335,6 +348,7 @@ appareils (`fake_tuya.py`) et les annonces UDP (`udp_broadcast()`, vérifiées p
 | 21 | firmware sans Matter, ou Matter désactivé : pas de `MtrUpdate`, rien en attente, la page et `TuyaMatter` le signalent ; `TuyaEnable 0` ferme les connexions |
 | 22 | gros `tuya.json` (60 entrées de plus, > 30 Ko) : page, édition et rechargement le lisent entrée par entrée ; ramasse-miettes après la page |
 | 23 | RAM : seuls les DP utilisés sont gardés (liaisons, relevés, booléens, `keep`) mais tous sont publiés ; `TuyaSend` par code lit les codes dans `tuya.json` (sous-appareil de passerelle compris) |
+| 24 | désactiver sans supprimer : une liaison Matter (`TuyaActive`, plus de `MtrUpdate`, ⏸️ dans la liste, réactivée depuis la page), un appareil depuis sa page d'édition (un appareil et un endpoint du même nom : seulement l'appareil), un sous-appareil de passerelle ; erreurs |
 
 Le workflow lance le banc avant la compilation ; il crée `/tuya.json`, `/tuya.json.bak`,
 `/devices.json` et `/tuya_cloud.json`, que le test écrit.
@@ -394,7 +408,7 @@ la configuration simplifiée ajoute 0,7 à 1,3 Ko au repos.
 | `platformio_override.ini` | `-DUSE_TUYA_LOCAL` (démarrage au boot) et `custom_berry_solidify` (driver en flash) |
 | `berry/test/run_tests.sh` | construction des deux interpréteurs, solidification, scénarios |
 | `berry/test/harness.be`, `webserver.be`, `crypto.be`, `persist.be` | simulations de Tasmota |
-| `berry/test/fake_tuya.py`, `test_tuya_local.py` | faux appareils, annonces UDP, 24 scénarios (0 à 23) |
+| `berry/test/fake_tuya.py`, `test_tuya_local.py` | faux appareils, annonces UDP, 25 scénarios (0 à 24) |
 | `.github/workflows/build.yml` | fichiers écrits par les tests |
 | `docs/tuya-local.fr.md` / `.en.md` | documentation d'utilisation |
 | `docs/tuya-local-examples.fr.md` / `.en.md` | exemples de commandes et d'événements |

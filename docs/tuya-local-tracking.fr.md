@@ -240,7 +240,20 @@ Tuya Wi-Fi et les sous-appareils Zigbee de la passerelle Tuya, et les présenter
     surtout une case de table), d'où une chaîne courte par nœud. Banc avec la configuration de
     Guillaume (11 nœuds, vraies valeurs de DP de son `TuyaStatus`) : 75 → 33 DP gardés,
     11,8 → 10,5 Ko (64 bits), environ −0,7 Ko sur l'ESP32. Scénario 23 (il échoue sans le
-    filtre) : 24/24 dans les deux modes. **Pas encore de build.**
+    filtre) : 24/24 dans les deux modes.
+
+23. **Désactiver sans supprimer ; seuls les appareils Wi-Fi se connectent** (9 novembre) :
+    vérifié que seuls les appareils Wi-Fi (entrées principales) ouvrent une connexion TCP, les
+    sous-appareils de passerelle passant par celle de leur passerelle (4 connexions avec la
+    configuration de Guillaume ; le scénario 1 le vérifie désormais). `"enabled": false` vaut
+    maintenant aussi pour un sous-appareil de passerelle et pour une liaison `matter` (par
+    exemple `Récepteur radio 3` / `4`, dont les endpoints ont été supprimés : plus de « Invalid
+    Device (retry every 30 s) »). Nouvelle commande `TuyaActive <nom>[,...],<0|1>` ; sur la
+    page, un bouton ⏸️ Disable / ▶️ Enable sur la page d'édition, et une case sur chaque ligne de
+    la liste Matter avec Create / Disable / Enable pour les lignes cochées (liaisons désactivées
+    listées avec ⏸️). Corrigé : enregistrer, supprimer ou importer rechargeait la configuration
+    même avec le driver désactivé. Scénario 24 : 25/25 dans les deux modes ; page vérifiée à
+    340 px.
 
 ## Mesures sur la passerelle
 

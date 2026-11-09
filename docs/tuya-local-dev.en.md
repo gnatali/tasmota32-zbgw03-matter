@@ -130,6 +130,16 @@ the instance always exists, and the work is deferred:
 
 ## 4. Configuration file and API
 
+- **Disable without deleting**: `"enabled": false` on a device (skipped by `load_config()`), a
+  gateway sub-device (`children`, skipped by `TuyaDevice.init()`) or a `matter` entry (no
+  `TuyaBinding`, so no `MtrUpdate` and no "Invalid Device" retry). `set_active(names, on,
+  scope)` sets or removes it in `tuya.json` (scope `"dev"`: devices and sub-devices, by name
+  or id; `"ep"`: bindings, by endpoint name; `nil` for `TuyaActive`: devices first, bindings if
+  no device matches), then `reload()`. Saving, deleting and importing also call `reload()`,
+  which only reloads when the driver runs (a disabled driver used to reconnect the devices).
+- **Only Wi-Fi devices open a connection**: one `TuyaDevice` (one `tcpclientasync`) per
+  top-level entry of `tuya.json`; gateway sub-devices are `TuyaNode`s that go through their
+  gateway's connection (checked by scenario 1).
 - **DPs kept in RAM**: `TuyaNode.dps` only keeps booleans (for `toggle`) and the DPs listed in
   `keep`, a short string (`",20,60,62,"`) built from `TuyaBinding.dps_used()` (the DPs read by
   `to_matter()`, defaults included), the sensors and the `"keep"` option (list, or `"all"`). A
@@ -274,10 +284,12 @@ Ported from `tinytuya.Cloud` (`Cloud.py`):
   redirect to `/tuya` (or `/?rst=` to restart after creating endpoints).
 - Matter endpoints: `matter_names()` reads `matter_device.plugins_config` (lower-case name →
   endpoint number); `matter_status()` gives each binding (one per endpoint name) with its
-  endpoint number or `nil`, which the page lists; `matter_missing()` keeps the `nil` ones. The
-  page names the missing ones' checkboxes `m0`, `m1`... (value: endpoint name), and the post
-  passes the ticked names to `matter_create(only)` (`nil`: all of them, as `TuyaMatter`
-  without argument), which calls
+  endpoint number or `nil`, which the page lists, followed by the bindings disabled in
+  `tuya.json` (`matter_disabled()`, read entry by entry); `matter_missing()` keeps the `nil`
+  ones. Every row has a checkbox `m0`, `m1`... (value: endpoint name; `mn`: their number). The
+  post passes the ticked names to `matter_create(only)` (**Create**: missing ones only; `nil`:
+  all of them, as `TuyaMatter` without argument) or to `set_active(names, on, "ep")`
+  (**Disable** / **Enable**). `matter_create` calls
   `matter_device.bridge_add_endpoint(<v_... type>, {"name": <ep>})` (Matter's internal API, the
   one its own configuration page uses).
 
@@ -325,6 +337,7 @@ announcements (`udp_broadcast()`, checked with `decrypt_udp()`) are built with T
 | 21 | firmware without Matter, or Matter disabled: no `MtrUpdate`, nothing pending, page and `TuyaMatter` report it; `TuyaEnable 0` closes the connections |
 | 22 | large `tuya.json` (60 more entries, > 30 KB): page, editor and reload read it entry by entry; garbage collected after the page |
 | 23 | RAM: only the DPs used are kept (bindings, sensors, booleans, `keep`) but all are published; `TuyaSend` by code reads the codes from `tuya.json` (gateway sub-device included) |
+| 24 | disable without deleting: a Matter binding (`TuyaActive`, no more `MtrUpdate`, ⏸️ in the list, enabled back from the page), a device from its edit page (a device and an endpoint with the same name: only the device), a gateway sub-device; errors |
 
 The workflow runs the bench before compiling; it creates `/tuya.json`, `/tuya.json.bak`,
 `/devices.json` and `/tuya_cloud.json`, which the test writes.
@@ -384,7 +397,7 @@ simplified configuration adds 0.7 to 1.3 KB at rest.
 | `platformio_override.ini` | `-DUSE_TUYA_LOCAL` (start at boot) and `custom_berry_solidify` (driver in flash) |
 | `berry/test/run_tests.sh` | builds the two interpreters, solidification, scenarios |
 | `berry/test/harness.be`, `webserver.be`, `crypto.be`, `persist.be` | Tasmota mocks |
-| `berry/test/fake_tuya.py`, `test_tuya_local.py` | fake devices, UDP announcements, 24 scenarios (0 to 23) |
+| `berry/test/fake_tuya.py`, `test_tuya_local.py` | fake devices, UDP announcements, 25 scenarios (0 to 24) |
 | `.github/workflows/build.yml` | files written by the tests |
 | `docs/tuya-local.en.md` / `.fr.md` | user guide |
 | `docs/tuya-local-examples.fr.md` / `.en.md` | command and event examples |

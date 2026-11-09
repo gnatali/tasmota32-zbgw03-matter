@@ -111,6 +111,7 @@ pictograms for the actions.
 - **Tuya devices**: name, IP, version and state of each `tuya.json` entry (🟢 connected,
   🔴 disconnected, ⚪ disabled, ⚠ incomplete). **📝** opens the entry as JSON (same format as the
   file): the key is replaced by `***`, and a key left as `***` is kept when saving (**💾 Save**;
+  **⏸️ Disable** sets the device aside without deleting it, **▶️ Enable** turns it back on;
   **🔥 Delete** removes the device). **➕ Add device** offers a template. Each save keeps the
   previous version in `/tuya.json.bak`, then reloads the configuration. **🔄 Reload tuya.json**
   reads the file again.
@@ -139,11 +140,13 @@ pictograms for the actions.
   metering, multi-gang switches, temperature and humidity sensor, energy meter) and the `codes`
   table of its DPs. An already configured device keeps its bindings: only its key, IP and
   version are updated. A device without a known IP is added with `"enabled": false`.
-- **Matter endpoints**: one row per binding, like the device list: endpoint name, Matter type
-  and, when the endpoint exists (same name, case-insensitive), ✅ and its number. A missing
-  endpoint has a checkbox (the header checkbox ticks them all). **➕ Create and restart**
-  creates the ticked endpoints only (types in the table below), then restarts Tasmota, which
-  Google Home needs.
+- **Matter endpoints**: one row per binding, like the device list, with a checkbox (the header
+  checkbox ticks them all): endpoint name, Matter type and its state: ✅ and its number when the
+  endpoint exists (same name, case-insensitive), ⚠ when it is missing, ⏸️ when the binding is
+  disabled. On the ticked rows: **➕ Create and restart** creates the missing endpoints (types
+  in the table below), then restarts Tasmota, which Google Home needs; **⏸️ Disable** disables
+  the bindings without deleting them (no more updates to Matter, no more "Invalid Device
+  (retry every 30 s)" for an endpoint you do not want); **▶️ Enable** turns them back on.
 
 ## Creating the Matter endpoints
 
@@ -199,7 +202,9 @@ exists: `TUY: Matter endpoint 'xxx' available, state sent`.
 
 **Device** (TCP connection): `name`, `id`, `key`, `ip`, `version` (`"3.3"`, `"3.4"` or
 `"3.5"`), and `"enabled": false` to set it aside. A Tuya gateway declares its sub-devices in
-`children` (`name`, `id`, `cid` = `node_id` from `devices.json`). To save RAM, the driver only
+`children` (`name`, `id`, `cid` = `node_id` from `devices.json`). `"enabled": false` also
+works on a sub-device and on a `matter` entry: it is kept in the file but ignored (page,
+`TuyaActive`). To save RAM, the driver only
 keeps the values of the DPs it uses (those of the `matter` bindings and `sensors`, plus every
 boolean DP for `toggle`); `"keep": [63, 64]` keeps others, `"keep": "all"` keeps them all. The
 other DPs are still published in the `Tuya` event (rules can use them), but `TuyaStatus` does
@@ -232,6 +237,7 @@ The meaning of each device's DPs is in the `mapping` of `devices.json` (`code`, 
 |---|---|
 | `TuyaStatus [device]` | Connection state and last values of each device (or of one): the DPs kept (used ones, booleans, `keep`) |
 | `TuyaSend <device>,<dp>,<value>` | Sends a value, for example `TuyaSend Ventilateur,60,true` or `TuyaSend Ventilateur,62,3`. The DP can also be a code (`TuyaSend Lampe,switch_led,true`) if the device has a `codes` table (import). `toggle` inverts a boolean DP: `TuyaSend Entrée-Porche,20,toggle` |
+| `TuyaActive <name>[,<name>...],<0\|1>` | Disables (`0`) or enables (`1`) without deleting them devices, gateway sub-devices (name or id) or, if no device has that name, Matter bindings (endpoint name): `TuyaActive Récepteur radio 3,Récepteur radio 4,0` → `{"TuyaActive":{"Disabled":["Récepteur radio 3","Récepteur radio 4"]}}` |
 | `TuyaEnable [0\|1]` | Enables or disables the driver (kept across restarts), like the page's checkbox; without argument, gives the state: `{"TuyaEnable":{"Enabled":true,"State":"running"}}` (`State`: `running`, `disabled`, `waiting for Zigbee`...) |
 | `TuyaReload` | Reloads `tuya.json` and reconnects the devices (driver running only) |
 | `TuyaConfig [device]` | Configuration (`tuya.json`) **without the keys**, or that of one device |
@@ -311,7 +317,7 @@ It no longer appears in Smart Life; remove it from `tuya.json` if it was there.
 ## Tests
 
 `berry/test/run_tests.sh <Tasmota repository>` compiles Tasmota's Berry interpreter with
-Tasmota's BearSSL encryption, and runs 24 scenarios against fake Tuya devices built on
+Tasmota's BearSSL encryption, and runs 25 scenarios against fake Tuya devices built on
 [TinyTuya](https://github.com/jasonacox/tinytuya) (3.3, 3.4, 3.5, Zigbee gateway): key
 negotiation, Matter commands, state feedback, readings, disconnection and reconnection,
 corrupted or fragmented frames, Matter endpoint created later, API, discovery (announcements in

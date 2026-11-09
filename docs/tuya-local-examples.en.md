@@ -223,6 +223,24 @@ TuyaMatter Lampe bureau,Ventilateur
 {"TuyaMatter":{"Added":["Lampe bureau"],"Restart":"Restart 1 so that Google Home sees them"}}
 ```
 
+**Disable without deleting** a binding whose Matter endpoint you do not want (no more
+`TUY: Matter endpoint 'Récepteur radio 3': Invalid Device (retry every 30 s)`), a device or a
+gateway sub-device (`"enabled": false` in `tuya.json`), then turn it back on:
+
+```
+TuyaActive Récepteur radio 3,Récepteur radio 4,0
+TuyaActive Chauffage,0
+TuyaActive Récepteur radio 3,1
+```
+```json
+{"TuyaActive":{"Disabled":["Récepteur radio 3","Récepteur radio 4"]}}
+{"TuyaActive":{"Disabled":["Chauffage"]}}
+{"TuyaActive":{"Enabled":["Récepteur radio 3"]}}
+```
+
+A device name is looked for first: `TuyaActive Ventilateur,0` disables the device, not its
+`Ventilateur` endpoint (to disable only the endpoint: **⏸️ Disable** in the page's Matter list).
+
 Then `Restart 1`: without a restart, Google Home shows the new devices offline.
 
 **What the driver does**: a Google Home command arrives as an `MtrReceived` event and goes to

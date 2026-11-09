@@ -218,6 +218,25 @@ TuyaMatter Lampe bureau,Ventilateur
 {"TuyaMatter":{"Added":["Lampe bureau"],"Restart":"Restart 1 so that Google Home sees them"}}
 ```
 
+**Désactiver sans supprimer** une liaison dont on ne veut pas l'endpoint Matter (plus de
+`TUY: Matter endpoint 'Récepteur radio 3': Invalid Device (retry every 30 s)`), un appareil ou
+un sous-appareil de passerelle (`"enabled": false` dans `tuya.json`), puis le réactiver :
+
+```
+TuyaActive Récepteur radio 3,Récepteur radio 4,0
+TuyaActive Chauffage,0
+TuyaActive Récepteur radio 3,1
+```
+```json
+{"TuyaActive":{"Disabled":["Récepteur radio 3","Récepteur radio 4"]}}
+{"TuyaActive":{"Disabled":["Chauffage"]}}
+{"TuyaActive":{"Enabled":["Récepteur radio 3"]}}
+```
+
+Un nom d'appareil est cherché en premier : `TuyaActive Ventilateur,0` désactive l'appareil, pas
+son endpoint `Ventilateur` (pour ne désactiver que l'endpoint : **⏸️ Disable** dans la liste
+Matter de la page).
+
 Puis `Restart 1` : sans redémarrage, Google Home affiche les nouveaux appareils hors ligne.
 
 **Ce que fait le driver** : une commande de Google Home arrive par l'événement `MtrReceived`

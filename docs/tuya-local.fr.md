@@ -113,7 +113,8 @@ des commandes, les réponses et le journal sont aussi en anglais.
 - **Tuya devices** : nom, IP, version et état de chaque entrée de `tuya.json` (🟢 connecté,
   🔴 déconnecté, ⚪ désactivé, ⚠ incomplet). **📝** ouvre l'entrée en JSON (même format que le
   fichier) : la clé y est remplacée par `***`, et une clé laissée à `***` est conservée à
-  l'enregistrement (**💾 Save** ; **🔥 Delete** supprime l'appareil). **➕ Add device** propose
+  l'enregistrement (**💾 Save** ; **⏸️ Disable** met l'appareil de côté sans le supprimer,
+  **▶️ Enable** le réactive ; **🔥 Delete** supprime l'appareil). **➕ Add device** propose
   un modèle. Chaque enregistrement garde l'ancienne version dans `/tuya.json.bak`, puis recharge
   la configuration. **🔄 Reload tuya.json** relit le fichier.
 - **Network discovery → 🔍 Discover devices (20 s)** : écoute les annonces des appareils Wi-Fi sur le réseau
@@ -143,11 +144,14 @@ nouveau). La passerelle et les
   la table `codes` de ses DP. Un appareil déjà configuré garde ses liaisons : seules sa clé, son
   IP et sa version sont mises à jour. Un appareil sans IP connue est ajouté avec
   `"enabled": false`.
-- **Matter endpoints** : une ligne par liaison, comme la liste des appareils : nom de
-  l'endpoint, type Matter et, si l'endpoint existe (même nom, sans tenir compte de la casse), ✅
-  et son numéro. Un endpoint manquant a une case à cocher (la case de l'en-tête les coche
-  toutes). **➕ Create and restart** crée seulement les endpoints cochés (types du tableau
-  ci-dessous), puis redémarre Tasmota, ce qui est nécessaire pour Google Home.
+- **Matter endpoints** : une ligne par liaison, comme la liste des appareils, avec une case à
+  cocher (celle de l'en-tête les coche toutes) : nom de l'endpoint, type Matter et son état : ✅
+  et son numéro si l'endpoint existe (même nom, sans tenir compte de la casse), ⚠ s'il manque,
+  ⏸️ si la liaison est désactivée. Sur les lignes cochées : **➕ Create and restart** crée les
+  endpoints manquants (types du tableau ci-dessous), puis redémarre Tasmota, ce qui est
+  nécessaire pour Google Home ; **⏸️ Disable** désactive les liaisons sans les supprimer (plus de
+  mise à jour vers Matter, plus de « Invalid Device (retry every 30 s) » pour un endpoint dont
+  on ne veut pas) ; **▶️ Enable** les réactive.
 
 ## Créer les endpoints Matter
 
@@ -204,7 +208,9 @@ l'endpoint existe : `TUY: Matter endpoint 'xxx' available, state sent`.
 
 **Appareil** (connexion TCP) : `name`, `id`, `key`, `ip`, `version` (`"3.3"`, `"3.4"` ou
 `"3.5"`), et `"enabled": false` pour le mettre de côté. Une passerelle Tuya déclare ses
-sous-appareils dans `children` (`name`, `id`, `cid` = `node_id` de `devices.json`). Pour
+sous-appareils dans `children` (`name`, `id`, `cid` = `node_id` de `devices.json`).
+`"enabled": false` vaut aussi pour un sous-appareil et pour une entrée `matter` : elle reste
+dans le fichier mais est ignorée (page, `TuyaActive`). Pour
 économiser la RAM, le driver ne garde que les valeurs des DP qu'il utilise (ceux des liaisons
 `matter` et des `sensors`, plus tous les DP booléens pour `toggle`) ; `"keep": [63, 64]` en garde
 d'autres, `"keep": "all"` les garde tous. Les autres DP sont toujours publiés dans l'événement
@@ -238,6 +244,7 @@ La signification des DP de chaque appareil se trouve dans `mapping` de `devices.
 |---|---|
 | `TuyaStatus [appareil]` | État des connexions et dernières valeurs de chaque appareil (ou d'un seul) : les DP gardés (utilisés, booléens, `keep`) |
 | `TuyaSend <appareil>,<dp>,<valeur>` | Envoie une valeur, par exemple `TuyaSend Ventilateur,60,true` ou `TuyaSend Ventilateur,62,3`. Le DP peut aussi être un code (`TuyaSend Lampe,switch_led,true`) si l'appareil a une table `codes` (import). `toggle` inverse un DP booléen : `TuyaSend Entrée-Porche,20,toggle` |
+| `TuyaActive <nom>[,<nom>...],<0\|1>` | Désactive (`0`) ou réactive (`1`) sans les supprimer des appareils, des sous-appareils de passerelle (nom ou identifiant) ou, si aucun appareil ne porte ce nom, des liaisons Matter (nom d'endpoint) : `TuyaActive Récepteur radio 3,Récepteur radio 4,0` → `{"TuyaActive":{"Disabled":["Récepteur radio 3","Récepteur radio 4"]}}` |
 | `TuyaEnable [0\|1]` | Active ou désactive le driver (gardé d'un redémarrage à l'autre), comme la case de la page ; sans argument, donne l'état : `{"TuyaEnable":{"Enabled":true,"State":"running"}}` (`State` : `running`, `disabled`, `waiting for Zigbee`...) |
 | `TuyaReload` | Relit `tuya.json` et reconnecte les appareils (driver démarré seulement) |
 | `TuyaConfig [appareil]` | Configuration (`tuya.json`) **sans les clés**, ou celle d'un appareil |
@@ -320,7 +327,7 @@ Il n'apparaît plus dans Smart Life, et le retirer de `tuya.json` s'il y figurai
 ## Tests
 
 `berry/test/run_tests.sh <dépôt Tasmota>` compile l'interpréteur Berry de Tasmota avec le
-chiffrement BearSSL de Tasmota, et joue 24 scénarios contre de faux appareils Tuya construits
+chiffrement BearSSL de Tasmota, et joue 25 scénarios contre de faux appareils Tuya construits
 sur [TinyTuya](https://github.com/jasonacox/tinytuya) (3.3, 3.4, 3.5, passerelle Zigbee) :
 négociation de clé, commandes Matter, retours d'état, mesures, coupure et reconnexion, trames
 corrompues ou fragmentées, endpoint Matter créé à chaud, API, recherche (annonces au format

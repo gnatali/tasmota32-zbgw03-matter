@@ -10,7 +10,8 @@
   Configuration -> Tuya Local web page (/tuya)
   Commands: TuyaStatus [device], TuyaSend <device>,<dp or code>,<value|toggle>, TuyaReload,
     TuyaConfig [device], TuyaAdd <json>, TuyaDel <device>, TuyaScan [s],
-    TuyaImport [file] [all|id,...], TuyaCloud [json], TuyaMatter [name,...]
+    TuyaImport [file] [all|id,...], TuyaCloud [json], TuyaMatter [name,...], TuyaEnable [0|1],
+    TuyaActive <device or endpoint>[,...],<0|1>
 
   Requires a firmware with USE_BERRY_CRYPTO_AES_CBC (3.3, 3.4) and the 128-bit AES_GCM with
   AAD patch (3.5).
@@ -416,7 +417,7 @@ class TuyaNode
     # the "codes" table (import) is not kept in RAM (~0.3 KB per device): TuyaSend by code reads
     # it from tuya.json when needed (TuyaLocal.code_dp)
     for m: conf.find("matter", [])
-      self.bindings.push(TuyaBinding(self, m))
+      if m.find("enabled", true) != false  self.bindings.push(TuyaBinding(self, m))  end   # disabled: kept in tuya.json only
     end
     # RAM: only the DPs used are kept (bindings, sensor readings, "keep", booleans for toggle);
     # devices send many others (timers, scenes, settings), some as long strings. The set is one
@@ -498,6 +499,7 @@ class TuyaDevice : TuyaNode
     self.key = bytes().fromstring(conf["key"])
     self.children = {}
     for c: conf.find("children", [])
+      if c.find("enabled", true) == false  continue  end      # disabled sub-device
       var n = TuyaNode(self, c)
       self.children[str(c["cid"])] = n
     end
@@ -1406,7 +1408,7 @@ class TuyaWeb
   # device state (TuyaLocal.state_of) -> pictogram and label
   static var STATES = {"connected": ["&#x1F7E2;", "connected"], "disconnected": ["&#x1F534;", "disconnected"],
                        "disabled": ["&#x26AA;", "disabled"], "ignored": ["&#x26A0;", "incomplete, ignored"],
-                       "stopped": ["&#x23F8;", "driver not running"]}
+                       "stopped": ["&#x23F8;&#xFE0F;", "driver not running"]}
   static var REGIONS = [["eu", "Central Europe"], ["we", "Western Europe"], ["us", "Western America"],
                         ["ue", "Eastern America"], ["cn", "China"], ["in", "India"], ["sg", "Singapore"]]
 
@@ -1538,50 +1540,66 @@ class TuyaWeb
                            TuyaWeb.esc(json.dump(d, "format")) + "</textarea>")
     webserver.content_send("<button name='save' class='button bgrn'>&#x1F4BE; Save</button></form>")
     if ref != ""
+      var on = d.find("enabled", true) != false
+      webserver.content_send("<p></p><form action='/tuya' method='post'><input type='hidden' name='ref' value='" + TuyaWeb.esc(ref) +
+                             "'><input type='hidden' name='active' value='" + (on ? "0" : "1") + "'><button>" +
+                             (on ? "&#x23F8;&#xFE0F; Disable (kept in tuya.json)" : "&#x25B6;&#xFE0F; Enable") + "</button></form>")
       webserver.content_send("<p></p><form action='/tuya' method='post' onsubmit='return confirm(\"Delete this device?\")'>" +
                              "<input type='hidden' name='ref' value='" + TuyaWeb.esc(ref) + "'><button name='del' class='button bred'>&#x1F525; Delete</button></form>")
     end
     webserver.content_send("<p></p><form action='/tuya' method='get'><button>&#x21A9; Back</button></form></fieldset><p></p>")
   end
 
-  # one row per binding, like the device list: created endpoint (number) or checkbox to create it
+  # one row per binding, like the device list, with a checkbox: created endpoint (number),
+  # missing endpoint, or binding disabled in tuya.json; create, disable or enable the selection
   static def matter(drv)
     import webserver
     TuyaWeb.legend("Matter endpoints")
     var rows = drv.running ? drv.matter_status() : nil
     if !drv.running
-      TuyaWeb.p("&#x23F8; Tuya Local is not running.")
+      TuyaWeb.p("&#x23F8;&#xFE0F; Tuya Local is not running.")
     elif rows == nil
       TuyaWeb.p("&#x26A0; Matter is not enabled.")
-    elif size(rows) == 0
-      TuyaWeb.p("No binding: add Tuya devices first.")
     else
+      var off = drv.matter_disabled()
+      if size(rows) == 0 && size(off) == 0
+        TuyaWeb.p("No binding: add Tuya devices first.")
+        webserver.content_send("</fieldset><p></p>")
+        return
+      end
       var nmiss = 0
       for r: rows
         if r[1] == nil  nmiss += 1  end
       end
-      var all = (nmiss > 1) ? "<input type='checkbox' title='all' onclick='for(var c of this.form.querySelectorAll(\"input[name^=m]\"))c.checked=this.checked'>" : ""
-      webserver.content_send("<form action='/tuya' method='post' onsubmit='return confirm(\"Create the selected endpoints and restart?\")'>" +
-                             "<table style='width:100%'>" + TuyaWeb.th([[all, 20], ["Endpoint", 150], ["Type", 90], ["#", 25]]))
+      var all = (size(rows) + size(off) > 1) ? "<input type='checkbox' title='all' onclick='for(var c of this.form.querySelectorAll(\"input[name^=m]\"))c.checked=this.checked'>" : ""
+      webserver.content_send("<form action='/tuya' method='post'><table style='width:100%'>" +
+                             TuyaWeb.th([[all, 20], ["Endpoint", 140], ["Type", 90], ["", 35]]))
       var i = 0
+      var row = def (ep, typ, state)
+        webserver.content_send("<tr><td><input type='checkbox' name='m" + str(i) + "' value='" + TuyaWeb.esc(ep) + "'></td><td>" +
+                               TuyaWeb.esc(ep) + "</td><td style='font-size:smaller;'>" + TuyaImport.MATTER_TYPES.find(typ, "?") +
+                               "</td><td style='font-size:smaller;'>" + state + "</td></tr>")
+        i += 1
+      end
       for r: rows
-        var b = r[0]
-        var cell = "<span title='created'>&#x2705;</span>"
-        if r[1] == nil
-          cell = "<input type='checkbox' name='m" + str(i) + "' value='" + TuyaWeb.esc(b.ep) + "'>"
-          i += 1
-        end
-        webserver.content_send("<tr><td>" + cell + "</td><td>" + TuyaWeb.esc(b.ep) + "</td><td style='font-size:smaller;'>" +
-                               TuyaImport.MATTER_TYPES.find(b.type, "?") + "</td><td style='font-size:smaller;'>" +
-                               (r[1] != nil ? str(r[1]) : "") + "</td></tr>")
+        row(r[0].ep, r[0].type, r[1] != nil ? "<span title='endpoint " + str(r[1]) + "'>&#x2705;" + str(r[1]) + "</span>" :
+                                              "<span title='missing'>&#x26A0;</span>")
       end
-      webserver.content_send("</table>")
+      for o: off  row(o[0], o[1], "<span title='disabled'>&#x23F8;&#xFE0F;</span>")  end
+      webserver.content_send("</table><input type='hidden' name='mn' value='" + str(i) + "'>")
+      var txt = []
       if nmiss > 0
-        TuyaWeb.p("&#x26A0; " + str(nmiss) + " missing: tick the endpoints to create.")
-        webserver.content_send("<button name='matter' class='button bgrn'>&#x2795; Create and restart</button>")
-      else
-        TuyaWeb.p("&#x2705; Every binding has its Matter endpoint.")
+        txt.push("&#x26A0; " + str(nmiss) + " missing")
+      elif size(rows) > 0
+        txt.push("&#x2705; Every active binding has its Matter endpoint")
       end
+      if size(off) > 0  txt.push("&#x23F8;&#xFE0F; " + str(size(off)) + " disabled")  end
+      TuyaWeb.p(txt.concat("; ") + ". Tick bindings, then:")
+      if nmiss > 0
+        webserver.content_send("<button name='matter' class='button bgrn' onclick='return confirm(\"Create the selected endpoints and restart?\")'>&#x2795; Create and restart</button><p></p>")
+      end
+      if size(rows) > 0  webserver.content_send("<button name='m_off'>&#x23F8;&#xFE0F; Disable</button><p></p>")  end
+      if size(off) > 0  webserver.content_send("<button name='m_on'>&#x25B6;&#xFE0F; Enable</button>")  end
       webserver.content_send("</form>")
     end
     webserver.content_send("</fieldset><p></p>")
@@ -1660,7 +1678,7 @@ class TuyaWeb
         msg = "Deleted: " + drv.del_device(webserver.arg("ref"))
       elif webserver.has_arg("reload")
         if !drv.running  raise "tuya_error", "Tuya Local is not running: " + drv.state()  end
-        drv.load_config()
+        drv.reload()
         msg = "tuya.json reloaded"
       elif webserver.has_arg("enable_save")
         drv.set_enabled(webserver.has_arg("enable"))
@@ -1672,19 +1690,27 @@ class TuyaWeb
       elif webserver.has_arg("cloud")
         msg = drv.cloud_start({"region": webserver.arg("region"), "id": webserver.arg("cid"),
                                "secret": webserver.arg("secret"), "save": webserver.has_arg("keep")})
-      elif webserver.has_arg("matter")
+      elif webserver.has_arg("matter") || webserver.has_arg("m_off") || webserver.has_arg("m_on")
         var sel = []
-        var miss = drv.matter_missing()
-        var n = (miss != nil) ? size(miss) : 0
+        var n = int(webserver.arg("mn"))
         var i = 0
         while i < n
           if webserver.has_arg("m" + str(i))  sel.push(webserver.arg("m" + str(i)))  end
           i += 1
         end
         if size(sel) == 0  raise "tuya_error", "no endpoint selected"  end
-        var added = drv.matter_create(sel)
-        msg = "Matter endpoints created: " + str(size(added)) + ", restarting"
-        rst = size(added) > 0
+        if webserver.has_arg("matter")
+          var added = drv.matter_create(sel)
+          if size(added) == 0  raise "tuya_error", "no missing endpoint selected"  end
+          msg = "Matter endpoints created: " + str(size(added)) + ", restarting"
+          rst = true
+        else
+          var on = webserver.has_arg("m_on")
+          msg = (on ? "Enabled: " : "Disabled: ") + drv.set_active(sel, on, "ep").concat(", ")
+        end
+      elif webserver.has_arg("active")
+        var on = webserver.arg("active") == "1"
+        msg = (on ? "Enabled: " : "Disabled: ") + drv.set_active([webserver.arg("ref")], on, "dev").concat(", ")
       end
     except .. as e, m
       msg = "Error: " + str(m)
@@ -1749,6 +1775,7 @@ class TuyaLocal
     tasmota.add_cmd("TuyaCloud", /c, i, p -> self.run_cmd("TuyaCloud", / -> self.cloud_json(p)))
     tasmota.add_cmd("TuyaMatter", /c, i, p -> self.run_cmd("TuyaMatter", / -> self.matter_cmd(p)))
     tasmota.add_cmd("TuyaEnable", /c, i, p -> self.run_cmd("TuyaEnable", / -> self.enable_cmd(p)))
+    tasmota.add_cmd("TuyaActive", /c, i, p -> self.run_cmd("TuyaActive", / -> self.active_cmd(p)))
     # web page: the driver starts after the web server, which therefore does not call web_add_handler()
     import webserver
     if webserver.state() > 0  self.web_add_handler()  end
@@ -1980,8 +2007,75 @@ class TuyaLocal
       devs[i] = d
     end
     self.write_conf(conf)
-    self.load_config()
+    self.reload()
     return d["name"]
+  end
+
+  # reloads tuya.json if the driver runs (otherwise it is read when it starts)
+  def reload()
+    if self.running  self.load_config()  end
+  end
+
+  # enables or disables, without deleting them, devices, gateway sub-devices or Matter bindings,
+  # designated by name (case-insensitive) or id: "enabled": false in tuya.json, then reload.
+  # scope "dev": devices and sub-devices only; "ep": bindings (endpoint names) only; nil: devices
+  # first, bindings if no device matches -> names changed
+  def set_active(names, on, scope)
+    import string
+    var want = {}
+    for n: names
+      var k = string.tolower(self.trim(str(n)))
+      if k != ""  want[k] = true  end
+    end
+    var conf = self.read_conf()
+    var done = []
+    var mark = def (e, label)
+      if on  e.remove("enabled")  else  e["enabled"] = false  end
+      done.push(label)
+    end
+    var hit = def (e)
+      return want.contains(string.tolower(str(e.find("name", "")))) || want.contains(string.tolower(str(e.find("id", ""))))
+    end
+    if scope != "ep"
+      for d: conf["devices"]
+        if hit(d)  mark(d, d.find("name", d.find("id")))  end
+        for ch: d.find("children", [])
+          if hit(ch)  mark(ch, ch.find("name", ch.find("id")))  end
+        end
+      end
+    end
+    if scope == "ep" || (scope == nil && size(done) == 0)
+      var eps = def (e)
+        for m: e.find("matter", [])
+          if want.contains(string.tolower(str(m.find("ep", e.find("name", "")))))  mark(m, m.find("ep", e.find("name")))  end
+        end
+      end
+      for d: conf["devices"]
+        eps(d)
+        for ch: d.find("children", [])  eps(ch)  end
+      end
+    end
+    if size(done) == 0  raise "tuya_error", "unknown device or endpoint"  end
+    self.write_conf(conf)
+    self.reload()
+    return done
+  end
+
+  # TuyaActive <device or endpoint>[,<device or endpoint>...],<0|1>
+  def active_cmd(p)
+    import string
+    var a = string.split(str(p), ",")
+    var f = string.tolower(self.trim(a[-1]))
+    if size(a) < 2 || (f != "0" && f != "1" && f != "on" && f != "off")
+      raise "tuya_error", "syntax: TuyaActive <device or endpoint>[,...],<0|1>"
+    end
+    var on = (f == "1" || f == "on")
+    var names = []
+    var i = 0
+    while i < size(a) - 1  names.push(a[i])  i += 1  end
+    var r = {}
+    r[on ? "Enabled" : "Disabled"] = self.set_active(names, on, nil)
+    return r
   end
 
   # TuyaDel <device> -> name of the deleted device
@@ -1992,7 +2086,7 @@ class TuyaLocal
     var name = conf["devices"][i].find("name", ref)
     conf["devices"].remove(i)
     self.write_conf(conf)
-    self.load_config()
+    self.reload()
     return name
   end
 
@@ -2093,7 +2187,7 @@ class TuyaLocal
     for x: skipped  r["Skipped"].push(x)  end
     if size(r["Added"]) + size(r["Updated"]) > 0
       self.write_conf(conf)
-      self.load_config()
+      self.reload()
     end
     return r
   end
@@ -2253,6 +2347,25 @@ class TuyaLocal
       end
     end
     return rows
+  end
+
+  # bindings disabled in tuya.json ("enabled": false) of the enabled devices and sub-devices,
+  # read entry by entry: [[endpoint name, type], ...]
+  def matter_disabled()
+    var l = []
+    var scan = def (e)
+      for m: e.find("matter", [])
+        if m.find("enabled", true) == false  l.push([str(m.find("ep", e.find("name", ""))), m.find("type", "relay")])  end
+      end
+    end
+    self.each_device(def (d)
+      if d.find("enabled", true) == false  return  end
+      scan(d)
+      for ch: d.find("children", [])
+        if ch.find("enabled", true) != false  scan(ch)  end
+      end
+    end)
+    return l
   end
 
   # bindings without a Matter endpoint of the same name; nil if Matter is not enabled

@@ -225,7 +225,18 @@ Wi-Fi devices and the Zigbee sub-devices of the Tuya gateway, and expose them to
     DP mostly costs a map slot), hence a short string per node. Bench with Guillaume's
     configuration (11 nodes, real DP values from his `TuyaStatus`): 75 → 33 DPs kept, 11.8 →
     10.5 KB (64-bit), about −0.7 KB on the ESP32. Scenario 23 (it fails without the filter):
-    24/24 in both modes. **No build yet.**
+    24/24 in both modes.
+
+23. **Disable without deleting; only Wi-Fi devices connect** (9 November): checked that only
+    Wi-Fi devices (top-level entries) open a TCP connection, gateway sub-devices using their
+    gateway's (4 connections with Guillaume's configuration; scenario 1 now asserts it).
+    `"enabled": false` now also works on a gateway sub-device and on a `matter` binding
+    (e.g. `Récepteur radio 3` / `4`, whose endpoints were deleted: no more "Invalid Device
+    (retry every 30 s)"). New `TuyaActive <name>[,...],<0|1>` command; on the page, a ⏸️ Disable
+    / ▶️ Enable button on the edit page, and a checkbox on every row of the Matter list with
+    Create / Disable / Enable for the ticked rows (disabled bindings listed with ⏸️). Fixed:
+    saving, deleting or importing reloaded the configuration even with the driver disabled.
+    Scenario 24: 25/25 in both modes; page checked at 340 px.
 
 ## Measurements on the gateway
 

@@ -246,6 +246,9 @@ def main():
     for ip in ("10.0.0.18", "10.0.0.80", "10.0.0.15", "10.0.0.31"):
         assert any(e[0] == "session" for e in DEVS[ip].log), ip    # 3.4/3.5 negotiation done
     ok += 1
+    # one TCP connection per Wi-Fi device (top-level entry); gateway sub-devices use the gateway's
+    conns = [l.split()[1] for l in out if l.startswith("CONNECT ")]
+    assert sorted(conns) == sorted(d["ip"] for d in CONFIG["devices"]), conns
     assert resp(h.send("CMD TuyaEnable"), "TuyaEnable")["State"] == "running"
     web = [l for l in h.send("SENSOR") if "Tuya Local" in l]
     assert web and "<a href='/tuya'><button>&#x1F50C; Tuya Local</button></a>" in web[-1], web
@@ -566,12 +569,15 @@ def main():
     html, _ = page("GET", {})
     assert "Lampe test" in html and "Prise mesure" in html and "Discover devices" in html, html[:300]
     assert K["clamp"] not in html and K["lamp"] not in html
-    # Matter list: existing endpoint with its number, a checkbox for each missing one
-    assert "<td><span title='created'>&#x2705;</span></td><td>Porche</td><td style='font-size:smaller;'>v_light2</td>" \
-           "<td style='font-size:smaller;'>1</td>" in html, html
+    # Matter list: a checkbox per binding; existing endpoint with its number, missing ones flagged
+    assert "<td>Porche</td><td style='font-size:smaller;'>v_light2</td><td style='font-size:smaller;'>" \
+           "<span title='endpoint 1'>&#x2705;1</span></td>" in html, html
+    assert "<td>Lampe test</td><td style='font-size:smaller;'>v_light2</td><td style='font-size:smaller;'>" \
+           "<span title='missing'>&#x26A0;</span></td>" in html, html
     boxes = dict((v, n) for n, v in re.findall(r"<input type='checkbox' name='(m\d+)' value='([^']*)'>", html))
-    assert "Lampe test" in boxes and "Ventilateur" in boxes and "Porche" not in boxes, boxes
-    assert "title='all'" in html and "missing: tick the endpoints to create" in html
+    assert "Lampe test" in boxes and "Ventilateur" in boxes and "Porche" in boxes, boxes
+    mn = re.findall(r"name='mn' value='(\d+)'", html)[0]
+    assert int(mn) == len(boxes) and "title='all'" in html and " missing. Tick bindings, then:" in html, html
     html, _ = page("GET", {"edit": "Pince"})
     assert "&quot;key&quot;: &quot;***&quot;" in html and K["clamp"] not in html, html
     pince = [d for d in json.load(open("/tuya.json"))["devices"] if d["name"] == "Pince"][0]
@@ -585,23 +591,24 @@ def main():
     assert "Saved: Pince" in html
     page("POST", {"del": "", "ref": "Cloud double"})
     assert all(d["name"] != "Cloud double" for d in json.load(open("/tuya.json"))["devices"])
-    html, out = page("POST", {"matter": ""})                       # nothing ticked
+    html, out = page("POST", {"matter": "", "mn": mn})             # nothing ticked
     assert not any(l.startswith("MATTERADD ") for l in out) and html.endswith("REDIRECT /tuya"), html
     html, _ = page("GET", {})
     assert "Error: no endpoint selected" in html
-    html, out = page("POST", {"matter": "", boxes["Lampe test"]: "Lampe test", boxes["Ventilateur"]: "Ventilateur"})
+    html, out = page("POST", {"matter": "", "mn": mn, boxes["Porche"]: "Porche", boxes["Lampe test"]: "Lampe test",
+                              boxes["Ventilateur"]: "Ventilateur"})    # Porche exists: ignored
     added = [json.loads(l[10:]) for l in out if l.startswith("MATTERADD ")]
     assert {a["name"]: a["type"] for a in added} == {"Lampe test": "v_light2", "Ventilateur": "v_fan"}, added
     assert html.endswith("REDIRECT /?rst="), html
     html, _ = page("GET", {})
-    assert "<td>Lampe test</td><td style='font-size:smaller;'>v_light2</td><td style='font-size:smaller;'>" in html
-    assert "value='Lampe test'" not in html and "value='Prise mesure'" in html, html
+    assert "<td>Lampe test</td><td style='font-size:smaller;'>v_light2</td><td style='font-size:smaller;'>" \
+           "<span title='endpoint 3'>&#x2705;3</span></td>" in html, html
     out = h.send("CMD TuyaMatter prise MESURE, inexistant")           # by name, case-insensitive
     assert resp(out, "TuyaMatter")["Added"] == ["Prise mesure"], out
     out = h.send("CMD TuyaMatter")                                     # all the remaining ones
     assert "Prise mesure" not in resp(out, "TuyaMatter")["Added"] and resp(out, "TuyaMatter")["Restart"], out
     html, _ = page("GET", {})
-    assert "Every binding has its Matter endpoint" in html and "name='m0'" not in html, html
+    assert "Every active binding has its Matter endpoint" in html and "name='matter'" not in html, html
     html, _ = page("POST", {"scan": ""})
     html, _ = page("GET", {})
     assert "Discovery in progress" in html
@@ -725,6 +732,49 @@ def main():
     ok += 1
     print("OK 23 RAM: only the DPs used are kept (bindings, sensors, booleans, keep), all published; codes read from tuya.json")
 
+    # 24. disable without deleting ("enabled": false in tuya.json): a Matter binding (no more
+    #     MtrUpdate nor retry, paused in the list), a device (page button), a gateway sub-device
+    out = h.pump(h.send("CMD TuyaActive Radio 2,0"))
+    assert resp(out, "TuyaActive") == {"Disabled": ["Radio 2"]}, out
+    radio = [d for d in json.load(open("/tuya.json"))["devices"] if d["name"] == "Recepteur radio"][0]
+    assert [m.get("enabled", True) for m in radio["matter"]] == [True, False], radio
+    rdev = DEVS["10.0.0.15"]
+    out = h.pump(h.send("RX 10.0.0.15 " + rdev.push({"protocol": 4, "t": 8, "data": {"dps": {"1": True, "2": True}}}).hex()))
+    out += h.pump(h.send("ADV 31000"))
+    up = mtr_updates(out)
+    assert find(up, "Inconnu")["Power"] == 1 and find(up, "Radio 2") == {}, up    # DP 1: renamed "Inconnu" in 12
+    html, _ = page("GET", {})
+    assert "<td>Radio 2</td><td style='font-size:smaller;'>v_relay</td><td style='font-size:smaller;'>" \
+           "<span title='disabled'>&#x23F8;&#xFE0F;</span></td>" in html and "1 disabled" in html, html
+    boxes = dict((v, n) for n, v in re.findall(r"<input type='checkbox' name='(m\d+)' value='([^']*)'>", html))
+    mn = re.findall(r"name='mn' value='(\d+)'", html)[0]
+    html, out = page("POST", {"m_on": "", "mn": mn, boxes["Radio 2"]: "Radio 2"})   # page() pumps
+    radio = [d for d in json.load(open("/tuya.json"))["devices"] if d["name"] == "Recepteur radio"][0]
+    assert all("enabled" not in m for m in radio["matter"]), radio
+    assert "Enabled: Radio 2" in page("GET", {})[0]
+    # a device from its edit page; "Pergola 1" is also an endpoint name: only the device changes
+    html, _ = page("GET", {"edit": "Pergola 1"})
+    assert "name='active' value='0'" in html and "Disable (kept in tuya.json)" in html, html
+    html, out = page("POST", {"ref": "perg00000000000000000", "active": "0"})
+    perg = [d for d in json.load(open("/tuya.json"))["devices"] if d["name"] == "Pergola 1"][0]
+    assert perg["enabled"] is False and "enabled" not in perg["matter"][0], perg
+    st = resp(h.send("CMD TuyaStatus"), "TuyaStatus")
+    assert "Pergola 1" not in st and "Ventilateur" in st, list(st)
+    assert "name='active' value='1'" in page("GET", {"edit": "Pergola 1"})[0]
+    # a gateway sub-device by command, then everything back on
+    out = h.pump(h.send("CMD TuyaActive Prise Lisseur,0"))
+    assert resp(out, "TuyaActive") == {"Disabled": ["Prise Lisseur"]}, out
+    assert "Prise Lisseur" not in resp(h.send("CMD TuyaStatus"), "TuyaStatus")
+    out = h.pump(h.send("CMD TuyaActive Prise Lisseur,Pergola 1,1"))
+    assert sorted(resp(out, "TuyaActive")["Enabled"]) == ["Pergola 1", "Prise Lisseur"], out
+    out += h.pump(h.send("ADV 500"))
+    st = resp(h.send("CMD TuyaStatus"), "TuyaStatus")
+    assert "Prise Lisseur" in st and "Pergola 1" in st, list(st)
+    assert "unknown device or endpoint" in resp(h.send("CMD TuyaActive Nothing,0"), "TuyaActive")["Error"]
+    assert "syntax" in resp(h.send("CMD TuyaActive Radio 2"), "TuyaActive")["Error"]
+    ok += 1
+    print("OK 24 disable without deleting: Matter binding, device (page), sub-device (command), enable back")
+
     # disabling stops the driver: connections closed, no main page button
     out = h.send("CMD TuyaEnable 0")
     assert resp(out, "TuyaEnable") == {"Enabled": False, "State": "disabled"}, out
@@ -732,7 +782,7 @@ def main():
     assert not [l for l in h.send("SENSOR") if "Tuya Local" in l]
 
     h.close()
-    print("%d/24 scenarios OK" % ok)
+    print("%d/25 scenarios OK" % ok)
 
 
 if __name__ == "__main__":
