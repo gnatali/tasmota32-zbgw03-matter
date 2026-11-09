@@ -211,7 +211,9 @@ Wi-Fi devices and the Zigbee sub-devices of the Tuya gateway, and expose them to
     each page and form; `read_conf()` (whole file, only to modify it) collects garbage first and
     refuses under 30 KB free. Bench with a realistic 16-device file (12.7 KB): 42 KB alive for
     the whole file, 8 KB at worst entry by entry (64-bit; about half on the ESP32). Scenario 22
-    (60 more entries, > 30 KB file): 23/23 in both modes.
+    (60 more entries, > 30 KB file): 23/23 in both modes. Build: run 22 (commit `06a695d`),
+    flash used 2,112,795 bytes (+768); to be flashed, then open the page and read `Heap` and
+    Berry's `HeapUsed`.
 
 ## Measurements on the gateway
 

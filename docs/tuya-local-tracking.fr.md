@@ -225,7 +225,8 @@ Tuya Wi-Fi et les sous-appareils Zigbee de la passerelle Tuya, et les présenter
     déchets et refuse sous 30 Ko libres. Banc avec un fichier réaliste de 16 appareils
     (12,7 Ko) : 42 Ko en vie pour le fichier entier, 8 Ko au pire entrée par entrée (64 bits ;
     environ la moitié sur l'ESP32). Scénario 22 (60 entrées de plus, fichier > 30 Ko) : 23/23
-    dans les deux modes.
+    dans les deux modes. Build : exécution 22 (commit `06a695d`), flash utilisée 2 112 795
+    octets (+768) ; à flasher, puis ouvrir la page et relever `Heap` et le `HeapUsed` de Berry.
 
 ## Mesures sur la passerelle
 
