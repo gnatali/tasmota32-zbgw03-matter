@@ -47,12 +47,14 @@ Ce build part de l'environnement officiel `tasmota32-zbbrdgpro` et modifie :
 |---|---|---|
 | Protocole Zigbee | ZNP (CC2652P) | EZSP (EFR32MG21) |
 | Matter (`USE_MATTER_DEVICE`) | non | oui |
+| [Driver Tuya local](docs/tuya-local.fr.md) (`USE_TUYA_LOCAL`, `custom_berry_solidify`) | non | oui : intégré, démarré au boot comme Matter, activé depuis sa page |
 | Composant `espressif/mdns` | retiré | conservé (Matter s'annonce en mDNS) |
 | Composant `espressif/fb_gfx` (caméra) | conservé | retiré |
 | Partitions | `app1856k_fs1344k` | `app2880k_fs320k` (safeboot) |
 | `OTA_URL` | firmware officiel | dernière release de ce dépôt |
 | Firmware et flasheur du CC2652P dans le système de fichiers | oui | non (inutiles sur l'EFR32) |
-| Date des événements Matter (appuis de bouton) | secondes sur 32 bits | millisecondes sur 64 bits, comme le veut Matter (voir [Bouton Zigbee dans Google Home](#bouton-zigbee-dans-google-home)) |
+| Date des événements Matter (appuis de bouton) | secondes sur 32 bits (16.0.0.2 et avant) | millisecondes sur 64 bits, comme le veut Matter : corrigé en amont dans la 16.0.0.3, compilée par ce dépôt (voir [Bouton Zigbee dans Google Home](#bouton-zigbee-dans-google-home)) |
+| Chiffrement Berry `AES_CBC` et `AES_GCM` 128 bits avec AAD | non | oui, pour les [appareils Tuya en local](docs/tuya-local.fr.md) |
 
 Avec Matter, l'image fait environ 2 Mo (environ 1990 Ko). Elle ne tient pas dans les 1856 Ko
 de la disposition officielle, d'où la disposition **safeboot** : `safeboot` 832 Ko, `app0`
@@ -178,6 +180,21 @@ l'adresse PHY 1, soit `Backlog EthType 0; EthAddress 1; EthClockMode 3`.
 Sans PSRAM, Zigbee et Matter laissent environ 70 à 100 Ko de mémoire libre : surveiller
 `Heap` dans `Status 4`.
 
+### Appareils Tuya en local
+
+Le driver Berry `berry/tuya_local.be` pilote les appareils Tuya Wi-Fi (protocoles 3.3, 3.4 et
+3.5) et les sous-appareils d'une passerelle Tuya, sans le cloud, et les présente à Matter. Il
+est intégré au firmware (solidifié : son code reste en flash au lieu d'être compilé en RAM) et
+démarré au boot comme Matter, sans `autoexec.be` : une case **Tuya Local enable** l'active, et il
+attend Zigbee avant de se connecter (bouton grisé sur la page d'accueil en attendant). La page
+**Configuration → Tuya Local** recherche les appareils sur le
+réseau, importe leurs clés locales (depuis le `devices.json` de tinytuya ou le cloud Tuya), crée
+leurs endpoints Matter et modifie la configuration ; les mêmes fonctions existent en commandes
+(HTTP, MQTT). Voir [docs/tuya-local.fr.md](docs/tuya-local.fr.md) (utilisation),
+[docs/tuya-local-examples.fr.md](docs/tuya-local-examples.fr.md) (exemples de commandes,
+d'événements, de règles et de scripts) et [docs/tuya-local-dev.fr.md](docs/tuya-local-dev.fr.md)
+(documentation technique).
+
 ### Bouton Zigbee dans Google Home
 
 Tasmota ne présente pas un bouton Zigbee à Matter, mais il peut créer un **bouton virtuel**
@@ -201,10 +218,11 @@ Matter qu'une règle déclenche à chaque appui. Testé avec un Sonoff SNZB-01P 
 5. Dans Google Home : **Automatisations → Ajouter → Pour la maison**, déclencheur
    **« Interrupteur ou bouton pressé »**, puis le bouton et le type d'appui.
 
-Tasmota date chaque événement Matter en secondes, alors que Matter attend des millisecondes :
-un appui semble dater de janvier 1970, et Google Home le reçoit sans lancer l'automatisation.
-Ce dépôt corrige ce point (`patches/matter-event-timestamp-ms.patch`), à partir de la release
-`v16.0.0.2-matter4`. Avec `WebLog 3`, un appui affiche `MTR: +Add_Event` (événements du
+Jusqu'à la 16.0.0.2, Tasmota date chaque événement Matter en secondes, alors que Matter attend
+des millisecondes : un appui semble dater de janvier 1970, et Google Home le reçoit sans lancer
+l'automatisation. Ce dépôt l'a corrigé par un correctif à partir de la release
+`v16.0.0.2-matter4` ; Tasmota l'a corrigé en amont dans la 16.0.0.3 (commit `4676a03`, avec une
+vraie résolution à la milliseconde), que ce dépôt compile désormais : le correctif a été retiré. Avec `WebLog 3`, un appui affiche `MTR: +Add_Event` (événements du
 bouton) puis `MTR: <Sub_Data` (envoi au contrôleur).
 
 ## Mise à jour OTA
@@ -245,8 +263,8 @@ Le firmware est compilé par GitHub Actions (`.github/workflows/build.yml`) :
   ```
 
 Le workflow compile un commit fixe de Tasmota : branche `development`, commit
-[`a281cec`](https://github.com/arendst/Tasmota/commit/a281cece518b0031e22f2317ca7dbc530c934da1)
-(16.0.0.2, 4 novembre 2026). Pour suivre une version plus récente, modifier `TASMOTA_REF` dans
+[`43d9409`](https://github.com/arendst/Tasmota/commit/43d9409e67c4a28adac34925e1a1c6813f315ce0)
+(16.0.0.3, 8 novembre 2026). Pour suivre une version plus récente, modifier `TASMOTA_REF` dans
 le workflow.
 
 | Fichier | Rôle |

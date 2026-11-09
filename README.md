@@ -47,12 +47,14 @@ This build starts from the official `tasmota32-zbbrdgpro` environment and change
 |---|---|---|
 | Zigbee protocol | ZNP (CC2652P) | EZSP (EFR32MG21) |
 | Matter (`USE_MATTER_DEVICE`) | no | yes |
+| [Local Tuya driver](docs/tuya-local.en.md) (`USE_TUYA_LOCAL`, `custom_berry_solidify`) | no | yes: built in, started at boot like Matter, enabled from its page |
 | `espressif/mdns` component | removed | kept (Matter advertises over mDNS) |
 | `espressif/fb_gfx` component (camera) | kept | removed |
 | Partitions | `app1856k_fs1344k` | `app2880k_fs320k` (safeboot) |
 | `OTA_URL` | official firmware | latest release of this repository |
 | CC2652P firmware and flasher in the file system | yes | no (useless on the EFR32) |
-| Matter event timestamps (button presses) | seconds, 32 bits | milliseconds, 64 bits, as Matter requires (see [Zigbee button in Google Home](#zigbee-button-in-google-home)) |
+| Matter event timestamps (button presses) | seconds, 32 bits (16.0.0.2 and earlier) | milliseconds, 64 bits, as Matter requires: fixed upstream in 16.0.0.3, built by this repository (see [Zigbee button in Google Home](#zigbee-button-in-google-home)) |
+| Berry `AES_CBC` and 128-bit `AES_GCM` with AAD | no | yes, for [local Tuya devices](docs/tuya-local.en.md) |
 
 With Matter, the image is about 2 MB (about 1990 KB). It does not fit in the 1856 KB slot of
 the official layout, hence the **safeboot** layout: `safeboot` 832 KB, `app0` 2880 KB,
@@ -175,6 +177,20 @@ ESPHome configuration for v1.4 uses the clock output on GPIO17 and PHY address 1
 Without PSRAM, Zigbee and Matter leave about 70 to 100 KB of free heap: watch `Heap` in
 `Status 4`.
 
+### Local Tuya devices
+
+The Berry driver `berry/tuya_local.be` controls Tuya Wi-Fi devices (protocols 3.3, 3.4 and
+3.5) and Tuya gateway sub-devices locally, without the cloud, and exposes them to Matter. It
+is built into the firmware (solidified: its code stays in flash instead of being compiled into
+RAM) and started at boot like Matter, without `autoexec.be`: a **Tuya Local enable** checkbox
+turns it on, and it waits for Zigbee before connecting (greyed-out button on the main page
+meanwhile). The **Configuration → Tuya Local** page discovers devices on
+the network, imports their local keys (from tinytuya's `devices.json` or the Tuya cloud), creates
+their Matter endpoints and edits the configuration; the same features are available as commands
+(HTTP, MQTT). See [docs/tuya-local.en.md](docs/tuya-local.en.md) (user guide),
+[docs/tuya-local-examples.en.md](docs/tuya-local-examples.en.md) (command, event, rule and script
+examples) and [docs/tuya-local-dev.en.md](docs/tuya-local-dev.en.md) (technical documentation).
+
 ### Zigbee button in Google Home
 
 Tasmota does not expose a Zigbee button to Matter, but it can create a **virtual Matter
@@ -198,10 +214,11 @@ button** that a rule triggers on each press. Tested with a Sonoff SNZB-01P and G
 5. In Google Home: **Automations → Add → Household**, starter **"Switch or button
    pressed"**, then the button and the press type.
 
-Tasmota timestamps each Matter event in seconds, while Matter expects milliseconds: a press
-seems to date from January 1970, and Google Home receives it without starting the
-automation. This repository fixes it (`patches/matter-event-timestamp-ms.patch`), from
-release `v16.0.0.2-matter4`. With `WebLog 3`, a press shows `MTR: +Add_Event` (button
+Up to 16.0.0.2, Tasmota timestamps each Matter event in seconds, while Matter expects
+milliseconds: a press seems to date from January 1970, and Google Home receives it without
+starting the automation. This repository fixed it with a patch from release
+`v16.0.0.2-matter4`; Tasmota fixed it upstream in 16.0.0.3 (commit `4676a03`, with true
+millisecond resolution), which this repository now builds, so the patch was removed. With `WebLog 3`, a press shows `MTR: +Add_Event` (button
 events) then `MTR: <Sub_Data` (sent to the controller).
 
 ## OTA updates
@@ -242,8 +259,8 @@ The firmware is built by GitHub Actions (`.github/workflows/build.yml`):
   ```
 
 The workflow builds a fixed Tasmota commit: branch `development`, commit
-[`a281cec`](https://github.com/arendst/Tasmota/commit/a281cece518b0031e22f2317ca7dbc530c934da1)
-(16.0.0.2, 4 November 2026). To follow a newer version, change `TASMOTA_REF` in the
+[`43d9409`](https://github.com/arendst/Tasmota/commit/43d9409e67c4a28adac34925e1a1c6813f315ce0)
+(16.0.0.3, 8 November 2026). To follow a newer version, change `TASMOTA_REF` in the
 workflow.
 
 | File | Role |

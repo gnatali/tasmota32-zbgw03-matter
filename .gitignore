@@ -2,3 +2,9 @@
 *.log
 .pio/
 __pycache__/
+
+# real Tuya configuration (local keys) and cloud credentials: on the gateway only
+/tuya.json
+/tuya_cloud.json
+berry/tuya.json
+tuya_cloud.json
