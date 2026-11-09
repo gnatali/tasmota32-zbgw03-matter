@@ -236,7 +236,9 @@ Wi-Fi devices and the Zigbee sub-devices of the Tuya gateway, and expose them to
     / ▶️ Enable button on the edit page, and a checkbox on every row of the Matter list with
     Create / Disable / Enable for the ticked rows (disabled bindings listed with ⏸️). Fixed:
     saving, deleting or importing reloaded the configuration even with the driver disabled.
-    Scenario 24: 25/25 in both modes; page checked at 340 px.
+    Scenario 24: 25/25 in both modes; page checked at 340 px. Build: run 23 (commit
+    `4ffd833`, entries 22 and 23), flash used 2,119,179 bytes (+6.4 KB since run 22); to be
+    flashed, then read `Heap` and Berry's `HeapUsed` with the same configuration.
 
 ## Measurements on the gateway
 

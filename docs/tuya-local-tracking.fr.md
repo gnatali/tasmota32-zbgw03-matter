@@ -253,7 +253,9 @@ Tuya Wi-Fi et les sous-appareils Zigbee de la passerelle Tuya, et les présenter
     la liste Matter avec Create / Disable / Enable pour les lignes cochées (liaisons désactivées
     listées avec ⏸️). Corrigé : enregistrer, supprimer ou importer rechargeait la configuration
     même avec le driver désactivé. Scénario 24 : 25/25 dans les deux modes ; page vérifiée à
-    340 px.
+    340 px. Build : exécution 23 (commit `4ffd833`, entrées 22 et 23), flash utilisée
+    2 119 179 octets (+6,4 Ko depuis l'exécution 22) ; à flasher, puis relever `Heap` et le
+    `HeapUsed` de Berry avec la même configuration.
 
 ## Mesures sur la passerelle
 
