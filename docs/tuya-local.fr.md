@@ -204,7 +204,13 @@ l'endpoint existe : `TUY: Matter endpoint 'xxx' available, state sent`.
 
 **Appareil** (connexion TCP) : `name`, `id`, `key`, `ip`, `version` (`"3.3"`, `"3.4"` ou
 `"3.5"`), et `"enabled": false` pour le mettre de côté. Une passerelle Tuya déclare ses
-sous-appareils dans `children` (`name`, `id`, `cid` = `node_id` de `devices.json`).
+sous-appareils dans `children` (`name`, `id`, `cid` = `node_id` de `devices.json`). Pour
+économiser la RAM, le driver ne garde que les valeurs des DP qu'il utilise (ceux des liaisons
+`matter` et des `sensors`, plus tous les DP booléens pour `toggle`) ; `"keep": [63, 64]` en garde
+d'autres, `"keep": "all"` les garde tous. Les autres DP sont toujours publiés dans l'événement
+`Tuya` (les règles peuvent s'en servir), mais `TuyaStatus` ne les affiche pas. La table `codes`
+(import) n'est pas non plus gardée en RAM : `TuyaSend` par code la relit dans `tuya.json` quand
+il s'en sert.
 
 **Entrée `matter`** : `ep` (nom de l'endpoint), `type`, et les numéros de DP (les valeurs par
 défaut sont celles des ampoules et ventilateurs Tuya courants) :
@@ -230,7 +236,7 @@ La signification des DP de chaque appareil se trouve dans `mapping` de `devices.
 
 | Commande | Effet |
 |---|---|
-| `TuyaStatus [appareil]` | État des connexions et dernières valeurs de chaque appareil (ou d'un seul) |
+| `TuyaStatus [appareil]` | État des connexions et dernières valeurs de chaque appareil (ou d'un seul) : les DP gardés (utilisés, booléens, `keep`) |
 | `TuyaSend <appareil>,<dp>,<valeur>` | Envoie une valeur, par exemple `TuyaSend Ventilateur,60,true` ou `TuyaSend Ventilateur,62,3`. Le DP peut aussi être un code (`TuyaSend Lampe,switch_led,true`) si l'appareil a une table `codes` (import). `toggle` inverse un DP booléen : `TuyaSend Entrée-Porche,20,toggle` |
 | `TuyaEnable [0\|1]` | Active ou désactive le driver (gardé d'un redémarrage à l'autre), comme la case de la page ; sans argument, donne l'état : `{"TuyaEnable":{"Enabled":true,"State":"running"}}` (`State` : `running`, `disabled`, `waiting for Zigbee`...) |
 | `TuyaReload` | Relit `tuya.json` et reconnecte les appareils (driver démarré seulement) |
@@ -314,7 +320,7 @@ Il n'apparaît plus dans Smart Life, et le retirer de `tuya.json` s'il y figurai
 ## Tests
 
 `berry/test/run_tests.sh <dépôt Tasmota>` compile l'interpréteur Berry de Tasmota avec le
-chiffrement BearSSL de Tasmota, et joue 23 scénarios contre de faux appareils Tuya construits
+chiffrement BearSSL de Tasmota, et joue 24 scénarios contre de faux appareils Tuya construits
 sur [TinyTuya](https://github.com/jasonacox/tinytuya) (3.3, 3.4, 3.5, passerelle Zigbee) :
 négociation de clé, commandes Matter, retours d'état, mesures, coupure et reconnexion, trames
 corrompues ou fragmentées, endpoint Matter créé à chaud, API, recherche (annonces au format

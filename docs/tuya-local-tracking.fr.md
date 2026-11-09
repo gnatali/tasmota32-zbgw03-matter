@@ -230,6 +230,18 @@ Tuya Wi-Fi et les sous-appareils Zigbee de la passerelle Tuya, et les présenter
     57 Ko), 49 Ko après plusieurs chargements de la page avec Berry toujours à 57 Ko (contre
     29 Ko et 76 Ko, puis le plantage) : les déchets de la page sont bien rendus.
 
+22. **Seuls les DP utilisés sont gardés** (9 novembre) : un nœud garde les DP lus par ses
+    liaisons (`TuyaBinding.dps_used()`, valeurs par défaut comprises), ses relevés, les booléens
+    (pour `toggle`) et la nouvelle option `"keep"` (liste, ou `"all"`) ; les autres sont
+    toujours publiés dans l'événement `Tuya`, mais `TuyaStatus` ne les affiche plus. Les tables
+    `codes` quittent aussi la RAM : `TuyaSend` par code les relit dans `tuya.json`
+    (`code_dp()`). Premier essai avec une table par nœud : plus de RAM qu'avant sur le banc
+    (Berry partage les chaînes courtes et range les petits entiers dans la table, un DP coûte
+    surtout une case de table), d'où une chaîne courte par nœud. Banc avec la configuration de
+    Guillaume (11 nœuds, vraies valeurs de DP de son `TuyaStatus`) : 75 → 33 DP gardés,
+    11,8 → 10,5 Ko (64 bits), environ −0,7 Ko sur l'ESP32. Scénario 23 (il échoue sans le
+    filtre) : 24/24 dans les deux modes. **Pas encore de build.**
+
 ## Mesures sur la passerelle
 
 | Situation | `Heap` (`Status 4`) |
@@ -337,11 +349,10 @@ endpoints Matter `z_light2` ou `z_light1`.
    **`Restart 1` obligatoire** après la création : sans lui, Google Home affiche les nouveaux
    appareils hors ligne. Reste à tester les deux sens (Google Home → appareil, et appareil
    → Google Home : bouton, Smart Life, télécommande) pour chaque endpoint.
-3. **Réduire la RAM du driver** si les endpoints Matter ne laissent pas assez de marge (peu
-   probable avec 3 appareils, ~10 Ko) :
-   - ne garder dans `dps` que les DP utilisés par une liaison ou un capteur (la pince en
-     envoie 22, les prises 11) ;
-   - limiter `publish_result` (un message MQTT par changement, la pince en envoie souvent).
+3. **Réduire la RAM du driver** : ~~ne garder que les DP utilisés~~ fait (entrée 22), gain
+   faible (~0,7 Ko sur l'ESP32). Reste : limiter `publish_result` (un message MQTT par
+   changement, la pince en envoie souvent) ; l'essentiel de la RAM, ce sont les connexions TCP
+   et leurs tampons.
 4. **Valider la configuration simplifiée** sur la passerelle (après flash) : page
    Configuration → Tuya Local, recherche (les 3 appareils doivent apparaître), `Heap` pendant
    et après, import du `devices.json` (puis import cloud, qui exerce le HTTPS vers Tuya : à

@@ -700,6 +700,31 @@ def main():
     ok += 1
     print("OK 22 large tuya.json read entry by entry: page, editor, reload")
 
+    # 23. RAM: a node only keeps the DPs used (bindings, sensors, booleans, "keep"); the others
+    #     are still published in the Tuya event
+    fan = DEVS["10.0.0.18"]
+    out = h.pump(h.send("RX 10.0.0.18 " + fan.push({"protocol": 4, "t": 6, "data": {"dps": {"23": 500, "63": "reverse"}}}).hex()))
+    pub = [json.loads(l[4:]) for l in out if l.startswith("PUB ") and '"Tuya"' in l]
+    assert pub and pub[-1]["Tuya"]["Dps"] == {"23": 500, "63": "reverse"}, pub
+    st = resp(h.send("CMD TuyaStatus Ventilateur"), "TuyaStatus")["Ventilateur"]["Dps"]
+    assert set(st) == {"20", "60", "62"}, st                     # 20 bool + light0, 60/62 fan
+    fancfg = [d for d in json.load(open("/tuya.json"))["devices"] if d["name"] == "Ventilateur"][0]
+    fancfg["key"] = "***"
+    fancfg["keep"] = [63]
+    out = h.pump(h.send("CMD TuyaAdd " + json.dumps(fancfg)))
+    assert resp(out, "TuyaAdd") == "Ventilateur", out
+    out = h.pump(h.send("ADV 500"))
+    h.pump(h.send("RX 10.0.0.18 " + fan.push({"protocol": 4, "t": 7, "data": {"dps": {"63": "forward", "23": 100}}}).hex()))
+    st = resp(h.send("CMD TuyaStatus Ventilateur"), "TuyaStatus")["Ventilateur"]["Dps"]
+    assert st.get("63") == "forward" and "23" not in st, st
+    # codes are not kept in RAM: TuyaSend by code reads them from tuya.json, here for a gateway
+    # sub-device (codes in the gateway entry's "children")
+    out = h.pump(h.send("CMD TuyaSend Prise Z,switch,true"))
+    assert "RESP Done" in out and DEVS["10.0.0.180"].children["00158d00000000ff"]["1"] is True, out
+    assert "Unknown DP" in h.send("CMD TuyaSend Prise Z,nonexistent,true")[-1]
+    ok += 1
+    print("OK 23 RAM: only the DPs used are kept (bindings, sensors, booleans, keep), all published; codes read from tuya.json")
+
     # disabling stops the driver: connections closed, no main page button
     out = h.send("CMD TuyaEnable 0")
     assert resp(out, "TuyaEnable") == {"Enabled": False, "State": "disabled"}, out
@@ -707,7 +732,7 @@ def main():
     assert not [l for l in h.send("SENSOR") if "Tuya Local" in l]
 
     h.close()
-    print("%d/23 scenarios OK" % ok)
+    print("%d/24 scenarios OK" % ok)
 
 
 if __name__ == "__main__":

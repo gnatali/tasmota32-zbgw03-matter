@@ -216,6 +216,17 @@ Wi-Fi devices and the Zigbee sub-devices of the Tuya gateway, and expose them to
     (Berry 57 KB), 49 KB after several page loads with Berry still at 57 KB (was 29 KB and
     76 KB, then the crash): the page's garbage is given back.
 
+22. **Only the DPs used are kept** (9 November): a node keeps the DPs read by its bindings
+    (`TuyaBinding.dps_used()`, defaults included), its sensors, booleans (for `toggle`) and the
+    new `"keep"` option (list, or `"all"`); the others are still published in the `Tuya`
+    event, but no longer shown by `TuyaStatus`. The `codes` tables leave RAM too: `TuyaSend` by
+    code reads them from `tuya.json` (`code_dp()`). First attempt with a map per node: more RAM
+    than before on the bench (Berry shares short strings and stores small integers in place, a
+    DP mostly costs a map slot), hence a short string per node. Bench with Guillaume's
+    configuration (11 nodes, real DP values from his `TuyaStatus`): 75 → 33 DPs kept, 11.8 →
+    10.5 KB (64-bit), about −0.7 KB on the ESP32. Scenario 23 (it fails without the filter):
+    24/24 in both modes. **No build yet.**
+
 ## Measurements on the gateway
 
 | Situation | `Heap` (`Status 4`) |
@@ -322,11 +333,9 @@ température et d'humidité (`temp` DP 103 and `humidity` DP 101, divider 100).
    **`Restart 1` is mandatory** after creating them: without it, Google Home shows the new
    devices offline. Both directions remain to be tested (Google Home → device, and device →
    Google Home: button, Smart Life, remote) for each endpoint.
-3. **Reduce the driver's RAM** if the Matter endpoints do not leave enough margin (unlikely
-   with 3 devices, ~10 KB):
-   - only keep in `dps` the DPs used by a binding or a sensor (the clamp sends 22, the plugs
-     11);
-   - limit `publish_result` (one MQTT message per change, the clamp sends many).
+3. **Reduce the driver's RAM**: ~~only keep the DPs used~~ done (entry 22), small gain (~0.7 KB
+   on the ESP32). What remains: limit `publish_result` (one MQTT message per change, the clamp
+   sends many); the bulk of the RAM is the TCP connections and their buffers.
 4. **Validate the simplified configuration** on the gateway (after flashing): Configuration →
    Tuya Local page, discovery (the 3 devices must show up), `Heap` during and after, import
    of `devices.json` (then the cloud import, which exercises HTTPS to Tuya: to be tested with

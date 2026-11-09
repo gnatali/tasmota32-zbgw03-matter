@@ -74,7 +74,7 @@ TuyaStatus
 ```
 ```json
 {"TuyaStatus":{
-  "Ventilateur":{"Connected":true,"Ip":"192.168.1.20","Version":"3.5","Dps":{"20":false,"60":true,"62":3,"63":"forward"}},
+  "Ventilateur":{"Connected":true,"Ip":"192.168.1.20","Version":"3.5","Dps":{"20":false,"60":true,"62":3}},
   "Récepteur radio":{"Connected":true,"Ip":"192.168.1.23","Version":"3.5","Dps":{"1":false,"2":false,"3":false,"4":false}},
   "Entrée-Porche":{"Connected":false,"Ip":"192.168.1.174","Version":"3.3","Dps":{}}}}
 ```

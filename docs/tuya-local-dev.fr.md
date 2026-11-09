@@ -134,6 +134,17 @@ l'instance existe toujours, et le travail est différé :
 
 ## 4. Fichier de configuration et API
 
+- **DP gardés en RAM** : `TuyaNode.dps` ne garde que les booléens (pour `toggle`) et les DP
+  listés dans `keep`, une chaîne courte (`",20,60,62,"`) construite à partir de
+  `TuyaBinding.dps_used()` (les DP lus par `to_matter()`, valeurs par défaut comprises), des
+  relevés et de l'option `"keep"` (liste, ou `"all"`). Une table par nœud coûtait plus que les DP
+  qu'elle économisait : Berry partage les chaînes courtes et range les petits entiers dans la
+  table, un DP coûte donc surtout une case de table. Les DP non gardés restent dans l'événement
+  `Tuya` (`changed`). Les tables `codes` ne sont plus gardées non plus : `code_dp()` relit
+  l'entrée du nœud (ou les `children` de sa passerelle) dans `tuya.json` pour `TuyaSend` par
+  code. Mesuré sur le banc avec la configuration de Guillaume (11 nœuds, vraies valeurs de DP) :
+  11,8 → 10,5 Ko (64 bits), soit environ −0,7 Ko sur l'ESP32 : l'essentiel de la RAM du driver
+  est ailleurs (connexions TCP, tampons, liaisons).
 - **`/tuya.json` est lu entrée par entrée** (`each_device()`, `TuyaImport.each_object(fichier,
   cb, 1)`, morceaux de 512 octets) par la page web (liste, édition, recherche) et
   `load_config()` : après un import cloud, une entrée pèse ~0,5 à 1,5 Ko (codes, liaisons,
@@ -323,6 +334,7 @@ appareils (`fake_tuya.py`) et les annonces UDP (`udp_broadcast()`, vérifiées p
 | 20 | identifiants du cloud enregistrés : case de la page, secret jamais affiché, `TuyaCloud` sans argument, effacement |
 | 21 | firmware sans Matter, ou Matter désactivé : pas de `MtrUpdate`, rien en attente, la page et `TuyaMatter` le signalent ; `TuyaEnable 0` ferme les connexions |
 | 22 | gros `tuya.json` (60 entrées de plus, > 30 Ko) : page, édition et rechargement le lisent entrée par entrée ; ramasse-miettes après la page |
+| 23 | RAM : seuls les DP utilisés sont gardés (liaisons, relevés, booléens, `keep`) mais tous sont publiés ; `TuyaSend` par code lit les codes dans `tuya.json` (sous-appareil de passerelle compris) |
 
 Le workflow lance le banc avant la compilation ; il crée `/tuya.json`, `/tuya.json.bak`,
 `/devices.json` et `/tuya_cloud.json`, que le test écrit.
@@ -382,7 +394,7 @@ la configuration simplifiée ajoute 0,7 à 1,3 Ko au repos.
 | `platformio_override.ini` | `-DUSE_TUYA_LOCAL` (démarrage au boot) et `custom_berry_solidify` (driver en flash) |
 | `berry/test/run_tests.sh` | construction des deux interpréteurs, solidification, scénarios |
 | `berry/test/harness.be`, `webserver.be`, `crypto.be`, `persist.be` | simulations de Tasmota |
-| `berry/test/fake_tuya.py`, `test_tuya_local.py` | faux appareils, annonces UDP, 23 scénarios (0 à 22) |
+| `berry/test/fake_tuya.py`, `test_tuya_local.py` | faux appareils, annonces UDP, 24 scénarios (0 à 23) |
 | `.github/workflows/build.yml` | fichiers écrits par les tests |
 | `docs/tuya-local.fr.md` / `.en.md` | documentation d'utilisation |
 | `docs/tuya-local-examples.fr.md` / `.en.md` | exemples de commandes et d'événements |

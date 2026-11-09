@@ -179,6 +179,27 @@ class TuyaBinding
     return self.c.find(k, dflt)
   end
 
+  # DPs read by to_matter() (defaults included): the node keeps their values
+  def dps_used()
+    var t = self.type
+    if t == "fan"  return [self.dp("dp", 60), self.dp("dp_speed", 62)]  end
+    if t == "temp" || t == "humidity"  return [self.dp("dp", t == "temp" ? 1 : 2)]  end
+    var light = (t == "light0" || t == "light1" || t == "light2" || t == "light3")
+    var l = [self.dp("dp", light ? 20 : 1)]
+    if t == "relay_power"
+      for k: ["dp_power", "dp_voltage", "dp_current"]
+        if self.dp(k) != nil  l.push(self.dp(k))  end
+      end
+    end
+    if t == "light1" || t == "light2" || t == "light3"
+      l.push(self.dp("dp_mode", 21))
+      l.push(self.dp("dp_bri", 22))
+      if t == "light2"  l.push(self.dp("dp_ct", 23))  end
+      if t == "light3"  l.push(self.dp("dp_colour", 24))  end
+    end
+    return l
+  end
+
   # Matter -> Tuya: MtrReceived attributes -> map of DPs to send
   def to_tuya(a)
     import string
@@ -382,7 +403,7 @@ class TuyaNode
   var bindings               # list of TuyaBinding
   var sensors                # {"label": [dp, divider, unit]}: Tasmota sensor readings
   var seen                   # millis of the last reception
-  var codes                  # {"switch_led": 20, ...} (import): TuyaSend by code, or nil
+  var keep                   # ",20,60,62," DPs kept in dps besides booleans, or true ("keep": "all")
 
   def init(conn, conf)
     self.conn = conn
@@ -392,10 +413,33 @@ class TuyaNode
     self.dps = {}
     self.bindings = []
     self.sensors = conf.find("sensors", {})
-    self.codes = conf.find("codes")
+    # the "codes" table (import) is not kept in RAM (~0.3 KB per device): TuyaSend by code reads
+    # it from tuya.json when needed (TuyaLocal.code_dp)
     for m: conf.find("matter", [])
       self.bindings.push(TuyaBinding(self, m))
     end
+    # RAM: only the DPs used are kept (bindings, sensor readings, "keep", booleans for toggle);
+    # devices send many others (timers, scenes, settings), some as long strings. The set is one
+    # short string per node: a map of its own would cost more than the DPs it saves
+    var k = conf.find("keep")
+    if k == "all"
+      self.keep = true
+    else
+      var l = []
+      if type(k) == 'instance'
+        for d: k  l.push(str(d))  end
+      end
+      for b: self.bindings
+        for d: b.dps_used()  l.push(d)  end
+      end
+      for n: self.sensors.keys()  l.push(str(self.sensors[n][0]))  end
+      self.keep = "," + l.concat(",") + ","
+    end
+  end
+
+  def kept(ks)
+    import string
+    return self.keep == true || string.find(self.keep, "," + ks + ",") >= 0
   end
 
   # new values received from the device
@@ -404,10 +448,11 @@ class TuyaNode
     var changed = {}
     for k: dps.keys()
       var ks = str(k)
-      if self.dps.find(ks) != dps[k] || !self.dps.contains(ks)
-        changed[ks] = dps[k]
+      var v = dps[k]
+      if self.dps.find(ks) != v || !self.dps.contains(ks)
+        changed[ks] = v                 # unused DPs too: published, rules can use them
       end
-      self.dps[ks] = dps[k]
+      if type(v) == 'bool' || self.kept(ks)  self.dps[ks] = v  end
     end
     self.seen = tasmota.millis()
     if size(changed) == 0  return  end
@@ -2357,6 +2402,26 @@ class TuyaLocal
     return nil
   end
 
+  # DP of a code (switch_led...) for a node, from the "codes" of its tuya.json entry (or of its
+  # entry among its gateway's children), read entry by entry: codes are not kept in RAM
+  def code_dp(n, code)
+    var r = []
+    self.each_device(def (c)
+      if size(r) > 0  return  end
+      var hit = (str(c.find("id")) == str(n.id)) ? c : nil
+      if hit == nil
+        for ch: c.find("children", [])
+          if str(ch.find("id")) == str(n.id) || (n.cid != nil && str(ch.find("cid")) == str(n.cid))  hit = ch  end
+        end
+      end
+      if hit != nil && type(hit.find("codes")) == 'instance'
+        var v = hit["codes"].find(code)
+        if v != nil  r.push(v)  end
+      end
+    end)
+    return size(r) > 0 ? r[0] : nil
+  end
+
   # TuyaSend <device>,<dp or code>,<JSON value | toggle>   e.g. TuyaSend Ventilateur,60,true
   def cmd_send(payload)
     import string
@@ -2370,7 +2435,7 @@ class TuyaLocal
     var dp = self.trim(a[1])
     var num = int(dp)
     if str(num) != dp                         # DP code (switch_led...): "codes" from the import
-      var c = (n.codes != nil) ? n.codes.find(dp) : nil
+      var c = self.code_dp(n, dp)
       if c == nil  return tasmota.resp_cmnd_str("Unknown DP: " + dp)  end
       num = int(c)
     end

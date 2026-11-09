@@ -130,6 +130,16 @@ the instance always exists, and the work is deferred:
 
 ## 4. Configuration file and API
 
+- **DPs kept in RAM**: `TuyaNode.dps` only keeps booleans (for `toggle`) and the DPs listed in
+  `keep`, a short string (`",20,60,62,"`) built from `TuyaBinding.dps_used()` (the DPs read by
+  `to_matter()`, defaults included), the sensors and the `"keep"` option (list, or `"all"`). A
+  map per node cost more than the DPs it saved: Berry shares short strings and stores small
+  integers in place, so a DP mostly costs a map slot. Unkept DPs are still in the `Tuya` event
+  (`changed`). The `codes` tables are not kept either: `code_dp()` reads the node's entry (or
+  its gateway's `children`) from `tuya.json` for `TuyaSend` by code. Measured on the bench with
+  Guillaume's configuration (11 nodes, real DP values): 11.8 → 10.5 KB (64-bit), i.e. about
+  −0.7 KB on the ESP32: most of the driver's RAM is elsewhere (TCP connections, buffers,
+  bindings).
 - **`/tuya.json` is read entry by entry** (`each_device()`, `TuyaImport.each_object(file, cb,
   1)`, 512-byte chunks) by the web page (list, editor, discovery) and `load_config()`: after a
   cloud import, an entry weighs ~0.5 to 1.5 KB (codes, bindings, sensors), and `json.load` of the
@@ -314,6 +324,7 @@ announcements (`udp_broadcast()`, checked with `decrypt_udp()`) are built with T
 | 20 | saved cloud credentials: page checkbox, secret never shown, `TuyaCloud` without argument, erasing |
 | 21 | firmware without Matter, or Matter disabled: no `MtrUpdate`, nothing pending, page and `TuyaMatter` report it; `TuyaEnable 0` closes the connections |
 | 22 | large `tuya.json` (60 more entries, > 30 KB): page, editor and reload read it entry by entry; garbage collected after the page |
+| 23 | RAM: only the DPs used are kept (bindings, sensors, booleans, `keep`) but all are published; `TuyaSend` by code reads the codes from `tuya.json` (gateway sub-device included) |
 
 The workflow runs the bench before compiling; it creates `/tuya.json`, `/tuya.json.bak`,
 `/devices.json` and `/tuya_cloud.json`, which the test writes.
@@ -373,7 +384,7 @@ simplified configuration adds 0.7 to 1.3 KB at rest.
 | `platformio_override.ini` | `-DUSE_TUYA_LOCAL` (start at boot) and `custom_berry_solidify` (driver in flash) |
 | `berry/test/run_tests.sh` | builds the two interpreters, solidification, scenarios |
 | `berry/test/harness.be`, `webserver.be`, `crypto.be`, `persist.be` | Tasmota mocks |
-| `berry/test/fake_tuya.py`, `test_tuya_local.py` | fake devices, UDP announcements, 23 scenarios (0 to 22) |
+| `berry/test/fake_tuya.py`, `test_tuya_local.py` | fake devices, UDP announcements, 24 scenarios (0 to 23) |
 | `.github/workflows/build.yml` | files written by the tests |
 | `docs/tuya-local.en.md` / `.fr.md` | user guide |
 | `docs/tuya-local-examples.fr.md` / `.en.md` | command and event examples |

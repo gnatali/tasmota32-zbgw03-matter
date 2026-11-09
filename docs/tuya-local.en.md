@@ -199,7 +199,12 @@ exists: `TUY: Matter endpoint 'xxx' available, state sent`.
 
 **Device** (TCP connection): `name`, `id`, `key`, `ip`, `version` (`"3.3"`, `"3.4"` or
 `"3.5"`), and `"enabled": false` to set it aside. A Tuya gateway declares its sub-devices in
-`children` (`name`, `id`, `cid` = `node_id` from `devices.json`).
+`children` (`name`, `id`, `cid` = `node_id` from `devices.json`). To save RAM, the driver only
+keeps the values of the DPs it uses (those of the `matter` bindings and `sensors`, plus every
+boolean DP for `toggle`); `"keep": [63, 64]` keeps others, `"keep": "all"` keeps them all. The
+other DPs are still published in the `Tuya` event (rules can use them), but `TuyaStatus` does
+not show them. The `codes` table (import) is not kept in RAM either: `TuyaSend` by code reads it
+from `tuya.json` when used.
 
 **`matter` entry**: `ep` (endpoint name), `type`, and the DP numbers (defaults are those of
 common Tuya bulbs and fans):
@@ -225,7 +230,7 @@ The meaning of each device's DPs is in the `mapping` of `devices.json` (`code`, 
 
 | Command | Effect |
 |---|---|
-| `TuyaStatus [device]` | Connection state and last values of each device (or of one) |
+| `TuyaStatus [device]` | Connection state and last values of each device (or of one): the DPs kept (used ones, booleans, `keep`) |
 | `TuyaSend <device>,<dp>,<value>` | Sends a value, for example `TuyaSend Ventilateur,60,true` or `TuyaSend Ventilateur,62,3`. The DP can also be a code (`TuyaSend Lampe,switch_led,true`) if the device has a `codes` table (import). `toggle` inverts a boolean DP: `TuyaSend Entrée-Porche,20,toggle` |
 | `TuyaEnable [0\|1]` | Enables or disables the driver (kept across restarts), like the page's checkbox; without argument, gives the state: `{"TuyaEnable":{"Enabled":true,"State":"running"}}` (`State`: `running`, `disabled`, `waiting for Zigbee`...) |
 | `TuyaReload` | Reloads `tuya.json` and reconnects the devices (driver running only) |
@@ -306,7 +311,7 @@ It no longer appears in Smart Life; remove it from `tuya.json` if it was there.
 ## Tests
 
 `berry/test/run_tests.sh <Tasmota repository>` compiles Tasmota's Berry interpreter with
-Tasmota's BearSSL encryption, and runs 23 scenarios against fake Tuya devices built on
+Tasmota's BearSSL encryption, and runs 24 scenarios against fake Tuya devices built on
 [TinyTuya](https://github.com/jasonacox/tinytuya) (3.3, 3.4, 3.5, Zigbee gateway): key
 negotiation, Matter commands, state feedback, readings, disconnection and reconnection,
 corrupted or fragmented frames, Matter endpoint created later, API, discovery (announcements in
