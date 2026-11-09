@@ -212,8 +212,9 @@ Wi-Fi devices and the Zigbee sub-devices of the Tuya gateway, and expose them to
     refuses under 30 KB free. Bench with a realistic 16-device file (12.7 KB): 42 KB alive for
     the whole file, 8 KB at worst entry by entry (64-bit; about half on the ESP32). Scenario 22
     (60 more entries, > 30 KB file): 23/23 in both modes. Build: run 22 (commit `06a695d`),
-    flash used 2,112,795 bytes (+768); to be flashed, then open the page and read `Heap` and
-    Berry's `HeapUsed`.
+    flash used 2,112,795 bytes (+768). **Checked on the gateway**: 54 KB free after boot
+    (Berry 57 KB), 49 KB after several page loads with Berry still at 57 KB (was 29 KB and
+    76 KB, then the crash): the page's garbage is given back.
 
 ## Measurements on the gateway
 
@@ -235,6 +236,9 @@ Wi-Fi devices and the Zigbee sub-devices of the Tuya gateway, and expose them to
 | Run 13, just before the driver starts (`autoexec.be`) | 73 KB |
 | … driver started, 3 devices connected, readings at 5, 10 and 12 min (`STATE`, `Status 4`) | 56, 62, 60 KB |
 | Run 21 (Tasmota 16.0.0.3, driver started at boot without `autoexec.be`), uptime 2 h 47, **11 devices connected** (4 TCP connections: Ventilateur, Entrée-Porche, Récepteur radio, Tuya gateway with 7 sub-devices), 1 Matter endpoint | **46 KB** |
+| … run 21, after opening the Tuya Local page (crash, entry 21) | 29 KB (Berry `HeapUsed` 76 KB) |
+| Run 22 (page reads `tuya.json` entry by entry), same configuration, after boot | **54 KB** (Berry `HeapUsed` 57 KB) |
+| … after several loads of the Tuya Local page | **49 KB** (Berry `HeapUsed` 57 KB): no more crash |
 
 With the 12 devices connected, the driver used about **40 KB** when loaded from the file
 system (74 − 34: code compiled into RAM, device state, buffers), and about **23 KB** solidified

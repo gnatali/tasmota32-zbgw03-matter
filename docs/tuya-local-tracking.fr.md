@@ -226,7 +226,9 @@ Tuya Wi-Fi et les sous-appareils Zigbee de la passerelle Tuya, et les présenter
     (12,7 Ko) : 42 Ko en vie pour le fichier entier, 8 Ko au pire entrée par entrée (64 bits ;
     environ la moitié sur l'ESP32). Scénario 22 (60 entrées de plus, fichier > 30 Ko) : 23/23
     dans les deux modes. Build : exécution 22 (commit `06a695d`), flash utilisée 2 112 795
-    octets (+768) ; à flasher, puis ouvrir la page et relever `Heap` et le `HeapUsed` de Berry.
+    octets (+768). **Vérifié sur la passerelle** : 54 Ko libres après le démarrage (Berry
+    57 Ko), 49 Ko après plusieurs chargements de la page avec Berry toujours à 57 Ko (contre
+    29 Ko et 76 Ko, puis le plantage) : les déchets de la page sont bien rendus.
 
 ## Mesures sur la passerelle
 
@@ -248,6 +250,9 @@ Tuya Wi-Fi et les sous-appareils Zigbee de la passerelle Tuya, et les présenter
 | Exécution 13, juste avant le démarrage du driver (`autoexec.be`) | 73 Ko |
 | … driver démarré, 3 appareils connectés, relevés à 5, 10 et 12 min (`STATE`, `Status 4`) | 56, 62, 60 Ko |
 | Exécution 21 (Tasmota 16.0.0.3, driver démarré au boot sans `autoexec.be`), uptime 2 h 47, **11 appareils connectés** (4 connexions TCP : Ventilateur, Entrée-Porche, Récepteur radio, passerelle Tuya avec 7 sous-appareils), 1 endpoint Matter | **46 Ko** |
+| … exécution 21, après ouverture de la page Tuya Local (plantage, entrée 21) | 29 Ko (`HeapUsed` Berry 76 Ko) |
+| Exécution 22 (page qui lit `tuya.json` entrée par entrée), même configuration, après le démarrage | **54 Ko** (`HeapUsed` Berry 57 Ko) |
+| … après plusieurs chargements de la page Tuya Local | **49 Ko** (`HeapUsed` Berry 57 Ko) : plus de plantage |
 
 Avec les 12 appareils connectés, le driver consommait environ **40 Ko** chargé depuis le
 système de fichiers (74 − 34 : code compilé en RAM, état des appareils, tampons), et environ
