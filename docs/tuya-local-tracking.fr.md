@@ -212,6 +212,21 @@ Tuya Wi-Fi et les sous-appareils Zigbee de la passerelle Tuya, et les présenter
     (+80 octets), RAM statique DRAM 65 892 octets (−184) ; version 16.0.0.3(zbgw03-matter) ;
     à flasher.
 
+21. **Plantage de la page Tuya Local : mémoire** (9 novembre, exécution 21 sur la passerelle,
+    11 appareils) : ouvrir la page faisait tomber le heap libre à 29 Ko (heap Berry 76 Ko), puis
+    `MEMORY ALLOCATION FAILED` dans `every_50ms`. Cause : la page chargeait tout `/tuya.json`
+    jusqu'à deux fois (`read_conf()` : liste des appareils et recherche) ; depuis l'import cloud,
+    il contient codes, liaisons et relevés (~1 Ko par appareil), et `json.load` du fichier
+    entier coûte ~3 fois sa taille tant qu'il est en vie ; Berry ne ramasse les déchets que
+    quand il en a besoin. Correctif : la page (liste, édition, recherche) et `load_config()`
+    lisent le fichier **entrée par entrée** (`each_device()`, `each_object(fichier, cb, 1)`,
+    morceaux de 512 octets) ; `.bak` copié par morceaux ; `tasmota.gc()` après chaque page et
+    formulaire ; `read_conf()` (fichier entier, seulement pour le modifier) ramasse d'abord les
+    déchets et refuse sous 30 Ko libres. Banc avec un fichier réaliste de 16 appareils
+    (12,7 Ko) : 42 Ko en vie pour le fichier entier, 8 Ko au pire entrée par entrée (64 bits ;
+    environ la moitié sur l'ESP32). Scénario 22 (60 entrées de plus, fichier > 30 Ko) : 23/23
+    dans les deux modes.
+
 ## Mesures sur la passerelle
 
 | Situation | `Heap` (`Status 4`) |

@@ -294,6 +294,10 @@ Il n'apparaît plus dans Smart Life, et le retirer de `tuya.json` s'il y figurai
 
 ## Limites
 
+- **Mémoire** : la page et le driver lisent `tuya.json` entrée par entrée, mais modifier la
+  configuration (enregistrement, suppression, imports, `TuyaConfig`) charge tout le fichier : ces
+  actions demandent **30 Ko libres** et sont refusées en dessous (`not enough free memory: ...`)
+  plutôt que de risquer un plantage.
 - **Une seule connexion locale par appareil** : ne pas utiliser en même temps LocalTuya,
   tuya-local ou TinyTuya sur les mêmes appareils. L'application Smart Life continue de
   fonctionner (par le cloud).
@@ -310,7 +314,7 @@ Il n'apparaît plus dans Smart Life, et le retirer de `tuya.json` s'il y figurai
 ## Tests
 
 `berry/test/run_tests.sh <dépôt Tasmota>` compile l'interpréteur Berry de Tasmota avec le
-chiffrement BearSSL de Tasmota, et joue 21 scénarios contre de faux appareils Tuya construits
+chiffrement BearSSL de Tasmota, et joue 23 scénarios contre de faux appareils Tuya construits
 sur [TinyTuya](https://github.com/jasonacox/tinytuya) (3.3, 3.4, 3.5, passerelle Zigbee) :
 négociation de clé, commandes Matter, retours d'état, mesures, coupure et reconnexion, trames
 corrompues ou fragmentées, endpoint Matter créé à chaud, API, recherche (annonces au format

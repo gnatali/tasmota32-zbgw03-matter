@@ -41,7 +41,11 @@ paths:
   `<p><b>Label</b><br><input></p>` block, never several fields side by side; check the width on
   a desktop screen (screenshot with Tasmota's CSS).
 - File larger than the free RAM (tinytuya's `devices.json`): read it in chunks
-  (`readbytes(512)`, `TuyaImport.each_object`), never `read()` in one go.
+  (`readbytes(512)`, `TuyaImport.each_object`), never `read()` in one go. The same goes for
+  `/tuya.json` once imported (~1 KB per device): `json.load` of a whole file costs ~3 times its
+  size while alive. Read it entry by entry (`each_device()`), load it whole (`read_conf()`)
+  only to modify it, and call `tasmota.gc()` after a web page: Berry only collects garbage
+  when it needs to, and the page's garbage pushed the gateway to allocation failures.
 - **Start at boot**: `TuyaLocal.init()` runs in Berry's init code, before the network, Zigbee and
   Matter: it must stay light (no file, no connection, no `persist`). The real start is in
   `every_second()` (`start_wait()`: enabled, Zigbee started, network, Matter started, memory).

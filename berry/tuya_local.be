@@ -909,10 +909,12 @@ class TuyaImport
                              "fan": "v_fan", "temp": "v_temp", "humidity": "v_humidity"}
   static var MAX_OBJECT = 8192      # bytes: beyond this, the JSON object is skipped (RAM)
 
-  # calls cb(object) for each object of a JSON array, read in 512-byte chunks:
-  # tinytuya's devices.json (with the mappings) can exceed the free RAM
-  static def each_object(fname, cb)
+  # calls cb(object) for each JSON object found at brace depth `level` (nil: 0), the file being
+  # read in 512-byte chunks: tinytuya's devices.json (an array, level 0) can exceed the free RAM,
+  # and /tuya.json ({"devices": [...]}, level 1) must not be loaded in one go either
+  static def each_object(fname, cb, level)
     import json
+    var lvl = (level != nil) ? level : 0
     var f = open(fname, "r")
     var depth = 0
     var in_str = false
@@ -940,11 +942,11 @@ class TuyaImport
           elif c == 0x22
             in_str = true
           elif c == 0x7B
-            if depth == 0  acc = bytes()  start = i  skip = false  end
+            if depth == lvl  acc = bytes()  start = i  skip = false  end
             depth += 1
           elif c == 0x7D
             depth -= 1
-            if depth == 0
+            if depth == lvl
               if acc != nil
                 acc .. b[start .. i]
                 var o = json.load(acc.asstring())
@@ -1435,30 +1437,33 @@ class TuyaWeb
     end
     webserver.content_button(webserver.BUTTON_CONFIGURATION)
     webserver.content_stop()
+    tasmota.gc()                              # give the page's garbage back at once
   end
 
   static def devices(drv)
     import webserver
     TuyaWeb.legend("Tuya devices")
-    var conf
+    webserver.content_send("<table style='width:100%'>" +
+                           TuyaWeb.th([["Name", 130], ["IP", 100], ["Ver.", 30], ["", 20], ["", 20]]))
+    var n = [0]
     try
-      conf = drv.read_conf()
-    except .. as e, m
-      TuyaWeb.p("&#x26A0; " + TuyaWeb.esc(m))
-    end
-    if conf != nil
-      webserver.content_send("<table style='width:100%'>" +
-                             TuyaWeb.th([["Name", 130], ["IP", 100], ["Ver.", 30], ["", 20], ["", 20]]))
-      for c: conf["devices"]
+      drv.each_device(def (c)                 # one entry at a time: tuya.json is never loaded whole
         var id = str(c.find("id", ""))
         var st = TuyaWeb.STATES.find(drv.state_of(c), ["?", "?"])
         webserver.content_send("<tr><td>" + TuyaWeb.esc(c.find("name", id)) + "</td><td style='font-size:smaller;'>" +
                                TuyaWeb.esc(c.find("ip", "")) + "</td><td style='font-size:smaller;'>" + TuyaWeb.esc(c.find("version", "")) +
                                "</td><td title='" + st[1] + "'>" + st[0] + "</td><td><a href='/tuya?edit=" + TuyaWeb.esc(id) +
                                "' title='Edit' style='text-decoration:none;'>&#x1F4DD;</a></td></tr>")
-      end
+        n[0] += 1
+      end)
+    except .. as e, m
       webserver.content_send("</table>")
-      if size(conf["devices"]) == 0  TuyaWeb.p("No device: run a discovery, then import the local keys.")  end
+      TuyaWeb.p("&#x26A0; " + TuyaWeb.esc(m))
+      n = nil
+    end
+    if n != nil
+      webserver.content_send("</table>")
+      if n[0] == 0  TuyaWeb.p("No device: run a discovery, then import the local keys.")  end
     end
     webserver.content_send("<p></p><form action='/tuya' method='get'><input type='hidden' name='edit' value=''><button>&#x2795; Add device</button></form>")
     webserver.content_send("<p></p><form action='/tuya' method='post'><button name='reload'>&#x1F504; Reload tuya.json</button></form></fieldset><p></p>")
@@ -1469,9 +1474,11 @@ class TuyaWeb
     import json
     var d = nil
     if ref != ""
-      var conf = drv.read_conf()
-      var i = TuyaImport.find(conf["devices"], ref)
-      if i != nil  d = conf["devices"][i]  end
+      var found = []
+      drv.each_device(def (c)
+        if size(found) == 0 && TuyaImport.find([c], ref) != nil  found.push(c)  end
+      end)
+      if size(found) > 0  d = found[0]  end
     end
     if d == nil
       ref = ""
@@ -1545,8 +1552,11 @@ class TuyaWeb
       webserver.content_send("<form action='/tuya' method='post'><button name='scan'>&#x1F50D; Discover devices (20 s)</button></form>")
     end
     if drv.scan_result != nil
-      var conf
-      try  conf = drv.read_conf()  except .. as e, m  conf = {"devices": []}  end
+      var conf = {"devices": []}             # ids only, entry by entry
+      try
+        drv.each_device(def (c)  conf["devices"].push({"id": c.find("id"), "name": c.find("name")})  end)
+      except .. as e, m
+      end
       webserver.content_send("<p></p><table style='width:100%'>" + TuyaWeb.th([["Id", 160], ["IP", 100], ["Ver.", 30], ["", 20]]))
       for r: drv.scan_result
         var known = (TuyaImport.find(conf["devices"], r["id"]) != nil) ? "<span title='configured'>&#x2705;</span>" : "<span title='new'>&#x1F195;</span>"
@@ -1635,6 +1645,7 @@ class TuyaWeb
       msg = "Error: " + str(m)
     end
     drv.web_msg = msg
+    tasmota.gc()
     webserver.redirect(rst ? "/?rst=" : "/tuya")
   end
 end
@@ -1653,6 +1664,7 @@ class TuyaLocal
   static var IMPORT_MIN_HEAP = 20
   static var CLOUD_MIN_HEAP = 35
   static var START_MIN_HEAP = 45  # free memory (KB) needed to start the driver at boot
+  static var CONF_MIN_HEAP = 30   # free memory (KB) needed to load the whole tuya.json (to modify it)
   static var LABELS = {"Added": "added", "Updated": "updated", "Skipped": "skipped"}
   var devices                 # list of TuyaDevice
   var by_ep                   # {lower-case Matter endpoint name: TuyaBinding}
@@ -1826,8 +1838,22 @@ class TuyaLocal
 
   ###################### configuration file ######################
   # /tuya.json -> map; missing or empty: empty configuration; invalid: error (never overwritten)
+  # each device entry of /tuya.json, read in chunks: never the whole file in RAM (with an import
+  # from the cloud, codes and bindings make it ~1 KB per device, and json.load of the whole file
+  # costs ~2 times its size). A missing file gives no entry; an invalid entry is skipped.
+  def each_device(cb)
+    try
+      TuyaImport.each_object(self.CONFIG, cb, 1)
+    except "io_error"
+    end
+  end
+
+  # the whole /tuya.json, only to modify it (save, delete, imports): costly, hence the garbage
+  # collection first and the memory guard, which refuses instead of crashing
   def read_conf()
     import json
+    tasmota.gc()
+    self.check_heap(self.CONF_MIN_HEAP)
     var s
     try
       var f = open(self.CONFIG, "r")
@@ -1848,12 +1874,15 @@ class TuyaLocal
   # writes /tuya.json, the previous version being kept in /tuya.json.bak
   def write_conf(conf)
     import json
-    try
+    try                                       # copy in chunks, not the whole file in RAM
       var fi = open(self.CONFIG, "r")
-      var old = fi.read()
-      fi.close()
       var fb = open(self.CONFIG + ".bak", "w")
-      fb.write(old)
+      while true
+        var b = fi.readbytes(512)
+        if b == nil || size(b) == 0  break  end
+        fb.write(b)
+      end
+      fi.close()
       fb.close()
     except .. as e, m
     end
@@ -2229,32 +2258,25 @@ class TuyaLocal
     for d: self.devices  d.close("reload")  end
     self.devices = []
     self.by_ep = {}
-    var conf
+    tasmota.gc()
     try
-      var f = open(self.CONFIG, "r")
-      conf = json.load(f.read())
-      f.close()
+      TuyaImport.each_object(self.CONFIG, def (c)       # one entry at a time
+        if c.find("enabled", true) == false  return  end
+        if c.find("ip", "") == "" || !c.contains("key") || !c.contains("id")
+          tasmota.log(f"TUY: incomplete device ignored: {c.find('name')}", 1)
+          return
+        end
+        var d = TuyaDevice(c)
+        self.devices.push(d)
+        for n: d.nodes()
+          for b: n.bindings
+            self.by_ep[string.tolower(b.ep)] = b
+          end
+        end
+      end, 1)
     except .. as e, m
       tasmota.log(f"TUY: cannot read {self.CONFIG}: {m}", 1)
       return
-    end
-    if conf == nil
-      tasmota.log(f"TUY: {self.CONFIG} is not valid JSON", 1)
-      return
-    end
-    for c: conf.find("devices", [])
-      if c.find("enabled", true) == false  continue  end
-      if c.find("ip", "") == "" || !c.contains("key") || !c.contains("id")
-        tasmota.log(f"TUY: incomplete device ignored: {c.find('name')}", 1)
-        continue
-      end
-      var d = TuyaDevice(c)
-      self.devices.push(d)
-      for n: d.nodes()
-        for b: n.bindings
-          self.by_ep[string.tolower(b.ep)] = b
-        end
-      end
     end
     tasmota.log(f"TUY: {size(self.devices)} device(s), {size(self.by_ep)} Matter endpoint(s)", 2)
   end

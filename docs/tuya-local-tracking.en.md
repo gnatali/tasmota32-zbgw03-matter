@@ -200,6 +200,19 @@ Wi-Fi devices and the Zigbee sub-devices of the Tuya gateway, and expose them to
     run 21 (commit `2abb2fb`), 2,112,351-byte firmware (+80 bytes), static RAM DRAM 65,892
     bytes (−184); firmware version 16.0.0.3(zbgw03-matter); to be flashed.
 
+21. **Tuya Local page crash: memory** (9 November, run 21 on the gateway, 11 devices): opening
+    the page made the free heap fall to 29 KB (Berry heap 76 KB), then `MEMORY ALLOCATION
+    FAILED` in `every_50ms`. Cause: the page loaded the whole `/tuya.json` up to twice
+    (`read_conf()`: device list and discovery); since the cloud import it holds codes, bindings
+    and sensors (~1 KB per device), and `json.load` of the whole file costs ~3 times its size
+    while alive; Berry only collects garbage when it needs to. Fix: the page (list, editor,
+    discovery) and `load_config()` read the file **entry by entry** (`each_device()`,
+    `each_object(file, cb, 1)`, 512-byte chunks); `.bak` copied in chunks; `tasmota.gc()` after
+    each page and form; `read_conf()` (whole file, only to modify it) collects garbage first and
+    refuses under 30 KB free. Bench with a realistic 16-device file (12.7 KB): 42 KB alive for
+    the whole file, 8 KB at worst entry by entry (64-bit; about half on the ESP32). Scenario 22
+    (60 more entries, > 30 KB file): 23/23 in both modes.
+
 ## Measurements on the gateway
 
 | Situation | `Heap` (`Status 4`) |

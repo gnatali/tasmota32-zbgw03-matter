@@ -679,6 +679,27 @@ def main():
     ok += 1
     print("OK 21 firmware without Matter or Matter disabled: no MtrUpdate, page and TuyaMatter report it")
 
+    # 22. large tuya.json (as after a cloud import): the page, the editor and the reload read it
+    #     entry by entry (512-byte chunks), never in one go; garbage given back after the page
+    big = json.load(open("/tuya.json"))
+    for i in range(60):
+        big["devices"].append({"name": "Gros %02d" % i, "id": "big%017d" % i, "key": "k" * 16,
+                               "ip": "10.0.1.%d" % i, "version": "3.3", "enabled": False,
+                               "codes": {"switch_%d" % j: j for j in range(1, 30)},
+                               "matter": [{"ep": "Gros %02d" % i, "type": "relay", "dp": 1}]})
+    with open("/tuya.json", "w") as f:
+        json.dump(big, f, indent=1)
+    assert os.path.getsize("/tuya.json") > 30000
+    html, out = page("GET", {})
+    assert all("Gros %02d" % i in html for i in range(60)) and "Lampe test" in html, html[:300]
+    assert "GC" in out, out
+    html, _ = page("GET", {"edit": "gros 59"})
+    assert "big00000000000000059" in html and "&quot;key&quot;: &quot;***&quot;" in html, html[:300]
+    out = h.pump(h.send("CMD TuyaReload"))
+    assert any("device(s)" in l for l in out if l.startswith("LOG")), out
+    ok += 1
+    print("OK 22 large tuya.json read entry by entry: page, editor, reload")
+
     # disabling stops the driver: connections closed, no main page button
     out = h.send("CMD TuyaEnable 0")
     assert resp(out, "TuyaEnable") == {"Enabled": False, "State": "disabled"}, out
@@ -686,7 +707,7 @@ def main():
     assert not [l for l in h.send("SENSOR") if "Tuya Local" in l]
 
     h.close()
-    print("%d/22 scenarios OK" % ok)
+    print("%d/23 scenarios OK" % ok)
 
 
 if __name__ == "__main__":

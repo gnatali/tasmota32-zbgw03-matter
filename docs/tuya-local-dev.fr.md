@@ -134,9 +134,20 @@ l'instance existe toujours, et le travail est différé :
 
 ## 4. Fichier de configuration et API
 
-- `read_conf()` : `/tuya.json` absent ou vide donne une configuration vide ; un fichier invalide
-  lève une erreur et n'est **jamais écrasé**.
-- `write_conf()` : copie l'ancienne version dans `/tuya.json.bak`, écrit le JSON indenté, puis
+- **`/tuya.json` est lu entrée par entrée** (`each_device()`, `TuyaImport.each_object(fichier,
+  cb, 1)`, morceaux de 512 octets) par la page web (liste, édition, recherche) et
+  `load_config()` : après un import cloud, une entrée pèse ~0,5 à 1,5 Ko (codes, liaisons,
+  relevés), et `json.load` du fichier entier coûte environ 3 fois sa taille tant qu'il est en
+  vie (banc, 16 appareils, fichier de 12,7 Ko : 42 Ko pour le fichier entier, 8 Ko au pire
+  entrée par entrée). Le charger entier deux fois par page épuisait la mémoire de la passerelle
+  (exécution 21 : heap Berry 76 Ko, heap libre 29 Ko, échecs d'allocation dans `every_50ms`).
+- `read_conf()` (fichier entier, seulement pour le modifier : enregistrement, suppression,
+  imports, `TuyaConfig`) : lance d'abord le ramasse-miettes et refuse sous `CONF_MIN_HEAP`
+  (30 Ko libres) au lieu de planter ; `/tuya.json` absent ou vide donne une configuration vide ;
+  un fichier invalide lève une erreur et n'est **jamais écrasé**. La page et le formulaire
+  appellent `tasmota.gc()` à la fin.
+- `write_conf()` : copie l'ancienne version dans `/tuya.json.bak` par morceaux de 512 octets,
+  écrit le JSON indenté, puis
   la configuration est rechargée (`load_config()`).
 - `save_device(d, ref)` : ajoute ou remplace un appareil, désigné par `ref` (identifiant ou nom,
   sans casse) ou par son `id`. Une clé absente, vide ou `***` conserve la clé enregistrée.
@@ -311,6 +322,7 @@ appareils (`fake_tuya.py`) et les annonces UDP (`udp_broadcast()`, vérifiées p
 | 19 | `TuyaSend ... toggle` |
 | 20 | identifiants du cloud enregistrés : case de la page, secret jamais affiché, `TuyaCloud` sans argument, effacement |
 | 21 | firmware sans Matter, ou Matter désactivé : pas de `MtrUpdate`, rien en attente, la page et `TuyaMatter` le signalent ; `TuyaEnable 0` ferme les connexions |
+| 22 | gros `tuya.json` (60 entrées de plus, > 30 Ko) : page, édition et rechargement le lisent entrée par entrée ; ramasse-miettes après la page |
 
 Le workflow lance le banc avant la compilation ; il crée `/tuya.json`, `/tuya.json.bak`,
 `/devices.json` et `/tuya_cloud.json`, que le test écrit.
@@ -370,7 +382,7 @@ la configuration simplifiée ajoute 0,7 à 1,3 Ko au repos.
 | `platformio_override.ini` | `-DUSE_TUYA_LOCAL` (démarrage au boot) et `custom_berry_solidify` (driver en flash) |
 | `berry/test/run_tests.sh` | construction des deux interpréteurs, solidification, scénarios |
 | `berry/test/harness.be`, `webserver.be`, `crypto.be`, `persist.be` | simulations de Tasmota |
-| `berry/test/fake_tuya.py`, `test_tuya_local.py` | faux appareils, annonces UDP, 22 scénarios (0 à 21) |
+| `berry/test/fake_tuya.py`, `test_tuya_local.py` | faux appareils, annonces UDP, 23 scénarios (0 à 22) |
 | `.github/workflows/build.yml` | fichiers écrits par les tests |
 | `docs/tuya-local.fr.md` / `.en.md` | documentation d'utilisation |
 | `docs/tuya-local-examples.fr.md` / `.en.md` | exemples de commandes et d'événements |

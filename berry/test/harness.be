@@ -26,6 +26,12 @@ class MockTasmota
   def init()  self.now = 100000  self.rules = {}  self.cmds = {}  self.drivers = []  self.missing = {"Inconnu": true}  self.heap = 60  end
   def millis()  return self.now  end
   def memory()  return {"heap_free": self.heap}  end
+  def gc()
+    import gc
+    gc.collect()
+    print("GC")
+    return gc.allocated()
+  end
   def eth()  return {"ip": "10.0.0.2"}  end
   def wifi()  return {}  end
   def rtc()  return {"utc": 1793984000 + self.now / 1000}  end
