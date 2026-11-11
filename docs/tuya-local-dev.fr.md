@@ -168,9 +168,19 @@ l'instance existe toujours, et le travail est différé :
   (30 Ko libres) au lieu de planter ; `/tuya.json` absent ou vide donne une configuration vide ;
   un fichier invalide lève une erreur et n'est **jamais écrasé**. La page et le formulaire
   appellent `tasmota.gc()` à la fin.
-- `write_conf()` : copie l'ancienne version dans `/tuya.json.bak` par morceaux de 512 octets,
-  écrit le JSON indenté, puis
-  la configuration est rechargée (`load_config()`).
+- `write_conf()` : copie l'ancienne version dans `/tuya.json.bak` par morceaux de 512 octets
+  (`copy_file` ; **jamais si le fichier actuel est vide**, un fichier vide ne peut donc pas
+  remplacer un bon `.bak`), puis écrit le nouveau fichier **entrée par entrée** (un
+  `json.dump(entrée, "format")` par appareil : la plus grosse chaîne est une entrée, pas le
+  fichier entier). Sur **toute** erreur (l'exécution du 11 novembre : échec d'allocation de
+  Berry dans le `json.dump` du fichier entier, alors que `open(..., "w")` avait déjà vidé
+  `tuya.json`), l'ancienne version est restaurée depuis le `.bak` (copie par morceaux) et une
+  erreur `tuya_error` `... not modified` est levée : le fichier est soit entièrement écrit, soit
+  inchangé. Puis la configuration est rechargée (`load_config()`).
+- Les imports lisent le `tuya.json` entier **en dernier** (`merge_entries()`, seulement s'il y a
+  quelque chose à fusionner), une fois prêtes les entrées du `devices.json` ou du cloud : les
+  identifiants connus viennent de `each_device()`, si bien que le `json.load` du fichier entier
+  (~3 fois le fichier) ne vit plus pendant l'analyse des objets du `devices.json` (jusqu'à 8 Ko).
 - `save_device(d, ref)` : ajoute ou remplace un appareil, désigné par `ref` (identifiant ou nom,
   sans casse) ou par son `id`. Une clé absente, vide ou `***` conserve la clé enregistrée.
   Refus d'un nom ou d'un identifiant déjà utilisé par un autre appareil.
@@ -233,7 +243,9 @@ pas de nom.
 - **Lecture par morceaux** (`TuyaImport.each_object`) : le fichier est lu par blocs de 512
   octets, les objets du tableau sont repérés par un automate (profondeur d'accolades, chaînes,
   échappements) et analysés un par un. Un objet de plus de 8 Ko est ignoré (journal
-  `JSON object too big`). La taille du fichier n'est donc pas limitée par la RAM.
+  `JSON object too big` ; `each_object` appelle le rappel facultatif `on_big` et le résultat
+  contient `"<n> object(s) too big (use the cloud import)"` dans `Skipped`). La taille du fichier
+  n'est donc pas limitée par la RAM.
 - **Sélection** : par défaut, les appareils trouvés par la dernière recherche ou déjà
   configurés, et les sous-appareils dont la passerelle l'est ; `all` : tous ; `id,id` : ceux-là.
 - **Entrée créée** (`TuyaImport.entry`) : `name`, `id`, `key` (ou `local_key`), `ip` et
@@ -274,7 +286,13 @@ Reprise de `tinytuya.Cloud` (`Cloud.py`) :
   `tinytuya.Cloud` ;
 - **une requête par seconde** (chaque requête bloque le temps de la poignée de main TLS) ;
   **35 Ko libres** exigés avant chaque requête (le client HTTPS de Tasmota réserve un tampon de
-  16 Ko, `HttpClientLight`) ;
+  16 Ko, `HttpClientLight`). `cloud_step()` lance d'abord `tasmota.gc()` (les déchets de la
+  requête précédente ne sont pas de la mémoire libre : 32 Ko lus sur la passerelle avec 63 Ko
+  libres au repos) et, si la mémoire manque encore, **reporte** la requête au tick suivant, 5 fois
+  au plus (`cloud_wait`), avant de signaler `not enough free memory` au lieu de perdre l'import au
+  premier creux. Un appareil dont le cloud refuse les spécifications (`not support this device`,
+  p. ex. la passerelle Tuya Zigbee) est importé sans table de DP (journal `no DP table for
+  <id>`), donc sans liaisons ;
 - appareils : ceux passés dans `"devices"`, sinon ceux de la dernière recherche. Les
   sous-appareils ne sont pas traités ;
 - identifiants : enregistrés seulement sur demande (case de la page, `"save":true`) dans
@@ -366,6 +384,7 @@ appareils (`fake_tuya.py`) et les annonces UDP (`udp_broadcast()`, vérifiées p
 | 23 | RAM : seuls les DP utilisés sont gardés (liaisons, relevés, booléens, `keep`) mais tous sont publiés ; `TuyaSend` par code lit les codes dans `tuya.json` (sous-appareil de passerelle compris) |
 | 24 | désactiver sans supprimer : une liaison Matter (`TuyaActive`, plus de `MtrUpdate`, ⏸️ dans la liste, réactivée depuis la page), un appareil depuis sa page d'édition (un appareil et un endpoint du même nom : seulement l'appareil), un sous-appareil de passerelle ; erreurs |
 | 25 | tableau de la recherche : nom et type (`tuya.json`, `devices.json`, cloud), appareil inconnu (clé produit), tri par IP, rien de coché, import de la sélection (fichier, cloud), refus sans sélection ou avec un identifiant inconnu, identifiants requis, identification sans clé ni modification de `tuya.json` |
+| 26 | échecs d'import : `write_conf` d'une configuration qui échoue en cours d'écriture (`WRITEFAIL` du banc, `tojson()` qui échoue) restaure `tuya.json` et garde le `.bak` ; un fichier vide ne remplace pas le `.bak` ; import cloud reporté puis terminé quand la mémoire revient, erreur après 5 reports ; objets trop gros signalés dans `Skipped` |
 
 Le workflow lance le banc avant la compilation ; il crée `/tuya.json`, `/tuya.json.bak`,
 `/devices.json` et `/tuya_cloud.json`, que le test écrit.
@@ -425,7 +444,7 @@ la configuration simplifiée ajoute 0,7 à 1,3 Ko au repos.
 | `platformio_override.ini` | `-DUSE_TUYA_LOCAL` (démarrage au boot) et `custom_berry_solidify` (driver en flash) |
 | `berry/test/run_tests.sh` | construction des deux interpréteurs, solidification, scénarios |
 | `berry/test/harness.be`, `webserver.be`, `crypto.be`, `persist.be` | simulations de Tasmota |
-| `berry/test/fake_tuya.py`, `test_tuya_local.py` | faux appareils, annonces UDP, 26 scénarios (0 à 25) |
+| `berry/test/fake_tuya.py`, `test_tuya_local.py` | faux appareils, annonces UDP, 27 scénarios (0 à 26) |
 | `.github/workflows/build.yml` | fichiers écrits par les tests |
 | `docs/tuya-local.fr.md` / `.en.md` | documentation d'utilisation |
 | `docs/tuya-local-examples.fr.md` / `.en.md` | exemples de commandes et d'événements |

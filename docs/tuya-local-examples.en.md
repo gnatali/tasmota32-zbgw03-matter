@@ -286,7 +286,8 @@ and on the main page:
 | `TUY: Matter endpoint 'Lampe' available, state sent` | the endpoint accepts, state sent |
 | `TUY: incomplete device ignored: Pergola 1` | entry without `ip`, `key` or `id` |
 | `TUY: TuyaScan {"Devices":[...]}` | end of discovery |
-| `TUY: import: JSON object too big, ignored` | entry over 8 KB in `devices.json` |
+| `TUY: import: JSON object too big, ignored` | entry over 8 KB in `devices.json` (also reported in `Skipped`) |
+| `TUY: cloud: no DP table for <id> (...): imported without Matter bindings` | the cloud refuses the device's specifications; the device is added without bindings |
 
 ## 9. Tasmota rules
 

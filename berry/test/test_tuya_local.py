@@ -846,6 +846,60 @@ def main():
     ok += 1
     print("OK 25 discovery table: names/types, sorted by IP, selection (file, cloud), cloud identification")
 
+    # 26. import failures seen on the gateway: a failed write leaves tuya.json as it was (it was emptied),
+    #     an empty file never replaces the .bak, the cloud import waits for memory instead of aborting,
+    #     objects too big for the file import are reported
+    h.send("HEAP 60")
+    before = open("/tuya.json").read()
+    out = h.send("WRITEFAIL")                                         # the 3rd entry cannot be written
+    err = [l for l in out if l.startswith("WRITEFAIL ")]
+    assert err and "not modified" in err[0] and "simulated allocation failure" in err[0], out
+    assert open("/tuya.json").read() == before and open("/tuya.json.bak").read() == before
+    good_bak = open("/tuya.json.bak").read()
+    with open("/tuya.json", "w") as f:                                # emptied file (as on the gateway)
+        f.write("")
+    out = h.pump(h.send("CMD TuyaAdd " + json.dumps({"name": "Tmp", "id": "tmp0000000000000000", "key": "tMp-KeY-0000026",
+                                                       "ip": "10.0.0.99", "version": "3.3"})))
+    assert resp(out, "TuyaAdd") == "Tmp", out
+    assert open("/tuya.json.bak").read() == good_bak, "an empty file replaced the .bak"
+    with open("/tuya.json", "w") as f:
+        f.write(before)
+    h.pump(h.send("CMD TuyaReload"))
+    h.pump(h.send("ADV 1000"))
+    # cloud: free memory too low between two requests (uncollected garbage): wait, then continue
+    creds = {"region": "eu", "id": "AcCeSsId0126", "secret": "s3cr3t-s3cr3t-26", "devices": [cloud_id]}
+    h.send('HTTPSRESP /v1.0/token?grant_type=1 200 {"success":true,"result":{"access_token":"tok126"},"t":1794092132086}')
+    first = h.send("CMD TuyaCloud " + json.dumps(creds))                # the token request goes out at once
+    assert "1 device" in resp(first, "TuyaCloud")
+    h.send("HEAP 30")
+    out = h.pump(h.send("ADV 2000"))
+    assert not [l for l in out if l.startswith("HTTPS ")], out         # postponed, not aborted
+    assert not [l for l in out if l.startswith("PUB ") and "TuyaCloud" in l], out
+    h.send("HEAP 60")
+    out = list(first)
+    for _ in range(5):
+        out += h.pump(h.send("ADV 1000"))
+    pub = [json.loads(l[4:])["TuyaCloud"] for l in out if l.startswith("PUB ") and "TuyaCloud" in l]
+    assert pub and "Error" not in pub[-1] and set(pub[-1].get("Added", []) + pub[-1].get("Updated", [])) == {"Cloud double"}, pub
+    assert len([l for l in out if l.startswith("HTTPS ")]) == 3, out                # token, device, specifications
+    # ... but not for ever: the error comes after 5 postponed requests
+    assert "1 device" in resp(h.send("CMD TuyaCloud " + json.dumps(creds)), "TuyaCloud")
+    h.send("HEAP 30")
+    out = []
+    for _ in range(8):
+        out += h.pump(h.send("ADV 1000"))
+    pub = [json.loads(l[4:])["TuyaCloud"] for l in out if l.startswith("PUB ") and "TuyaCloud" in l]
+    assert pub and "memory" in pub[-1]["Error"], pub
+    h.send("HEAP 60")
+    # file import: objects too big are reported, not only logged
+    with open("/devices.json", "w") as f:
+        json.dump([{"name": "Enorme 2", "id": "huge20000000000000000", "key": "x", "icon": "y" * 9000},
+                   {"name": "Enorme 3", "id": "huge30000000000000000", "key": "x", "icon": "z" * 9000}], f)
+    out = h.pump(h.send("CMD TuyaImport /devices.json all"))
+    assert resp(out, "TuyaImport")["Skipped"] == ["2 object(s) too big (use the cloud import)"], out
+    ok += 1
+    print("OK 26 import failures: tuya.json restored after a failed write, .bak kept, cloud waits for memory, big objects reported")
+
     # disabling stops the driver: connections closed, no main page button
     out = h.send("CMD TuyaEnable 0")
     assert resp(out, "TuyaEnable") == {"Enabled": False, "State": "disabled"}, out
@@ -853,7 +907,7 @@ def main():
     assert not [l for l in h.send("SENSOR") if "Tuya Local" in l]
 
     h.close()
-    print("%d/26 scenarios OK" % ok)
+    print("%d/27 scenarios OK" % ok)
 
 
 if __name__ == "__main__":

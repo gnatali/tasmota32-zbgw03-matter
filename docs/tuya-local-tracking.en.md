@@ -250,6 +250,21 @@ Wi-Fi devices and the Zigbee sub-devices of the Tuya gateway, and expose them to
     measure `Heap` (the code is in flash; `scan_info` ~0.5 KB for 7 devices, freed at the next
     discovery) and check the page on a desktop screen.
 
+25. **`tuya.json` emptied by an import; cloud import aborted** (11 November, first test of
+    entry 24 on the gateway, 63-65 KB free at rest): (a) a `devices.json` import with 4 entries
+    over 8 KB ended with `MEMORY ALLOCATION FAILED` in `merge_entries` and **`tuya.json` at
+    0 bytes** (recovered from `.bak`): `write_conf()` opened the file for writing *then* built the
+    whole indented JSON in one string, and `import_file()` kept the whole-file `json.load`
+    (~3 times the file) alive during the scan; (b) the cloud import stopped with `not enough free
+    memory: 32 KB` (then 34 KB, 35 needed) because the guard before each request counted the
+    previous request's garbage; (c) `no DP for ... not support this device` is normal for the Tuya
+    Zigbee gateway (no specifications): the device is added without bindings. Fixed:
+    `write_conf` writes entry by entry, restores the `.bak` on error and never replaces the `.bak`
+    by an empty file; imports read the whole `tuya.json` last; `cloud_step` collects garbage and
+    postpones up to 5 times; objects over 8 KB are reported in `Skipped`. Scenario 26: 27/27 in
+    both modes (it fails with the previous driver). To build and flash, then redo the same
+    imports with the same files and check `Heap` and that `tuya.json` is never empty.
+
 ## Measurements on the gateway
 
 | Situation | `Heap` (`Status 4`) |

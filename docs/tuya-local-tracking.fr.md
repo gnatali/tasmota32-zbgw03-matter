@@ -268,6 +268,23 @@ Tuya Wi-Fi et les sous-appareils Zigbee de la passerelle Tuya, et les présenter
     flasher, puis relever `Heap` (le code est en flash ; `scan_info` ~0,5 Ko pour 7 appareils,
     libéré à la recherche suivante) et vérifier la page sur un écran de bureau.
 
+25. **`tuya.json` vidé par un import ; import cloud interrompu** (11 novembre, premier essai de
+    l'entrée 24 sur la passerelle, 63-65 Ko libres au repos) : (a) un import `devices.json` avec 4
+    entrées de plus de 8 Ko s'est terminé par `MEMORY ALLOCATION FAILED` dans `merge_entries` et
+    **`tuya.json` à 0 octet** (récupéré depuis `.bak`) : `write_conf()` ouvrait le fichier en
+    écriture *puis* construisait tout le JSON indenté en une seule chaîne, et `import_file()`
+    gardait le `json.load` du fichier entier (~3 fois sa taille) en vie pendant la lecture ;
+    (b) l'import cloud s'est arrêté sur `not enough free memory: 32 KB` (puis 34 Ko, 35 exigés)
+    car la garde avant chaque requête comptait les déchets de la requête précédente ; (c) `no DP
+    for ... not support this device` est normal pour la passerelle Tuya Zigbee (pas de
+    spécifications) : l'appareil est ajouté sans liaisons. Corrigé : `write_conf` écrit entrée
+    par entrée, restaure le `.bak` sur erreur et ne remplace jamais le `.bak` par un fichier
+    vide ; les imports lisent le `tuya.json` entier en dernier ; `cloud_step` ramasse les déchets
+    et reporte jusqu'à 5 fois ; les objets de plus de 8 Ko sont signalés dans `Skipped`.
+    Scénario 26 : 27/27 dans les deux modes (il échoue avec le driver précédent). À compiler et
+    flasher, puis refaire les mêmes imports avec les mêmes fichiers et vérifier `Heap` et que
+    `tuya.json` n'est jamais vide.
+
 ## Mesures sur la passerelle
 
 | Situation | `Heap` (`Status 4`) |

@@ -990,8 +990,9 @@ class TuyaImport
 
   # calls cb(object) for each JSON object found at brace depth `level` (nil: 0), the file being
   # read in 512-byte chunks: tinytuya's devices.json (an array, level 0) can exceed the free RAM,
-  # and /tuya.json ({"devices": [...]}, level 1) must not be loaded in one go either
-  static def each_object(fname, cb, level)
+  # and /tuya.json ({"devices": [...]}, level 1) must not be loaded in one go either.
+  # on_big (optional) is called for each object over MAX_OBJECT, which is skipped
+  static def each_object(fname, cb, level, on_big)
     import json
     var lvl = (level != nil) ? level : 0
     var f = open(fname, "r")
@@ -1043,6 +1044,7 @@ class TuyaImport
             acc = nil
             skip = true
             tasmota.log("TUY: import: JSON object too big, ignored", 2)
+            if on_big != nil  on_big()  end
           end
         end
       end
@@ -1427,7 +1429,7 @@ class TuyaCloud
       try
         self.cur["mapping"] = TuyaCloud.mapping(self.request("/v1.1/devices/" + id + "/specifications"))
       except .. as e, m
-        tasmota.log(f"TUY: cloud: no DP for {id}: {m}", 2)
+        tasmota.log(f"TUY: cloud: no DP table for {id} ({m}): imported without Matter bindings", 2)
       end
       self.out.push(self.cur)
       self.cur = nil
@@ -1840,6 +1842,7 @@ class TuyaLocal
   var scan, scan_result       # running discovery (TuyaScan) and last result (list)
   var scan_info               # {id: [name, type, product]} of the last result (see scan_info_load); nil: to load
   var cloud, cloud_t          # running cloud import (TuyaCloud) and millis of the next request
+  var cloud_wait              # consecutive requests postponed for lack of memory
   var web_msg                 # message to show on the web page
   var running                 # true once started: tuya.json loaded, devices connecting
   var wait                    # why the driver is not started yet ("disabled", "waiting for Zigbee"...)
@@ -2042,24 +2045,71 @@ class TuyaLocal
     return conf
   end
 
-  # writes /tuya.json, the previous version being kept in /tuya.json.bak
+  # copies src to dst in 512-byte chunks (never the whole file in RAM); false, dst untouched, if src
+  # is missing or empty
+  def copy_file(src, dst)
+    var fi
+    try
+      fi = open(src, "r")
+    except .. as e, m
+      return false
+    end
+    var b = fi.readbytes(512)
+    if b == nil || size(b) == 0
+      fi.close()
+      return false
+    end
+    var fo = open(dst, "w")
+    while b != nil && size(b) > 0
+      fo.write(b)
+      b = fi.readbytes(512)
+    end
+    fi.close()
+    fo.close()
+    return true
+  end
+
+  # writes /tuya.json, the previous version being kept in /tuya.json.bak (never replaced by an
+  # empty file). The new file is written entry by entry (a single json.dump of the whole
+  # configuration needs a string as big as the file, which ran out of memory and left /tuya.json
+  # empty); on any error the previous version is restored from the .bak, so the file is either
+  # fully written or unchanged.
   def write_conf(conf)
     import json
-    try                                       # copy in chunks, not the whole file in RAM
-      var fi = open(self.CONFIG, "r")
-      var fb = open(self.CONFIG + ".bak", "w")
-      while true
-        var b = fi.readbytes(512)
-        if b == nil || size(b) == 0  break  end
-        fb.write(b)
+    tasmota.gc()
+    var bak = self.CONFIG + ".bak"
+    var had = self.copy_file(self.CONFIG, bak)
+    var fo = nil
+    try
+      fo = open(self.CONFIG, "w")
+      fo.write("{")
+      var sep = "\n"
+      for k: conf.keys()
+        if k == "devices"  continue  end
+        fo.write(sep + json.dump(k) + ": " + json.dump(conf[k]))
+        sep = ",\n"
       end
-      fi.close()
-      fb.close()
+      fo.write(sep + "\"devices\": [")
+      sep = "\n"
+      for d: conf["devices"]
+        fo.write(sep + json.dump(d, "format"))
+        sep = ",\n"
+      end
+      fo.write("\n]\n}\n")
+      fo.close()
     except .. as e, m
+      tasmota.gc()
+      try
+        if fo != nil  fo.close()  end
+      except .. as e2, m2
+      end
+      if had
+        self.copy_file(bak, self.CONFIG)
+      else
+        open(self.CONFIG, "w").close()      # there was nothing: no partial file
+      end
+      raise "tuya_error", f"{self.CONFIG} not modified ({e}: {m})"
     end
-    var fo = open(self.CONFIG, "w")
-    fo.write(json.dump(conf, "format"))
-    fo.close()
   end
 
   # TuyaConfig [device]: configuration without the keys
@@ -2300,9 +2350,8 @@ class TuyaLocal
     import string
     if fname == nil || fname == ""  fname = "/devices.json"  end
     self.check_heap(self.IMPORT_MIN_HEAP)
-    var conf = self.read_conf()
-    var known = {}
-    for c: conf["devices"]  known[str(c.find("id"))] = true  end
+    var known = {}                            # ids only: tuya.json is read whole later, once the file is scanned
+    self.each_device(def (c)  known[str(c.find("id"))] = true  end)
     var scan = self.scan_map()
     var all = (filter == "all")
     var ids = nil
@@ -2313,6 +2362,7 @@ class TuyaLocal
     end
     var entries = []
     var skipped = []
+    var big = [0]
     try
       TuyaImport.each_object(fname, def (d)
         var id = str(d.find("id", ""))
@@ -2328,20 +2378,26 @@ class TuyaLocal
         else
           entries.push(e)
         end
-      end)
+      end, nil, def ()  big[0] += 1  end)
     except "io_error" as e, m
       raise "tuya_error", f"{fname} not found"
     end
-    return self.merge_entries(conf, entries, skipped)
+    if big[0] > 0  skipped.push(str(big[0]) + " object(s) too big (use the cloud import)")  end
+    return self.merge_entries(entries, skipped)
   end
 
-  def merge_entries(conf, entries, skipped)
-    var r = TuyaImport.merge(conf, entries)
-    for x: skipped  r["Skipped"].push(x)  end
-    if size(r["Added"]) + size(r["Updated"]) > 0
-      self.write_conf(conf)
-      self.reload()
+  # tuya.json is only read (whole) here, once the entries are ready, then written back
+  def merge_entries(entries, skipped)
+    var r = {"Added": [], "Updated": [], "Skipped": []}
+    if size(entries) > 0
+      var conf = self.read_conf()
+      r = TuyaImport.merge(conf, entries)
+      if size(r["Added"]) + size(r["Updated"]) > 0
+        self.write_conf(conf)
+        self.reload()
+      end
     end
+    for x: skipped  r["Skipped"].push(x)  end
     return r
   end
 
@@ -2429,6 +2485,7 @@ class TuyaLocal
     self.check_heap(self.CLOUD_MIN_HEAP)
     self.cloud = TuyaCloud(region, key, secret, ids, names_only)
     self.cloud_t = 0
+    self.cloud_wait = 0
     return (names_only ? "cloud identification" : "cloud import") + f" started for {size(ids)} device(s)"
   end
 
@@ -2436,7 +2493,13 @@ class TuyaLocal
   def cloud_step()
     var more
     try
-      self.check_heap(self.CLOUD_MIN_HEAP)
+      tasmota.gc()                            # the previous request's garbage is not free memory yet
+      if tasmota.memory().find("heap_free", 0) < self.CLOUD_MIN_HEAP && self.cloud_wait < 5
+        self.cloud_wait += 1                  # retried at the next tick instead of aborting the import
+        return
+      end
+      self.check_heap(self.CLOUD_MIN_HEAP)    # still short after 5 tries: error
+      self.cloud_wait = 0
       more = self.cloud.next()
     except .. as e, m
       self.cloud = nil
@@ -2453,7 +2516,6 @@ class TuyaLocal
         self.report("TuyaCloud", {"Identified": self.scan_info_cloud(items)})
         return
       end
-      var conf = self.read_conf()
       var scan = self.scan_map()
       var entries = []
       var skipped = []
@@ -2465,7 +2527,7 @@ class TuyaLocal
           entries.push(e)
         end
       end
-      r = self.merge_entries(conf, entries, skipped)
+      r = self.merge_entries(entries, skipped)
     except .. as e, m
       r = {"Error": str(m)}
     end

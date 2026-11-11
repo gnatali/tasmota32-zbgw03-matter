@@ -321,7 +321,15 @@ Il n'apparaît plus dans Smart Life, et le retirer de `tuya.json` s'il y figurai
 - **Mémoire** : la page et le driver lisent `tuya.json` entrée par entrée, mais modifier la
   configuration (enregistrement, suppression, imports, `TuyaConfig`) charge tout le fichier : ces
   actions demandent **30 Ko libres** et sont refusées en dessous (`not enough free memory: ...`)
-  plutôt que de risquer un plantage.
+  plutôt que de risquer un plantage. `tuya.json` est écrit entrée par entrée et restauré depuis
+  `tuya.json.bak` si l'écriture échoue : il n'est donc jamais laissé vide ; `tuya.json.bak` n'est
+  pas remplacé quand `tuya.json` est vide.
+- **Import** : une entrée du `devices.json` de plus de **8 Ko** (grosse icône ou description des
+  DP) est ignorée et signalée (`N object(s) too big`) : importez ces appareils par le cloud.
+  Dans un import cloud, un appareil dont le cloud refuse les spécifications (`not support this
+  device`, typiquement la passerelle Tuya Zigbee) est quand même ajouté, sans liaisons :
+  complétez sa section `matter` à la main. L'import cloud attend (5 s au plus) quand la mémoire
+  manque un instant, au lieu de s'arrêter.
 - **Une seule connexion locale par appareil** : ne pas utiliser en même temps LocalTuya,
   tuya-local ou TinyTuya sur les mêmes appareils. L'application Smart Life continue de
   fonctionner (par le cloud).
@@ -338,7 +346,7 @@ Il n'apparaît plus dans Smart Life, et le retirer de `tuya.json` s'il y figurai
 ## Tests
 
 `berry/test/run_tests.sh <dépôt Tasmota>` compile l'interpréteur Berry de Tasmota avec le
-chiffrement BearSSL de Tasmota, et joue 26 scénarios contre de faux appareils Tuya construits
+chiffrement BearSSL de Tasmota, et joue 27 scénarios contre de faux appareils Tuya construits
 sur [TinyTuya](https://github.com/jasonacox/tinytuya) (3.3, 3.4, 3.5, passerelle Zigbee) :
 négociation de clé, commandes Matter, retours d'état, mesures, coupure et reconnexion, trames
 corrompues ou fragmentées, endpoint Matter créé à chaud, API, recherche (annonces au format

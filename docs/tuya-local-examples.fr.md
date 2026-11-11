@@ -282,7 +282,8 @@ règles) : seulement les DP qui ont changé, ou tout l'état à la connexion.
 | `TUY: Matter endpoint 'Lampe' available, state sent` | l'endpoint accepte, état envoyé |
 | `TUY: incomplete device ignored: Pergola 1` | entrée sans `ip`, `key` ou `id` |
 | `TUY: TuyaScan {"Devices":[...]}` | fin de recherche |
-| `TUY: import: JSON object too big, ignored` | entrée de plus de 8 Ko dans `devices.json` |
+| `TUY: import: JSON object too big, ignored` | entrée de plus de 8 Ko dans `devices.json` (aussi signalée dans `Skipped`) |
+| `TUY: cloud: no DP table for <id> (...): imported without Matter bindings` | le cloud refuse les spécifications de l'appareil ; il est ajouté sans liaisons |
 
 ## 9. Règles Tasmota
 
