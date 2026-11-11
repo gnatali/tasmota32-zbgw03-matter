@@ -177,10 +177,15 @@ the **Tuya Local** page, or MQTT / HTTP.
 ```
 TuyaCloud {"region":"eu","id":"<Access ID>","secret":"<Access Secret>"}
 TuyaCloud {"region":"eu","id":"<Access ID>","secret":"<Access Secret>","devices":["00000000000000lamp01"]}
+TuyaCloud {"names":true}
 ```
 ```json
 {"TuyaCloud":"cloud import started for 3 device(s)"}
 ```
+
+`"names":true` only identifies the devices of the last discovery that have no name yet (or the
+`devices` list): name and type for the discovery table, no key fetched, `tuya.json` untouched.
+The end event is `{"TuyaCloud":{"Identified":2}}`.
 
 Credentials saved in `/tuya_cloud.json` (like the page's checkbox), then reused without typing
 them again, which also keeps them out of the log; `"save":false` erases them:

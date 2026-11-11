@@ -240,6 +240,16 @@ Wi-Fi devices and the Zigbee sub-devices of the Tuya gateway, and expose them to
     `4ffd833`, entries 22 and 23), flash used 2,119,179 bytes (+6.4 KB since run 22); to be
     flashed, then read `Heap` and Berry's `HeapUsed` with the same configuration.
 
+24. **Discovery table: names, types, selection** (11 November): the table only showed id, IP and
+    version, hard to read with 7 devices (the UDP announcement has no name). Each row now shows
+    the name and type from `tuya.json`, `/devices.json` (name, category; no key kept) or, with
+    **🏷️ Identify (cloud)** (`TuyaCloud {"names":true}`), the cloud (no key, no DP, `tuya.json`
+    untouched); unknown devices show their product key and the end of the id. Rows are sorted by
+    IP and have a checkbox (none ticked): **Import selection** from `devices.json` or from the
+    cloud (saved credentials). Scenario 25: 26/26 in both modes. To build and flash, then
+    measure `Heap` (the code is in flash; `scan_info` ~0.5 KB for 7 devices, freed at the next
+    discovery) and check the page on a desktop screen.
+
 ## Measurements on the gateway
 
 | Situation | `Heap` (`Status 4`) |

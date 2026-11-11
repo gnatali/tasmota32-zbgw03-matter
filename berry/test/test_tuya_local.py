@@ -775,6 +775,77 @@ def main():
     ok += 1
     print("OK 24 disable without deleting: Matter binding, device (page), sub-device (command), enable back")
 
+    # 25. discovery table: name and type per row (tuya.json, devices.json, cloud identification), sorted by
+    #     IP, tick the devices to import (file or cloud); keys never shown
+    h.send("HEAP 60")
+    SALON = {"name": "Salon", "id": "salon000000000000000", "key": "SaLoN-KeY-0000005", "category": "dj", "mapping": {}}
+    UNK = "unknown0000000000000"
+    with open("/devices.json", "w") as f:
+        json.dump(devices_json + [SALON], f)
+    DEVS["10.0.0.61"] = FakeDevice(SALON["id"], SALON["key"], 3.3, {"20": False})
+    DEVS["10.0.0.9"] = FakeDevice(UNK, "cLoUd-KeY-000099", 3.3, {"1": False})
+    h.send("CMD TuyaScan 5")
+    for ip, gw, pk in (("10.0.0.61", SALON["id"], "keysalon"), ("10.0.0.50", "lamp330000000000000aa", "keylamp"),
+                       ("10.0.0.9", UNK, "keyunk")):
+        h.send("UDP 6667 %s %s" % (ip, udp_broadcast(3.3, {"ip": ip, "gwId": gw, "active": 2, "ability": 0, "mode": 0,
+                                                            "encrypt": True, "productKey": pk, "version": "3.3"}).hex()))
+    h.pump(h.send("ADV 6000"))
+    html, _ = page("GET", {})
+    boxes = re.findall(r"<input type='checkbox' name='(s\d+)' value='([^']*)'>", html)
+    assert [v for _, v in boxes] == [UNK, "lamp330000000000000aa", SALON["id"]], boxes       # sorted by IP, none ticked
+    assert "name='sn' value='3'" in html and "title='all'" in html, html
+    assert "Lampe test<br>" in html.split("Network discovery")[1] and "Salon<br>" in html and "<i>unknown</i><br>" in html, html
+    disc = html.split("Network discovery")[1].split("</table>")[0]
+    assert "light &middot; &hellip;" in disc and "light &middot; &hellip;0000aa" in disc, disc       # types: categories / bindings
+    assert "keyunk &middot; &hellip;" in disc and "keysalon" not in disc, disc                       # product key only for unknown ones
+    assert SALON["key"] not in html and K["lamp"] not in html
+    tick = dict((v, n) for n, v in boxes)
+    # file import of the selection: only the ticked device
+    html, _ = page("POST", {"import_sel": "", "sn": "3", tick[SALON["id"]]: SALON["id"]})
+    devs = {d["id"]: d for d in json.load(open("/tuya.json"))["devices"]}
+    assert "Salon" in [d["name"] for d in devs.values()] and UNK not in devs and devs[SALON["id"]]["ip"] == "10.0.0.61", devs.keys()
+    assert "added: Salon" in page("GET", {})[0]
+    # nothing ticked, or an id that was not discovered: refused
+    for args in ({"import_sel": "", "sn": "3"}, {"import_sel": "", "sn": "3", "s0": "bogus"}):
+        page("POST", args)
+        assert "Error: no device selected" in page("GET", {})[0]
+    # cloud buttons need the saved credentials
+    page("POST", {"identify": "", "sn": "3"})
+    assert "save the cloud credentials first" in page("GET", {})[0]
+    saved = {"region": "eu", "id": "AcCeSsId0125", "secret": "s4v3d-s3cr3t-25"}
+    with open("/tuya_cloud.json", "w") as f:
+        json.dump(saved, f)
+    before = open("/tuya.json").read()
+    h.send('HTTPSRESP /v1.0/token?grant_type=1 200 {"success":true,"result":{"access_token":"tok125"},"t":1794092132086}')
+    h.send('HTTPSRESP /v1.0/devices/%s 200 {"success":true,"result":{"id":"%s","name":"Cuisine","local_key":"cLoUd-KeY-000099",'
+           '"category":"cz","product_name":"Smart Plug"},"t":1794092132587}' % (UNK, UNK))
+    _, out = page("POST", {"identify": "", "sn": "3"})                # nothing ticked: the unknown devices only
+    for _ in range(4):
+        out += h.pump(h.send("ADV 1000"))
+    reqs = [l for l in out if l.startswith("HTTPS ")]
+    assert len(reqs) == 2 and UNK in reqs[1] and "specifications" not in reqs[1], reqs            # token + 1 device
+    pub = [json.loads(l[4:])["TuyaCloud"] for l in out if l.startswith("PUB ") and "TuyaCloud" in l]
+    assert pub and pub[-1] == {"Identified": 1}, pub
+    assert open("/tuya.json").read() == before                         # identification does not touch tuya.json
+    html, _ = page("GET", {})
+    assert "Cuisine<br>" in html and "plug &middot; Smart Plug" in html and "cLoUd-KeY-000099" not in html, html
+    # cloud import of the selection
+    h.send('HTTPSRESP /v1.1/devices/%s/specifications 200 {"success":true,"result":{"category":"cz","functions":'
+           '[{"code":"switch_1","dp_id":1,"type":"Boolean","values":"{}"}],"status":[]},"t":1794092133494}' % UNK)
+    tick = dict((v, n) for n, v in re.findall(r"<input type='checkbox' name='(s\d+)' value='([^']*)'>", html))
+    _, out = page("POST", {"cloud_sel": "", "sn": "3", tick[UNK]: UNK})
+    for _ in range(5):
+        out += h.pump(h.send("ADV 1000"))
+    pub = [json.loads(l[4:])["TuyaCloud"] for l in out if l.startswith("PUB ") and "TuyaCloud" in l]
+    assert pub and pub[-1]["Added"] == ["Cuisine"], pub
+    devs = {d["id"]: d for d in json.load(open("/tuya.json"))["devices"]}
+    assert devs[UNK]["key"] == "cLoUd-KeY-000099" and devs[UNK]["ip"] == "10.0.0.9", devs[UNK]
+    assert saved["secret"] not in open("/tuya.json").read()
+    with open("/tuya_cloud.json", "w") as f:
+        f.write("")
+    ok += 1
+    print("OK 25 discovery table: names/types, sorted by IP, selection (file, cloud), cloud identification")
+
     # disabling stops the driver: connections closed, no main page button
     out = h.send("CMD TuyaEnable 0")
     assert resp(out, "TuyaEnable") == {"Enabled": False, "State": "disabled"}, out
@@ -782,7 +853,7 @@ def main():
     assert not [l for l in h.send("SENSOR") if "Tuya Local" in l]
 
     h.close()
-    print("%d/25 scenarios OK" % ok)
+    print("%d/26 scenarios OK" % ok)
 
 
 if __name__ == "__main__":

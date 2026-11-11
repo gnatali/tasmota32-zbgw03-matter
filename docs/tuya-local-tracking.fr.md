@@ -257,6 +257,17 @@ Tuya Wi-Fi et les sous-appareils Zigbee de la passerelle Tuya, et les présenter
     2 119 179 octets (+6,4 Ko depuis l'exécution 22) ; à flasher, puis relever `Heap` et le
     `HeapUsed` de Berry avec la même configuration.
 
+24. **Tableau de la recherche : noms, types, sélection** (11 novembre) : le tableau ne montrait
+    que l'identifiant, l'IP et la version, peu lisible avec 7 appareils (l'annonce UDP ne contient
+    pas de nom). Chaque ligne montre maintenant le nom et le type issus de `tuya.json`, de
+    `/devices.json` (nom, catégorie ; aucune clé gardée) ou, avec **🏷️ Identify (cloud)**
+    (`TuyaCloud {"names":true}`), du cloud (ni clé ni DP, `tuya.json` intact) ; un appareil
+    inconnu montre sa clé produit et la fin de l'identifiant. Les lignes sont triées par IP et
+    ont une case à cocher (aucune cochée) : **Import selection** depuis `devices.json` ou depuis
+    le cloud (identifiants enregistrés). Scénario 25 : 26/26 dans les deux modes. À compiler et
+    flasher, puis relever `Heap` (le code est en flash ; `scan_info` ~0,5 Ko pour 7 appareils,
+    libéré à la recherche suivante) et vérifier la page sur un écran de bureau.
+
 ## Mesures sur la passerelle
 
 | Situation | `Heap` (`Status 4`) |

@@ -172,10 +172,15 @@ préférer la page **Tuya Local**, ou MQTT / HTTP.
 ```
 TuyaCloud {"region":"eu","id":"<Access ID>","secret":"<Access Secret>"}
 TuyaCloud {"region":"eu","id":"<Access ID>","secret":"<Access Secret>","devices":["00000000000000lamp01"]}
+TuyaCloud {"names":true}
 ```
 ```json
 {"TuyaCloud":"cloud import started for 3 device(s)"}
 ```
+
+`"names":true` identifie seulement les appareils de la dernière recherche qui n'ont pas encore de
+nom (ou la liste `devices`) : nom et type pour le tableau de la recherche, aucune clé récupérée,
+`tuya.json` intact. L'événement de fin est `{"TuyaCloud":{"Identified":2}}`.
 
 Identifiants enregistrés dans `/tuya_cloud.json` (comme la case de la page), puis réutilisés sans
 les retaper, ce qui évite aussi de les voir dans le journal ; `"save":false` les efface :

@@ -932,9 +932,26 @@ class TuyaScan
     self.found[id] = {"id": id, "ip": str(ip), "version": str(m.find("version", "3.3")), "product_key": m.find("productKey")}
   end
 
+  # sort key of an IPv4 address: last two octets (fits in 32 bits)
+  static def ip_key(ip)
+    import string
+    var p = string.split(str(ip), ".")
+    return (size(p) == 4) ? int(p[2]) * 256 + int(p[3]) : 0
+  end
+
+  # found devices, sorted by IP (stable order from one discovery to the next)
   def result()
     var l = []
-    for d: self.found  l.push(d)  end
+    for d: self.found
+      var k = TuyaScan.ip_key(d["ip"])
+      var i = size(l)
+      l.push(d)
+      while i > 0 && TuyaScan.ip_key(l[i - 1]["ip"]) > k
+        l[i] = l[i - 1]
+        i -= 1
+      end
+      l[i] = d
+    end
     return l
   end
 
@@ -955,6 +972,21 @@ class TuyaImport
                              "light1": "v_light1", "light2": "v_light2", "light3": "v_light3",
                              "fan": "v_fan", "temp": "v_temp", "humidity": "v_humidity"}
   static var MAX_OBJECT = 8192      # bytes: beyond this, the JSON object is skipped (RAM)
+  # Tuya category -> short label shown in the discovery table (unknown: the code itself)
+  static var CATEGORIES = {"dj": "light", "dd": "light", "xdd": "light", "fwd": "light", "dc": "light",
+                           "cz": "plug", "pc": "plug", "kg": "switch", "tgkg": "switch", "tgq": "switch",
+                           "fs": "fan", "fsd": "fan", "fskg": "fan", "wsdcg": "temp/humidity",
+                           "zndb": "energy meter", "dlq": "energy meter", "cl": "curtain", "wk": "thermostat"}
+
+  # Matter binding type -> label, for the devices already configured (no category kept)
+  static var BINDING_LABELS = {"relay": "switch", "relay_power": "plug", "light0": "light", "light1": "light",
+                               "light2": "light", "light3": "light", "fan": "fan", "temp": "temp/humidity",
+                               "humidity": "temp/humidity"}
+
+  static def type_label(category)
+    if category == nil || str(category) == ""  return ""  end
+    return TuyaImport.CATEGORIES.find(str(category), str(category))
+  end
 
   # calls cb(object) for each JSON object found at brace depth `level` (nil: 0), the file being
   # read in 512-byte chunks: tinytuya's devices.json (an array, level 0) can exceed the free RAM,
@@ -1265,9 +1297,10 @@ class TuyaCloud
                       "sg": "openapi-sg.iotbing.com"}
   static var EMPTY_SHA256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   var host, key, secret, token
-  var ids, i, step, cur, out
+  var ids, i, step, cur, out, names_only
 
-  def init(region, key, secret, ids)
+  # names_only: identification of the devices (name, category, product), without key or DP
+  def init(region, key, secret, ids, names_only)
     import string
     self.host = self.HOSTS.find(string.tolower(str(region)))
     if self.host == nil  raise "tuya_error", "unknown region (eu, we, us, ue, cn, in, sg)"  end
@@ -1275,6 +1308,7 @@ class TuyaCloud
     self.key = key
     self.secret = secret
     self.ids = ids
+    self.names_only = (names_only == true)
     self.i = 0
     self.step = 0
     self.out = []
@@ -1380,6 +1414,12 @@ class TuyaCloud
     var id = self.ids[self.i]
     if self.step == 0
       var d = self.request("/v1.0/devices/" + id)
+      if self.names_only
+        self.out.push({"id": id, "name": d.find("name", id), "category": d.find("category"),
+                       "product_name": d.find("product_name")})
+        self.i += 1
+        return self.i < size(self.ids)
+      end
       self.cur = {"id": id, "name": d.find("name", id), "key": d.find("local_key"),
                   "category": d.find("category"), "sub": d.find("sub")}
       self.step = 1
@@ -1620,14 +1660,43 @@ class TuyaWeb
         drv.each_device(def (c)  conf["devices"].push({"id": c.find("id"), "name": c.find("name")})  end)
       except .. as e, m
       end
-      webserver.content_send("<p></p><table style='width:100%'>" + TuyaWeb.th([["Id", 160], ["IP", 100], ["Ver.", 30], ["", 20]]))
-      for r: drv.scan_result
-        var known = (TuyaImport.find(conf["devices"], r["id"]) != nil) ? "<span title='configured'>&#x2705;</span>" : "<span title='new'>&#x1F195;</span>"
-        webserver.content_send("<tr><td style='font-size:smaller;'>" + TuyaWeb.esc(r["id"]) + "</td><td style='font-size:smaller;'>" + TuyaWeb.esc(r["ip"]) +
-                               "</td><td style='font-size:smaller;'>" + TuyaWeb.esc(r["version"]) + "</td><td>" + known + "</td></tr>")
+      drv.scan_info_load()                   # names and types, once per discovery
+      var rows = drv.scan_result
+      var all = (size(rows) > 1) ? "<input type='checkbox' title='all' onclick='for(var c of this.form.querySelectorAll(\"input[name^=s]\"))c.checked=this.checked'>" : ""
+      webserver.content_send("<form action='/tuya' method='post'><p></p><table style='width:100%'>" +
+                             TuyaWeb.th([[all, 20], ["Device", 150], ["IP", 100], ["", 30]]))
+      var i = 0
+      for r: rows
+        var id = r["id"]
+        var known = (TuyaImport.find(conf["devices"], id) != nil) ? "<span title='configured'>&#x2705;</span>" : "<span title='new'>&#x1F195;</span>"
+        var inf = drv.scan_info.find(id, ["", "", ""])
+        var name = (inf[0] != "") ? TuyaWeb.esc(inf[0]) : "<i>unknown</i>"
+        var det = []                         # small line: type, product, end of the id
+        if inf[1] != ""  det.push(TuyaWeb.esc(inf[1]))  end
+        if inf[2] != ""
+          det.push(TuyaWeb.esc(inf[2]))
+        elif inf[0] == "" && r.find("product_key") != nil
+          det.push(TuyaWeb.esc(r["product_key"]))
+        end
+        det.push("&hellip;" + ((size(id) > 6) ? id[size(id) - 6 ..] : id))
+        webserver.content_send("<tr><td><input type='checkbox' name='s" + str(i) + "' value='" + TuyaWeb.esc(id) + "'></td><td title='" +
+                               TuyaWeb.esc(id) + "'>" + name + "<br><span style='font-size:smaller;'>" + det.concat(" &middot; ") +
+                               "</span></td><td>" + TuyaWeb.esc(r["ip"]) + "<br><span style='font-size:smaller;'>" + TuyaWeb.esc(r["version"]) +
+                               "</span></td><td>" + known + "</td></tr>")
+        i += 1
       end
-      webserver.content_send("</table>")
-      if size(drv.scan_result) == 0  TuyaWeb.p("No device found.")  end
+      webserver.content_send("</table><input type='hidden' name='sn' value='" + str(i) + "'>")
+      if i == 0
+        TuyaWeb.p("No device found.")
+      else
+        TuyaWeb.p("Tick devices, then:")
+        webserver.content_send("<button name='import_sel'>&#x1F4E5; Import selection (devices.json)</button><p></p>" +
+                               "<button name='cloud_sel'>&#x2601;&#xFE0F; Import selection (cloud)</button><p></p>" +
+                               "<button name='identify'>&#x1F3F7;&#xFE0F; Identify (cloud)</button>")
+        TuyaWeb.p("The cloud buttons use the saved credentials (see below). Identify only fetches names and types, " +
+                  "for the ticked devices, or the unknown ones if none is ticked.")
+      end
+      webserver.content_send("</form>")
     end
     webserver.content_send("</fieldset><p></p>")
   end
@@ -1661,6 +1730,26 @@ class TuyaWeb
     webserver.content_send("</fieldset><p></p>")
   end
 
+  # ids ticked in the discovery table (s0..s<sn-1>), limited to the discovered devices; none ticked is
+  # an error, or nil (every unknown device) when `optional`
+  static def selected(drv, optional)
+    import webserver
+    var known = drv.scan_map()
+    var ids = []
+    var n = int(webserver.arg("sn"))
+    var i = 0
+    while i < n
+      var id = webserver.arg("s" + str(i))
+      if webserver.has_arg("s" + str(i)) && known.contains(id)  ids.push(id)  end
+      i += 1
+    end
+    if size(ids) == 0
+      if optional  return nil  end
+      raise "tuya_error", "no device selected"
+    end
+    return ids
+  end
+
   # forms (POST /tuya) -> action, message for the next page, redirect
   static def post(drv)
     import webserver
@@ -1687,6 +1776,14 @@ class TuyaWeb
         msg = drv.start_scan(20)
       elif webserver.has_arg("import")
         msg = drv.summary(drv.import_file(webserver.arg("file"), webserver.has_arg("all") ? "all" : nil))
+      elif webserver.has_arg("import_sel")
+        msg = drv.summary(drv.import_file("/devices.json", TuyaWeb.selected(drv)))
+      elif webserver.has_arg("cloud_sel") || webserver.has_arg("identify")
+        var ids = TuyaWeb.selected(drv, webserver.has_arg("identify"))
+        if drv.cloud_saved() == nil
+          raise "tuya_error", "save the cloud credentials first (Import local keys section, tick save credentials)"
+        end
+        msg = drv.cloud_start({"region": "", "id": "", "secret": "", "devices": ids, "names": webserver.has_arg("identify")})
       elif webserver.has_arg("cloud")
         msg = drv.cloud_start({"region": webserver.arg("region"), "id": webserver.arg("cid"),
                                "secret": webserver.arg("secret"), "save": webserver.has_arg("keep")})
@@ -1741,6 +1838,7 @@ class TuyaLocal
   var by_ep                   # {lower-case Matter endpoint name: TuyaBinding}
   var t_sync                  # millis of the last resend
   var scan, scan_result       # running discovery (TuyaScan) and last result (list)
+  var scan_info               # {id: [name, type, product]} of the last result (see scan_info_load); nil: to load
   var cloud, cloud_t          # running cloud import (TuyaCloud) and millis of the next request
   var web_msg                 # message to show on the web page
   var running                 # true once started: tuya.json loaded, devices connecting
@@ -1896,6 +1994,7 @@ class TuyaLocal
     if type(r) != 'instance'  return str(r)  end
     if r.contains("Error")  return "error: " + str(r["Error"])  end
     if r.contains("Devices")  return str(size(r["Devices"])) + " device(s) found"  end
+    if r.contains("Identified")  return str(r["Identified"]) + " device(s) identified"  end
     var l = []
     for k: ["Added", "Updated", "Skipped"]
       if r.contains(k) && size(r[k]) > 0  l.push(self.LABELS[k] + ": " + r[k].concat(", "))  end
@@ -2113,6 +2212,7 @@ class TuyaLocal
 
   def scan_done()
     self.scan_result = self.scan.result()
+    self.scan_info = nil
     self.scan.close()
     self.scan = nil
     self.report("TuyaScan", {"Devices": self.scan_result})
@@ -2124,6 +2224,58 @@ class TuyaLocal
       for r: self.scan_result  m[r["id"]] = r  end
     end
     return m
+  end
+
+  # names and types of the last discovery's devices, never the keys. In order of priority:
+  # tuya.json (name; type from the first Matter binding), /devices.json (name, category), then
+  # what the cloud identification adds (scan_info_cloud). Loaded once per discovery.
+  def scan_info_load()
+    if self.scan_info != nil  return  end
+    var info = {}
+    self.scan_info = info
+    if self.scan_result == nil || size(self.scan_result) == 0  return  end
+    var ids = self.scan_map()
+    if tasmota.memory().find("heap_free", 0) >= self.IMPORT_MIN_HEAP
+      try
+        TuyaImport.each_object("/devices.json", def (d)
+          var id = str(d.find("id", ""))
+          if ids.contains(id)
+            info[id] = [str(d.find("name", "")), TuyaImport.type_label(d.find("category")), str(d.find("product_name", ""))]
+          end
+        end)
+      except .. as e, m
+      end
+    end
+    try
+      self.each_device(def (c)
+        var id = str(c.find("id", ""))
+        if !ids.contains(id)  return  end
+        var cur = info.find(id, ["", "", ""])
+        var m = c.find("matter")
+        if cur[1] == "" && type(m) == 'instance' && size(m) > 0
+          cur[1] = TuyaImport.BINDING_LABELS.find(str(m[0].find("type", "")), "")
+        end
+        cur[0] = str(c.find("name", cur[0]))
+        info[id] = cur
+      end)
+    except .. as e, m
+    end
+  end
+
+  # cloud identification (names only): fills what is missing, tuya.json is not touched
+  def scan_info_cloud(items)
+    self.scan_info_load()
+    var n = 0
+    for d: items
+      var id = str(d.find("id", ""))
+      var cur = self.scan_info.find(id, ["", "", ""])
+      if cur[0] == ""  cur[0] = str(d.find("name", ""))  end
+      if cur[1] == ""  cur[1] = TuyaImport.type_label(d.find("category"))  end
+      if cur[2] == ""  cur[2] = str(d.find("product_name", ""))  end
+      self.scan_info[id] = cur
+      n += 1
+    end
+    return n
   end
 
   # TuyaImport [file] [all|id,id...]
@@ -2156,7 +2308,8 @@ class TuyaLocal
     var ids = nil
     if filter != nil && !all
       ids = {}
-      for x: string.split(filter, ",")  ids[self.trim(x)] = true  end
+      var l = (type(filter) == 'instance') ? filter : string.split(filter, ",")   # list of ids or "id,id"
+      for x: l  ids[self.trim(x)] = true  end
     end
     var entries = []
     var skipped = []
@@ -2251,28 +2404,32 @@ class TuyaLocal
     var note = (save == true) ? " (credentials saved)" : ""
     var msg
     try
-      msg = self.start_cloud(region, key, secret, a.find("devices"))
+      msg = self.start_cloud(region, key, secret, a.find("devices"), a.find("names") == true)
     except "tuya_error" as e, m
       raise "tuya_error", str(m) + note
     end
     return msg + note
   end
 
-  # cloud import: by default, the devices found by the last discovery
-  def start_cloud(region, key, secret, ids)
+  # cloud import: by default, the devices found by the last discovery. names_only: identification
+  # (name, type) of the devices that have none yet, without key or DP, tuya.json not touched
+  def start_cloud(region, key, secret, ids, names_only)
     if self.cloud != nil  raise "tuya_error", "cloud import already running"  end
     if self.scan != nil  raise "tuya_error", "discovery running: retry when it ends"  end
     if ids == nil
       ids = []
+      if names_only  self.scan_info_load()  end
       if self.scan_result != nil
-        for r: self.scan_result  ids.push(r["id"])  end
+        for r: self.scan_result
+          if !names_only || self.scan_info.find(r["id"], ["", "", ""])[0] == ""  ids.push(r["id"])  end
+        end
       end
     end
-    if size(ids) == 0  raise "tuya_error", "no device: run a discovery first (TuyaScan)"  end
+    if size(ids) == 0  raise "tuya_error", names_only ? "no device to identify" : "no device: run a discovery first (TuyaScan)"  end
     self.check_heap(self.CLOUD_MIN_HEAP)
-    self.cloud = TuyaCloud(region, key, secret, ids)
+    self.cloud = TuyaCloud(region, key, secret, ids, names_only)
     self.cloud_t = 0
-    return f"cloud import started for {size(ids)} device(s)"
+    return (names_only ? "cloud identification" : "cloud import") + f" started for {size(ids)} device(s)"
   end
 
   # one cloud request per second (each one blocks during the TLS handshake)
@@ -2288,9 +2445,14 @@ class TuyaLocal
     end
     if more  return  end
     var items = self.cloud.out
+    var names = self.cloud.names_only
     self.cloud = nil
     var r
     try
+      if names
+        self.report("TuyaCloud", {"Identified": self.scan_info_cloud(items)})
+        return
+      end
       var conf = self.read_conf()
       var scan = self.scan_map()
       var entries = []

@@ -211,9 +211,22 @@ Reprise de `tinytuya scan` (`scanner.py`, `udp_helper.py` de TinyTuya 1.20) :
   `{"from":"app","ip":"<adresse de la passerelle>"}` (Ethernet, sinon Wi-Fi). Notre propre
   demande, reçue sur le port 7000, est ignorée (champ `from`) ;
 - résultat par identifiant (`gwId`) : `id`, `ip`, `version`, `product_key`. Il est publié en
-  fin de recherche et gardé (`scan_result`) pour la page et les imports.
+  fin de recherche et gardé (`scan_result`) pour la page et les imports. `TuyaScan.result()` les
+  trie par IP (`ip_key` : deux derniers octets, sans dépasser 32 bits).
 
 Garde mémoire : 15 Ko libres au moins pour lancer une recherche.
+
+**Noms et types** (`TuyaLocal.scan_info_load()`, `scan_info` = `{id: [nom, type, produit]}`, chargé
+une fois par recherche, au premier affichage de la page, réinitialisé par la recherche suivante) :
+l'annonce ne contient pas de nom. Par ordre de priorité : `tuya.json` (`each_device` ; type de la
+première liaison, `TuyaImport.BINDING_LABELS`), `/devices.json` (`each_object`, seulement si
+`IMPORT_MIN_HEAP` Ko sont libres ; nom, `category` -> `TuyaImport.type_label`, `product_name` ; la
+clé n'est jamais gardée), puis l'identification par le cloud. **Identification par le cloud** :
+`TuyaCloud` avec `names_only` (`"names":true` dans la commande `TuyaCloud`, bouton *Identify*) :
+jeton puis une requête `/v1.0/devices/<id>` par appareil, sans garder `local_key` et sans
+`/specifications` ; la fin (`cloud_step`) remplit `scan_info` (`scan_info_cloud`), ne touche pas
+`tuya.json` et publie `{"Identified":<n>}`. Sans identifiants d'appareils, seulement ceux qui n'ont
+pas de nom.
 
 ## 6. Import du devices.json de tinytuya
 
@@ -279,7 +292,10 @@ Reprise de `tinytuya.Cloud` (`Cloud.py`) :
   démarré).
 - `TuyaWeb.page()` : message de la dernière action, sections *Tuya devices*, *Matter endpoints*,
   *Network discovery*, *Import local keys* ; `?edit=<ref>` : édition JSON (clé remplacée par
-  `***`).
+  `***`). Le tableau de la recherche est un formulaire : une case par ligne (`s<i>`, `sn` lignes,
+  aucune cochée), puis `import_sel` (`import_file("/devices.json", ids)`, qui accepte une liste
+  d'identifiants), `cloud_sel` et `identify` (`cloud_start` avec les identifiants enregistrés ;
+  `TuyaWeb.selected()` ne garde que les identifiants découverts).
 - Mise en page des pages de Tasmota (comme Matter) : le conteneur de Tasmota est un
   `inline-block` d'au moins 340 px qui s'élargit selon son contenu le plus large ; le texte va
   donc dans `<p style='width:320px;'>` (`TuyaWeb.p`), chaque champ dans son propre bloc
@@ -349,6 +365,7 @@ appareils (`fake_tuya.py`) et les annonces UDP (`udp_broadcast()`, vérifiées p
 | 22 | gros `tuya.json` (60 entrées de plus, > 30 Ko) : page, édition et rechargement le lisent entrée par entrée ; ramasse-miettes après la page |
 | 23 | RAM : seuls les DP utilisés sont gardés (liaisons, relevés, booléens, `keep`) mais tous sont publiés ; `TuyaSend` par code lit les codes dans `tuya.json` (sous-appareil de passerelle compris) |
 | 24 | désactiver sans supprimer : une liaison Matter (`TuyaActive`, plus de `MtrUpdate`, ⏸️ dans la liste, réactivée depuis la page), un appareil depuis sa page d'édition (un appareil et un endpoint du même nom : seulement l'appareil), un sous-appareil de passerelle ; erreurs |
+| 25 | tableau de la recherche : nom et type (`tuya.json`, `devices.json`, cloud), appareil inconnu (clé produit), tri par IP, rien de coché, import de la sélection (fichier, cloud), refus sans sélection ou avec un identifiant inconnu, identifiants requis, identification sans clé ni modification de `tuya.json` |
 
 Le workflow lance le banc avant la compilation ; il crée `/tuya.json`, `/tuya.json.bak`,
 `/devices.json` et `/tuya_cloud.json`, que le test écrit.
@@ -408,7 +425,7 @@ la configuration simplifiée ajoute 0,7 à 1,3 Ko au repos.
 | `platformio_override.ini` | `-DUSE_TUYA_LOCAL` (démarrage au boot) et `custom_berry_solidify` (driver en flash) |
 | `berry/test/run_tests.sh` | construction des deux interpréteurs, solidification, scénarios |
 | `berry/test/harness.be`, `webserver.be`, `crypto.be`, `persist.be` | simulations de Tasmota |
-| `berry/test/fake_tuya.py`, `test_tuya_local.py` | faux appareils, annonces UDP, 25 scénarios (0 à 24) |
+| `berry/test/fake_tuya.py`, `test_tuya_local.py` | faux appareils, annonces UDP, 26 scénarios (0 à 25) |
 | `.github/workflows/build.yml` | fichiers écrits par les tests |
 | `docs/tuya-local.fr.md` / `.en.md` | documentation d'utilisation |
 | `docs/tuya-local-examples.fr.md` / `.en.md` | exemples de commandes et d'événements |
