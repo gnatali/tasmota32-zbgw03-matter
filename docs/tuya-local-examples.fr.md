@@ -172,10 +172,15 @@ préférer la page **Tuya Local**, ou MQTT / HTTP.
 ```
 TuyaCloud {"region":"eu","id":"<Access ID>","secret":"<Access Secret>"}
 TuyaCloud {"region":"eu","id":"<Access ID>","secret":"<Access Secret>","devices":["00000000000000lamp01"]}
+TuyaCloud {"names":true}
 ```
 ```json
 {"TuyaCloud":"cloud import started for 3 device(s)"}
 ```
+
+`"names":true` identifie seulement les appareils de la dernière recherche qui n'ont pas encore de
+nom (ou la liste `devices`) : nom et type pour le tableau de la recherche, aucune clé récupérée,
+`tuya.json` intact. L'événement de fin est `{"TuyaCloud":{"Identified":2}}`.
 
 Identifiants enregistrés dans `/tuya_cloud.json` (comme la case de la page), puis réutilisés sans
 les retaper, ce qui évite aussi de les voir dans le journal ; `"save":false` les efface :
@@ -277,7 +282,8 @@ règles) : seulement les DP qui ont changé, ou tout l'état à la connexion.
 | `TUY: Matter endpoint 'Lampe' available, state sent` | l'endpoint accepte, état envoyé |
 | `TUY: incomplete device ignored: Pergola 1` | entrée sans `ip`, `key` ou `id` |
 | `TUY: TuyaScan {"Devices":[...]}` | fin de recherche |
-| `TUY: import: JSON object too big, ignored` | entrée de plus de 8 Ko dans `devices.json` |
+| `TUY: import: JSON object too big, ignored` | entrée de plus de 8 Ko dans `devices.json` (aussi signalée dans `Skipped`) |
+| `TUY: cloud: no DP table for <id> (...): imported without Matter bindings` | le cloud refuse les spécifications de l'appareil ; il est ajouté sans liaisons |
 
 ## 9. Règles Tasmota
 

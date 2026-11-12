@@ -58,3 +58,10 @@ paths:
   `matter_device.udp_server` is set; `matter_device.started` is declared but **never set**
   (stays `nil`). Check such Tasmota internals in its source before relying on them, and make
   the mocks behave like the source, not like the name suggests.
+- **Writing a big JSON file**: never `open(f, "w")` before the content exists in memory, and never
+  `json.dump` the whole file as one string (needs ~ the file size again; the ESP32 ran out of Berry
+  heap and left `tuya.json` empty). Write entry by entry (`TuyaLocal.write_conf`), keep the
+  previous version in a `.bak` (never from an empty file) and restore it on any error. The bench
+  injects a failure with `WRITEFAIL` (an object whose `tojson()` raises).
+- **Memory guards between steps**: free heap read right after a request includes uncollected
+  garbage (32 KB read with 63 KB free at rest): `tasmota.gc()` first, and postpone rather than abort.

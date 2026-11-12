@@ -15,6 +15,7 @@
 #   MATTERUDP <0|1>   Matter's UDP server not created yet / created (Matter started)
 #   SECOND            calls every_second() (ADV also calls it every 1000 ms)
 #   NEWDRV            second TuyaLocal() instance, like old autoexec.be lines
+#   WRITEFAIL         write_conf() of a configuration that fails while being written (prints WRITEFAIL <error>)
 # Outputs: CONNECT, TX, CLOSE, CMD (MtrUpdate), PUB, RESP, APPEND, WEB, LOG, UDPBIND, UDPTX,
 #   UDPCLOSE, HTTPS, MATTERADD, PAGE; READY after each line
 import json
@@ -141,6 +142,11 @@ matter_device = MockMatter()
 saved_matter = nil
 saved_config = nil
 
+# value that cannot be serialized: json.dump calls tojson(), which fails like an allocation failure
+class WriteBomb
+  def tojson(indent)  raise "memory_error", "simulated allocation failure"  end
+end
+
 # Zigbee: started() is false during the initialisation, true once started, nil without Zigbee
 class MockZigbee
   var ok
@@ -229,6 +235,14 @@ while true
     zigbee.ok = (arg == "nil") ? nil : (arg == "1")
   elif op == "SECOND"
     drv.every_second()
+  elif op == "WRITEFAIL"
+    # write_conf() of a configuration whose 3rd entry cannot be serialized (allocation failure)
+    try
+      drv.write_conf({"devices": [{"name": "a"}, {"name": "b"}, WriteBomb()], "other": 1})
+      print("WRITEFAIL none")
+    except .. as e, m
+      print("WRITEFAIL " + str(e) + " " + str(m))
+    end
   elif op == "NEWDRV"
     import global
     var d2 = global.TuyaLocal()

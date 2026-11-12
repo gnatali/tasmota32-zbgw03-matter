@@ -177,10 +177,15 @@ the **Tuya Local** page, or MQTT / HTTP.
 ```
 TuyaCloud {"region":"eu","id":"<Access ID>","secret":"<Access Secret>"}
 TuyaCloud {"region":"eu","id":"<Access ID>","secret":"<Access Secret>","devices":["00000000000000lamp01"]}
+TuyaCloud {"names":true}
 ```
 ```json
 {"TuyaCloud":"cloud import started for 3 device(s)"}
 ```
+
+`"names":true` only identifies the devices of the last discovery that have no name yet (or the
+`devices` list): name and type for the discovery table, no key fetched, `tuya.json` untouched.
+The end event is `{"TuyaCloud":{"Identified":2}}`.
 
 Credentials saved in `/tuya_cloud.json` (like the page's checkbox), then reused without typing
 them again, which also keeps them out of the log; `"save":false` erases them:
@@ -281,7 +286,8 @@ and on the main page:
 | `TUY: Matter endpoint 'Lampe' available, state sent` | the endpoint accepts, state sent |
 | `TUY: incomplete device ignored: Pergola 1` | entry without `ip`, `key` or `id` |
 | `TUY: TuyaScan {"Devices":[...]}` | end of discovery |
-| `TUY: import: JSON object too big, ignored` | entry over 8 KB in `devices.json` |
+| `TUY: import: JSON object too big, ignored` | entry over 8 KB in `devices.json` (also reported in `Skipped`) |
+| `TUY: cloud: no DP table for <id> (...): imported without Matter bindings` | the cloud refuses the device's specifications; the device is added without bindings |
 
 ## 9. Tasmota rules
 

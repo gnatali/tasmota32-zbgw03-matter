@@ -161,9 +161,18 @@ the instance always exists, and the work is deferred:
   garbage collector first and refuses under `CONF_MIN_HEAP` (30 KB free) instead of crashing; a
   missing or empty `/tuya.json` gives an empty configuration; an invalid file raises an error
   and is **never overwritten**. The page and the post call `tasmota.gc()` when done.
-- `write_conf()`: copies the previous version to `/tuya.json.bak` in 512-byte chunks, writes
-  indented JSON, then
-  the configuration is reloaded (`load_config()`).
+- `write_conf()`: copies the previous version to `/tuya.json.bak` in 512-byte chunks (`copy_file`;
+  **never when the current file is empty**, so an empty file cannot replace a good `.bak`), then
+  writes the new file **entry by entry** (one `json.dump(entry, "format")` per device: the biggest
+  string is one entry, not the whole file). On **any** error (the run of 11 November: Berry
+  allocation failure in the whole-file `json.dump`, after `open(..., "w")` had already emptied
+  `tuya.json`) the previous version is restored from the `.bak` (chunked copy) and a `tuya_error`
+  `... not modified` is raised: the file is either fully written or unchanged. Then the
+  configuration is reloaded (`load_config()`).
+- Imports read the whole `tuya.json` **last** (`merge_entries()`, only if there is something to
+  merge), after the entries of `devices.json` or of the cloud are ready: the known ids come from
+  `each_device()`, so the whole-file `json.load` (~3 times the file) no longer lives while
+  `devices.json` objects of up to 8 KB are being parsed.
 - `save_device(d, ref)`: adds or replaces a device, designated by `ref` (id or name, case
   insensitive) or by its `id`. A missing, empty or `***` key keeps the stored key. A name or id
   already used by another device is refused.
@@ -204,16 +213,30 @@ Ported from `tinytuya scan` (`scanner.py`, `udp_helper.py` in TinyTuya 1.20):
   Wi-Fi) is broadcast to `255.255.255.255:7000`. Our own request, received on port 7000, is
   ignored (`from` field);
 - result per id (`gwId`): `id`, `ip`, `version`, `product_key`. It is published at the end of
-  the discovery and kept (`scan_result`) for the page and the imports.
+  the discovery and kept (`scan_result`) for the page and the imports. `TuyaScan.result()`
+  sorts them by IP (`ip_key`: last two octets, 32-bit safe).
 
 Memory guard: at least 15 KB free to start a discovery.
+
+**Names and types** (`TuyaLocal.scan_info_load()`, `scan_info` = `{id: [name, type, product]}`, loaded
+once per discovery, at the first page render, reset by the next discovery): the announcement has
+no name. In order of priority: `tuya.json` (`each_device`; type from the first binding,
+`TuyaImport.BINDING_LABELS`), `/devices.json` (`each_object`, only if `IMPORT_MIN_HEAP` KB are free;
+name, `category` -> `TuyaImport.type_label`, `product_name`; the key is never kept), then the cloud
+identification. **Cloud identification**: `TuyaCloud` with `names_only` (`"names":true` in the
+`TuyaCloud` command, *Identify* button): token then one `/v1.0/devices/<id>` request per device,
+no `local_key` kept and no `/specifications`; the end (`cloud_step`) fills `scan_info`
+(`scan_info_cloud`), does not touch `tuya.json` and publishes `{"Identified":<n>}`. Without ids,
+only the devices without a name.
 
 ## 6. Importing tinytuya's devices.json
 
 - **Chunked reading** (`TuyaImport.each_object`): the file is read in 512-byte blocks, the
   objects of the array are found by a small state machine (brace depth, strings, escapes) and
   parsed one at a time. An object over 8 KB is skipped (log `JSON object
-  too big`). The file size is therefore not limited by RAM.
+  too big`; `each_object` calls the optional `on_big` callback and the result carries
+  `"<n> object(s) too big (use the cloud import)"` in `Skipped`). The file size is therefore not
+  limited by RAM.
 - **Selection**: by default, the devices found by the last discovery or already configured, and
   the sub-devices whose gateway is; `all`: all of them; `id,id`: those ones.
 - **Created entry** (`TuyaImport.entry`): `name`, `id`, `key` (or `local_key`), `ip` and
@@ -253,7 +276,12 @@ Ported from `tinytuya.Cloud` (`Cloud.py`):
   request (as tinytuya does). The test bench compares the signature with `tinytuya.Cloud`'s;
 - **one request per second** (each request blocks during the TLS handshake); **35 KB free**
   required before each request (Tasmota's HTTPS client reserves a 16 KB buffer,
-  `HttpClientLight`);
+  `HttpClientLight`). `cloud_step()` runs `tasmota.gc()` first (the previous request's garbage is
+  not free memory: 32 KB were read on the gateway with 63 KB free at rest) and, if memory is still
+  short, **postpones** the request to the next tick, 5 times at most (`cloud_wait`), before
+  reporting `not enough free memory` instead of losing the import at the first dip. A device
+  whose specifications the cloud refuses (`not support this device`, e.g. the Tuya Zigbee
+  gateway) is imported without DP table (log `no DP table for <id>`), hence without bindings;
 - devices: those given in `"devices"`, otherwise those of the last discovery. Sub-devices are
   not handled;
 - credentials: saved only on request (page checkbox, `"save":true`) in `/tuya_cloud.json`
@@ -270,7 +298,10 @@ Ported from `tinytuya.Cloud` (`Cloud.py`):
   `webserver.state() > 0` (`webserver.on()` crashes the ESP32 if the server is not running).
 - `TuyaWeb.page()`: message of the last action, *Tuya devices*, *Matter endpoints*, *Network
   discovery* and *Import local keys* sections; `?edit=<ref>`: JSON editing (key replaced by
-  `***`).
+  `***`). The discovery table is a form: a checkbox per row (`s<i>`, `sn` rows, none ticked), then
+  `import_sel` (`import_file("/devices.json", ids)`, which accepts a list of ids), `cloud_sel`
+  and `identify` (`cloud_start` with the saved credentials; `TuyaWeb.selected()` keeps only the
+  discovered ids).
 - Layout of Tasmota's pages (like Matter's): Tasmota's container is an `inline-block` at least
   340 px wide that grows to its widest content, so text goes in `<p style='width:320px;'>`
   (`TuyaWeb.p`), each form field in its own `<p><b>Label</b><br><input></p>` block (side by side,
@@ -338,6 +369,8 @@ announcements (`udp_broadcast()`, checked with `decrypt_udp()`) are built with T
 | 22 | large `tuya.json` (60 more entries, > 30 KB): page, editor and reload read it entry by entry; garbage collected after the page |
 | 23 | RAM: only the DPs used are kept (bindings, sensors, booleans, `keep`) but all are published; `TuyaSend` by code reads the codes from `tuya.json` (gateway sub-device included) |
 | 24 | disable without deleting: a Matter binding (`TuyaActive`, no more `MtrUpdate`, ⏸️ in the list, enabled back from the page), a device from its edit page (a device and an endpoint with the same name: only the device), a gateway sub-device; errors |
+| 25 | discovery table: name and type (`tuya.json`, `devices.json`, cloud), unknown device (product key), sorting by IP, none ticked, import of the selection (file, cloud), nothing ticked or unknown id refused, credentials required, identification without key nor `tuya.json` change |
+| 26 | import failures: `write_conf` of a configuration that fails while being written (harness `WRITEFAIL`, `tojson()` raising) restores `tuya.json` and keeps the `.bak`; an empty file does not replace the `.bak`; cloud import postponed then completed when memory comes back, error after 5 postponements; objects too big reported in `Skipped` |
 
 The workflow runs the bench before compiling; it creates `/tuya.json`, `/tuya.json.bak`,
 `/devices.json` and `/tuya_cloud.json`, which the test writes.
@@ -397,7 +430,7 @@ simplified configuration adds 0.7 to 1.3 KB at rest.
 | `platformio_override.ini` | `-DUSE_TUYA_LOCAL` (start at boot) and `custom_berry_solidify` (driver in flash) |
 | `berry/test/run_tests.sh` | builds the two interpreters, solidification, scenarios |
 | `berry/test/harness.be`, `webserver.be`, `crypto.be`, `persist.be` | Tasmota mocks |
-| `berry/test/fake_tuya.py`, `test_tuya_local.py` | fake devices, UDP announcements, 25 scenarios (0 to 24) |
+| `berry/test/fake_tuya.py`, `test_tuya_local.py` | fake devices, UDP announcements, 27 scenarios (0 to 26) |
 | `.github/workflows/build.yml` | files written by the tests |
 | `docs/tuya-local.en.md` / `.fr.md` | user guide |
 | `docs/tuya-local-examples.fr.md` / `.en.md` | command and event examples |

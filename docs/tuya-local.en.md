@@ -117,9 +117,19 @@ pictograms for the actions.
   reads the file again.
 - **Network discovery → 🔍 Discover devices (20 s)**: listens to the Wi-Fi devices'
   announcements on the local network (UDP ports 6666, 6667, 7000) and asks 3.5 devices to
-  announce themselves, like `tinytuya scan`. Gives the id, IP and version of each one (✅ already
-  configured, 🆕 new). The gateway and the devices must be on the **same local network**
-  (announcements do not cross a router).
+  announce themselves, like `tinytuya scan`. Gives the IP and version of each one (✅ already
+  configured, 🆕 new), sorted by IP. A device does not announce its name, so each row shows what
+  is known from elsewhere, in this order: the name in `tuya.json` (type deduced from its Matter
+  binding), the name and category of `/devices.json` (if the file is on the gateway; the keys are
+  not kept), then, with **🏷️ Identify (cloud)**, the name, category and product name given by the
+  Tuya cloud (no key fetched, `tuya.json` untouched). Otherwise the row says *unknown* with the
+  product key and the end of the id (the full id is in the tooltip). The gateway and the devices
+  must be on the **same local network** (announcements do not cross a router).
+
+  **Tick** the devices (nothing is ticked at first; the header checkbox ticks them all), then
+  **📥 Import selection (devices.json)** or **☁️ Import selection (cloud)**: only the ticked
+  devices are imported. The cloud buttons use the **saved** credentials (see below).
+  **🏷️ Identify (cloud)** looks up the ticked devices, or the unknown ones if none is ticked.
 - **Import local keys**, two options:
   - **📥 Import file**: `tinytuya wizard`'s `devices.json`, uploaded through **Tools → Manage
     File system**. It is read in chunks: its size is not limited by memory. The devices found by
@@ -245,7 +255,7 @@ The meaning of each device's DPs is in the `mapping` of `devices.json` (`code`, 
 | `TuyaDel <device>` | Deletes a device |
 | `TuyaScan [seconds]` | Network discovery (20 s by default, 60 at most); result published at the end: `{"TuyaScan":{"Devices":[...]}}` |
 | `TuyaImport [file] [all\|id,id]` | Imports tinytuya's `devices.json` (`/devices.json` by default) |
-| `TuyaCloud [json]` | Import from the cloud: `{"region":"eu","id":"<Access ID>","secret":"<Access Secret>"}` (and `"devices":[...]` to choose the ids, `"save":true` to save the credentials, `"save":false` to erase them); without an argument, the saved credentials; result published at the end. **The web console logs the command, secret included**: prefer the web page, or `TuyaCloud` without an argument once the credentials are saved |
+| `TuyaCloud [json]` | Import from the cloud: `{"region":"eu","id":"<Access ID>","secret":"<Access Secret>"}` (and `"devices":[...]` to choose the ids, `"names":true` to only identify them (name and type, no key, `tuya.json` untouched), `"save":true` to save the credentials, `"save":false` to erase them); without an argument, the saved credentials; result published at the end. **The web console logs the command, secret included**: prefer the web page, or `TuyaCloud` without an argument once the credentials are saved |
 | `TuyaMatter [name,name]` | Creates the missing Matter endpoints, all of them or only those named (case-insensitive), then `Restart 1` |
 
 These commands make up the **remote control API**: over HTTP
@@ -302,6 +312,13 @@ It no longer appears in Smart Life; remove it from `tuya.json` if it was there.
 - **Memory**: the page and the driver read `tuya.json` entry by entry, but changing the
   configuration (save, delete, imports, `TuyaConfig`) loads the whole file: these actions need
   **30 KB free** and are refused below (`not enough free memory: ...`) rather than risk a crash.
+  `tuya.json` is written entry by entry and restored from `tuya.json.bak` if the write fails, so
+  it is never left empty; `tuya.json.bak` is not replaced when `tuya.json` is empty.
+- **Import**: an entry of `devices.json` over **8 KB** (large icon or mapping) is skipped and
+  reported (`N object(s) too big`): import those devices from the cloud. In a cloud import, a
+  device whose specifications the cloud refuses (`not support this device`, typically the Tuya
+  Zigbee gateway) is still added, without bindings: complete its `matter` section by hand. The
+  cloud import waits (up to 5 s) when memory is momentarily short instead of stopping.
 - **One local connection per device**: do not use LocalTuya, tuya-local or TinyTuya on the same
   devices at the same time. The Smart Life app keeps working (through the cloud).
 - Colours: only the `colour_data_v2` format (12 hex characters) is supported.
@@ -317,7 +334,7 @@ It no longer appears in Smart Life; remove it from `tuya.json` if it was there.
 ## Tests
 
 `berry/test/run_tests.sh <Tasmota repository>` compiles Tasmota's Berry interpreter with
-Tasmota's BearSSL encryption, and runs 25 scenarios against fake Tuya devices built on
+Tasmota's BearSSL encryption, and runs 27 scenarios against fake Tuya devices built on
 [TinyTuya](https://github.com/jasonacox/tinytuya) (3.3, 3.4, 3.5, Zigbee gateway): key
 negotiation, Matter commands, state feedback, readings, disconnection and reconnection,
 corrupted or fragmented frames, Matter endpoint created later, API, discovery (announcements in

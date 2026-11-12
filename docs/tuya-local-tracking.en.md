@@ -240,6 +240,31 @@ Wi-Fi devices and the Zigbee sub-devices of the Tuya gateway, and expose them to
     `4ffd833`, entries 22 and 23), flash used 2,119,179 bytes (+6.4 KB since run 22); to be
     flashed, then read `Heap` and Berry's `HeapUsed` with the same configuration.
 
+24. **Discovery table: names, types, selection** (11 November): the table only showed id, IP and
+    version, hard to read with 7 devices (the UDP announcement has no name). Each row now shows
+    the name and type from `tuya.json`, `/devices.json` (name, category; no key kept) or, with
+    **🏷️ Identify (cloud)** (`TuyaCloud {"names":true}`), the cloud (no key, no DP, `tuya.json`
+    untouched); unknown devices show their product key and the end of the id. Rows are sorted by
+    IP and have a checkbox (none ticked): **Import selection** from `devices.json` or from the
+    cloud (saved credentials). Scenario 25: 26/26 in both modes. To build and flash, then
+    measure `Heap` (the code is in flash; `scan_info` ~0.5 KB for 7 devices, freed at the next
+    discovery) and check the page on a desktop screen.
+
+25. **`tuya.json` emptied by an import; cloud import aborted** (11 November, first test of
+    entry 24 on the gateway, 63-65 KB free at rest): (a) a `devices.json` import with 4 entries
+    over 8 KB ended with `MEMORY ALLOCATION FAILED` in `merge_entries` and **`tuya.json` at
+    0 bytes** (recovered from `.bak`): `write_conf()` opened the file for writing *then* built the
+    whole indented JSON in one string, and `import_file()` kept the whole-file `json.load`
+    (~3 times the file) alive during the scan; (b) the cloud import stopped with `not enough free
+    memory: 32 KB` (then 34 KB, 35 needed) because the guard before each request counted the
+    previous request's garbage; (c) `no DP for ... not support this device` is normal for the Tuya
+    Zigbee gateway (no specifications): the device is added without bindings. Fixed:
+    `write_conf` writes entry by entry, restores the `.bak` on error and never replaces the `.bak`
+    by an empty file; imports read the whole `tuya.json` last; `cloud_step` collects garbage and
+    postpones up to 5 times; objects over 8 KB are reported in `Skipped`. Scenario 26: 27/27 in
+    both modes (it fails with the previous driver). To build and flash, then redo the same
+    imports with the same files and check `Heap` and that `tuya.json` is never empty.
+
 ## Measurements on the gateway
 
 | Situation | `Heap` (`Status 4`) |
