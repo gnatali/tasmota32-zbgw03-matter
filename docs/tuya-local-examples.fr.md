@@ -258,6 +258,20 @@ règles) : seulement les DP qui ont changé, ou tout l'état à la connexion.
 {"Tuya":{"Name":"Entrée-Porche","Dps":{"20":true,"21":"white","22":1000,"23":0}}}
 ```
 
+**Appareil connecté / déconnecté** (MQTT `stat/<topic>/RESULT`, règles) : quand un appareil est
+prêt (connecté, négocié, état demandé), et quand un appareil qui était prêt est perdu. Ils partent
+aussi au démarrage du driver, qui connecte tous les appareils, pas à son arrêt.
+
+```json
+{"TuyaConnected":{"Name":"Ventilateur"}}
+{"TuyaDisconnected":{"Name":"Ventilateur"}}
+```
+
+Une règle teste une seule valeur : utilisez le nom, `on TuyaConnected#Name=Ventilateur do ...
+endon` (comparé sans tenir compte de la casse, espaces et virgules permis ; un nom contenant
+`= < > ! | $ %` ne peut pas servir). Les sous-appareils d'une passerelle suivent leur passerelle :
+pas d'événement à eux.
+
 **Relevés** (appareils avec `sensors`, par exemple une pince ampèremétrique), dans le message
 `tele/<topic>/SENSOR` et sur la page d'accueil :
 
