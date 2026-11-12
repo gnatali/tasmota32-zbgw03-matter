@@ -430,7 +430,7 @@ simplified configuration adds 0.7 to 1.3 KB at rest.
 | `platformio_override.ini` | `-DUSE_TUYA_LOCAL` (start at boot) and `custom_berry_solidify` (driver in flash) |
 | `berry/test/run_tests.sh` | builds the two interpreters, solidification, scenarios |
 | `berry/test/harness.be`, `webserver.be`, `crypto.be`, `persist.be` | Tasmota mocks |
-| `berry/test/fake_tuya.py`, `test_tuya_local.py` | fake devices, UDP announcements, 27 scenarios (0 to 26) |
+| `berry/test/fake_tuya.py`, `test_tuya_local.py` | fake devices, UDP announcements, 28 scenarios (0 to 27) |
 | `.github/workflows/build.yml` | files written by the tests |
 | `docs/tuya-local.en.md` / `.fr.md` | user guide |
 | `docs/tuya-local-examples.fr.md` / `.en.md` | command and event examples |

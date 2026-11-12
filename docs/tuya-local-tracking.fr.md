@@ -267,7 +267,6 @@ Tuya Wi-Fi et les sous-appareils Zigbee de la passerelle Tuya, et les présenter
     le cloud (identifiants enregistrés). Scénario 25 : 26/26 dans les deux modes. À compiler et
     flasher, puis relever `Heap` (le code est en flash ; `scan_info` ~0,5 Ko pour 7 appareils,
     libéré à la recherche suivante) et vérifier la page sur un écran de bureau.
-
 25. **`tuya.json` vidé par un import ; import cloud interrompu** (11 novembre, premier essai de
     l'entrée 24 sur la passerelle, 63-65 Ko libres au repos) : (a) un import `devices.json` avec 4
     entrées de plus de 8 Ko s'est terminé par `MEMORY ALLOCATION FAILED` dans `merge_entries` et
@@ -284,6 +283,15 @@ Tuya Wi-Fi et les sous-appareils Zigbee de la passerelle Tuya, et les présenter
     Scénario 26 : 27/27 dans les deux modes (il échoue avec le driver précédent). À compiler et
     flasher, puis refaire les mêmes imports avec les mêmes fichiers et vérifier `Heap` et que
     `tuya.json` n'est jamais vide.
+25. **Événements de connexion pour les règles** (12 novembre) : le driver ne faisait que journaliser
+    les connexions, donc une règle ne pouvait pas réagir au retour d'un appareil. Il publie
+    maintenant `{"TuyaConnected":{"Name":...}}` quand un appareil est prêt et
+    `{"TuyaDisconnected":{"Name":...}}` quand un appareil prêt est perdu (`TuyaDevice.announce`,
+    appelée depuis `on_ready()` et `close()`) ; déclencheur `TuyaConnected#Name=<appareil>`. Demandé
+    par TasmoFlow (son déclencheur *appareil connecté*, voir ses notes d'architecture). Scénario 27
+    (et une vérification dans le scénario 1 : chaque appareil annoncé au démarrage) : 28/28 dans les
+    deux modes. **À flasher**, puis débrancher et rebrancher un appareil Tuya avec une règle
+    `on TuyaConnected#Name=<appareil> do ... endon`.
 
 ## Mesures sur la passerelle
 
