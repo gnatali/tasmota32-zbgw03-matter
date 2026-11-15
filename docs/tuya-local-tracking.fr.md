@@ -454,6 +454,15 @@ endpoints Matter `z_light2` ou `z_light1`.
 - La cause exacte du plantage n'a pas été relevée (`Status 12` non collecté). Le chargement
   différé suffit, mais si un plantage revient, `Status 12` est la première chose à demander.
 
+- **Analyse de bugs du 15 novembre 2026**
+  ([investigations/bug-analysis-2026-11.md](investigations/bug-analysis-2026-11.md), en anglais) :
+  10 constats classés par priorité et 10 pistes d'amélioration, rien n'est encore corrigé. À
+  traiter en premier : F1 (après 24,9 jours de fonctionnement, `tasmota.millis()` est négatif :
+  un démarrage du driver ou un rechargement de `tuya.json` ne connecte plus aucun appareil,
+  reproduit sur le banc), puis F2 (une entrée invalide fait ignorer tous les appareils qui la
+  suivent) et F3 (une commande Matter vers un appareil déconnecté laisse Matter dans un état
+  faux).
+
 ## Fichiers hors dépôt
 
 | Fichier | Où | Contenu |

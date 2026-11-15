@@ -429,6 +429,13 @@ température et d'humidité (`temp` DP 103 and `humidity` DP 101, divider 100).
 - The exact cause of the crash was not captured (`Status 12` not collected). The delayed
   start is enough, but if a crash comes back, `Status 12` is the first thing to ask for.
 
+- **Bug analysis of 15 November 2026**
+  ([investigations/bug-analysis-2026-11.md](investigations/bug-analysis-2026-11.md)): 10 findings
+  sorted by priority and 10 improvement ideas, nothing fixed yet. First to handle: F1 (after
+  24.9 days of uptime `tasmota.millis()` is negative: a driver start or a `tuya.json` reload
+  connects to no device, reproduced on the bench), then F2 (one invalid entry drops every device
+  after it) and F3 (a Matter command to a disconnected device leaves Matter with a wrong state).
+
 ## Files outside the repository
 
 | File | Where | Content |
