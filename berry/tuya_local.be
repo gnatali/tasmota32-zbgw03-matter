@@ -2125,17 +2125,25 @@ class TuyaLocal
     end
   end
 
-  # TuyaConfig [device]: configuration without the keys
+  # TuyaConfig [device]: configuration without the keys. One device (name or id) is found by
+  # reading tuya.json entry by entry, like the web page's edit form: never the whole file, so no
+  # free-memory guard (TasmoFlow reads it device by device). The whole configuration still
+  # loads the file (read_conf), behind its guard.
   def masked_conf(ref)
-    var conf = self.read_conf()
-    for d: conf["devices"]
+    ref = self.trim(str(ref != nil ? ref : ""))
+    var found = []
+    if ref == ""
+      found = self.read_conf()["devices"]
+    else
+      self.each_device(def (c)
+        if size(found) == 0 && TuyaImport.find([c], ref) != nil  found.push(c)  end
+      end)
+      if size(found) == 0  raise "tuya_error", "unknown device"  end
+    end
+    for d: found
       if d.contains("key")  d["key"] = "***"  end
     end
-    ref = self.trim(str(ref != nil ? ref : ""))
-    if ref == ""  return conf  end
-    var i = TuyaImport.find(conf["devices"], ref)
-    if i == nil  raise "tuya_error", "unknown device"  end
-    return conf["devices"][i]
+    return ref == "" ? {"devices": found} : found[0]
   end
 
   # TuyaAdd {"name":...,"id":...,"key":...,"ip":...,"version":...,"matter":[...]}

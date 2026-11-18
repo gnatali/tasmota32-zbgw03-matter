@@ -310,7 +310,8 @@ It no longer appears in Smart Life; remove it from `tuya.json` if it was there.
 ## Limitations
 
 - **Memory**: the page and the driver read `tuya.json` entry by entry, but changing the
-  configuration (save, delete, imports, `TuyaConfig`) loads the whole file: these actions need
+  configuration (save, delete, imports, `TuyaConfig` without a device) loads the whole file
+  (`TuyaConfig <device>` does not): these actions need
   **30 KB free** and are refused below (`not enough free memory: ...`) rather than risk a crash.
   `tuya.json` is written entry by entry and restored from `tuya.json.bak` if the write fails, so
   it is never left empty; `tuya.json.bak` is not replaced when `tuya.json` is empty.
@@ -334,7 +335,7 @@ It no longer appears in Smart Life; remove it from `tuya.json` if it was there.
 ## Tests
 
 `berry/test/run_tests.sh <Tasmota repository>` compiles Tasmota's Berry interpreter with
-Tasmota's BearSSL encryption, and runs 28 scenarios against fake Tuya devices built on
+Tasmota's BearSSL encryption, and runs 29 scenarios against fake Tuya devices built on
 [TinyTuya](https://github.com/jasonacox/tinytuya) (3.3, 3.4, 3.5, Zigbee gateway): key
 negotiation, Matter commands, state feedback, readings, disconnection and reconnection,
 corrupted or fragmented frames, Matter endpoint created later, API, discovery (announcements in

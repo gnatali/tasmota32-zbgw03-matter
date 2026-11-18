@@ -292,6 +292,13 @@ Tuya Wi-Fi et les sous-appareils Zigbee de la passerelle Tuya, et les présenter
     (et une vérification dans le scénario 1 : chaque appareil annoncé au démarrage) : 28/28 dans les
     deux modes. **À flasher**, puis débrancher et rebrancher un appareil Tuya avec une règle
     `on TuyaConnected#Name=<appareil> do ... endon`.
+26. **`TuyaConfig <appareil>` sans charger `tuya.json`** (18 novembre, demandé par TasmoFlow,
+    son analyse de bugs T4) : `masked_conf()` chargeait tout le fichier (`read_conf()`, 30 Ko
+    libres nécessaires) même pour un appareil. Un appareil est maintenant trouvé entrée par entrée
+    (`each_device()`, comme le formulaire d'édition de la page web), par nom ou id, clé masquée,
+    sans garde mémoire ; `TuyaConfig` seul charge toujours le fichier derrière sa garde. Scénario
+    28 : 29/29 dans les deux modes (CI). **À flasher**, puis `TuyaConfig <appareil>` sur la
+    passerelle, et avec moins de 30 Ko libres.
 
 ## Mesures sur la passerelle
 

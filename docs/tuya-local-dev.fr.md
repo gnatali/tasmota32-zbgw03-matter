@@ -164,7 +164,8 @@ l'instance existe toujours, et le travail est différé :
   entrée par entrée). Le charger entier deux fois par page épuisait la mémoire de la passerelle
   (exécution 21 : heap Berry 76 Ko, heap libre 29 Ko, échecs d'allocation dans `every_50ms`).
 - `read_conf()` (fichier entier, seulement pour le modifier : enregistrement, suppression,
-  imports, `TuyaConfig`) : lance d'abord le ramasse-miettes et refuse sous `CONF_MIN_HEAP`
+  imports, et `TuyaConfig` sans appareil ; `TuyaConfig <appareil>` lit entrée par entrée avec
+  `each_device()` depuis le 18 novembre 2026) : lance d'abord le ramasse-miettes et refuse sous `CONF_MIN_HEAP`
   (30 Ko libres) au lieu de planter ; `/tuya.json` absent ou vide donne une configuration vide ;
   un fichier invalide lève une erreur et n'est **jamais écrasé**. La page et le formulaire
   appellent `tasmota.gc()` à la fin.
@@ -385,6 +386,8 @@ appareils (`fake_tuya.py`) et les annonces UDP (`udp_broadcast()`, vérifiées p
 | 24 | désactiver sans supprimer : une liaison Matter (`TuyaActive`, plus de `MtrUpdate`, ⏸️ dans la liste, réactivée depuis la page), un appareil depuis sa page d'édition (un appareil et un endpoint du même nom : seulement l'appareil), un sous-appareil de passerelle ; erreurs |
 | 25 | tableau de la recherche : nom et type (`tuya.json`, `devices.json`, cloud), appareil inconnu (clé produit), tri par IP, rien de coché, import de la sélection (fichier, cloud), refus sans sélection ou avec un identifiant inconnu, identifiants requis, identification sans clé ni modification de `tuya.json` |
 | 26 | échecs d'import : `write_conf` d'une configuration qui échoue en cours d'écriture (`WRITEFAIL` du banc, `tojson()` qui échoue) restaure `tuya.json` et garde le `.bak` ; un fichier vide ne remplace pas le `.bak` ; import cloud reporté puis terminé quand la mémoire revient, erreur après 5 reports ; objets trop gros signalés dans `Skipped` |
+| 27 | règles : `TuyaDisconnected` quand un appareil prêt est perdu, `TuyaConnected` quand il est de nouveau prêt (par nom) |
+| 28 | `TuyaConfig <appareil>` lu entrée par entrée : répond sous la garde mémoire, par nom ou id, clé masquée ; `TuyaConfig` seul y reste refusé |
 
 Le workflow lance le banc avant la compilation ; il crée `/tuya.json`, `/tuya.json.bak`,
 `/devices.json` et `/tuya_cloud.json`, que le test écrit.
@@ -444,7 +447,7 @@ la configuration simplifiée ajoute 0,7 à 1,3 Ko au repos.
 | `platformio_override.ini` | `-DUSE_TUYA_LOCAL` (démarrage au boot) et `custom_berry_solidify` (driver en flash) |
 | `berry/test/run_tests.sh` | construction des deux interpréteurs, solidification, scénarios |
 | `berry/test/harness.be`, `webserver.be`, `crypto.be`, `persist.be` | simulations de Tasmota |
-| `berry/test/fake_tuya.py`, `test_tuya_local.py` | faux appareils, annonces UDP, 28 scénarios (0 à 27) |
+| `berry/test/fake_tuya.py`, `test_tuya_local.py` | faux appareils, annonces UDP, 29 scénarios (0 à 28) |
 | `.github/workflows/build.yml` | fichiers écrits par les tests |
 | `docs/tuya-local.fr.md` / `.en.md` | documentation d'utilisation |
 | `docs/tuya-local-examples.fr.md` / `.en.md` | exemples de commandes et d'événements |
