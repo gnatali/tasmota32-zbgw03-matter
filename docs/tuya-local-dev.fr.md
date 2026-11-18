@@ -387,7 +387,7 @@ appareils (`fake_tuya.py`) et les annonces UDP (`udp_broadcast()`, vérifiées p
 | 25 | tableau de la recherche : nom et type (`tuya.json`, `devices.json`, cloud), appareil inconnu (clé produit), tri par IP, rien de coché, import de la sélection (fichier, cloud), refus sans sélection ou avec un identifiant inconnu, identifiants requis, identification sans clé ni modification de `tuya.json` |
 | 26 | échecs d'import : `write_conf` d'une configuration qui échoue en cours d'écriture (`WRITEFAIL` du banc, `tojson()` qui échoue) restaure `tuya.json` et garde le `.bak` ; un fichier vide ne remplace pas le `.bak` ; import cloud reporté puis terminé quand la mémoire revient, erreur après 5 reports ; objets trop gros signalés dans `Skipped` |
 | 27 | règles : `TuyaDisconnected` quand un appareil prêt est perdu, `TuyaConnected` quand il est de nouveau prêt (par nom) |
-| 28 | `TuyaConfig <appareil>` lu entrée par entrée : répond sous la garde mémoire, par nom ou id, clé masquée ; `TuyaConfig` seul y reste refusé |
+| 28 | `TuyaConfig <appareil>` lu entrée par entrée : répond sous la garde mémoire, par nom ou id, sous-appareil d'une passerelle Tuya, clé masquée ; `TuyaConfig` seul y reste refusé |
 
 Le workflow lance le banc avant la compilation ; il crée `/tuya.json`, `/tuya.json.bak`,
 `/devices.json` et `/tuya_cloud.json`, que le test écrit.

@@ -928,6 +928,8 @@ def main():
     assert one["name"] == "Ventilateur" and one["id"] == vent["id"] and one["key"] == "***", one
     assert resp(h.send("CMD TuyaConfig " + vent["id"]), "TuyaConfig")["name"] == "Ventilateur"
     assert vent.get("key") and vent["key"] not in json.dumps(one)
+    child = resp(h.send("CMD TuyaConfig prise lisseur"), "TuyaConfig")      # sub-device of the Tuya gateway
+    assert child["name"] == "Prise Lisseur" and child["cid"] == "00158d0000000001" and "key" not in child, child
     assert resp(h.send("CMD TuyaConfig Inexistant"), "TuyaConfig") == {"Error": "unknown device"}
     assert "memory" in resp(h.send("CMD TuyaConfig"), "TuyaConfig")["Error"]
     h.send("HEAP 60")
@@ -935,7 +937,7 @@ def main():
     assert [d["name"] for d in conf["devices"]] == [d["name"] for d in json.load(open("/tuya.json"))["devices"]], conf
     assert all(d.get("key", "***") == "***" for d in conf["devices"]), conf
     ok += 1
-    print("OK 28 TuyaConfig <device> without loading tuya.json (works below the memory guard), by name or id")
+    print("OK 28 TuyaConfig <device> without loading tuya.json (works below the memory guard), by name or id, sub-device")
 
     # disabling stops the driver: connections closed, no main page button
     out = h.send("CMD TuyaEnable 0")

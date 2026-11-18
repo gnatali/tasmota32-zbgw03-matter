@@ -373,7 +373,7 @@ announcements (`udp_broadcast()`, checked with `decrypt_udp()`) are built with T
 | 25 | discovery table: name and type (`tuya.json`, `devices.json`, cloud), unknown device (product key), sorting by IP, none ticked, import of the selection (file, cloud), nothing ticked or unknown id refused, credentials required, identification without key nor `tuya.json` change |
 | 26 | import failures: `write_conf` of a configuration that fails while being written (harness `WRITEFAIL`, `tojson()` raising) restores `tuya.json` and keeps the `.bak`; an empty file does not replace the `.bak`; cloud import postponed then completed when memory comes back, error after 5 postponements; objects too big reported in `Skipped` |
 | 27 | rules: `TuyaDisconnected` when a ready device is lost, `TuyaConnected` when it is ready again (by name) |
-| 28 | `TuyaConfig <device>` read entry by entry: answers below the memory guard, by name or id, key masked; `TuyaConfig` alone still refused there |
+| 28 | `TuyaConfig <device>` read entry by entry: answers below the memory guard, by name or id, sub-device of a Tuya gateway, key masked; `TuyaConfig` alone still refused there |
 
 The workflow runs the bench before compiling; it creates `/tuya.json`, `/tuya.json.bak`,
 `/devices.json` and `/tuya_cloud.json`, which the test writes.

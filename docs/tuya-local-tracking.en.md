@@ -274,7 +274,8 @@ Wi-Fi devices and the Zigbee sub-devices of the Tuya gateway, and expose them to
 26. **`TuyaConfig <device>` without loading `tuya.json`** (18 November, asked for by TasmoFlow,
     its bug analysis T4): `masked_conf()` loaded the whole file (`read_conf()`, 30 KB free needed)
     even for one device. One device is now found entry by entry (`each_device()`, like the web
-    page's edit form), by name or id, key masked, with no memory guard; `TuyaConfig` alone still
+    page's edit form), by name or id, also a sub-device of a Tuya gateway (its `children` entry), key
+    masked, with no memory guard; `TuyaConfig` alone still
     loads the file behind its guard. Scenario 28: 29/29 in both modes (CI). **To flash**, then
     `TuyaConfig <device>` on the gateway, and with less than 30 KB free.
 

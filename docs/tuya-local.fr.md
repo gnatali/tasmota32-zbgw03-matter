@@ -258,7 +258,7 @@ La signification des DP de chaque appareil se trouve dans `mapping` de `devices.
 | `TuyaActive <nom>[,<nom>...],<0\|1>` | Désactive (`0`) ou réactive (`1`) sans les supprimer des appareils, des sous-appareils de passerelle (nom ou identifiant) ou, si aucun appareil ne porte ce nom, des liaisons Matter (nom d'endpoint) : `TuyaActive Récepteur radio 3,Récepteur radio 4,0` → `{"TuyaActive":{"Disabled":["Récepteur radio 3","Récepteur radio 4"]}}` |
 | `TuyaEnable [0\|1]` | Active ou désactive le driver (gardé d'un redémarrage à l'autre), comme la case de la page ; sans argument, donne l'état : `{"TuyaEnable":{"Enabled":true,"State":"running"}}` (`State` : `running`, `disabled`, `waiting for Zigbee`...) |
 | `TuyaReload` | Relit `tuya.json` et reconnecte les appareils (driver démarré seulement) |
-| `TuyaConfig [appareil]` | Configuration (`tuya.json`) **sans les clés**, ou celle d'un appareil |
+| `TuyaConfig [appareil]` | Configuration (`tuya.json`) **sans les clés**, ou celle d'un appareil ou sous-appareil |
 | `TuyaAdd <json>` | Ajoute ou remplace un appareil (même format qu'une entrée de `devices`) ; `"key":"***"` ou sans clé : clé conservée |
 | `TuyaDel <appareil>` | Supprime un appareil |
 | `TuyaScan [secondes]` | Recherche sur le réseau (20 s par défaut, 60 au plus) ; résultat publié à la fin : `{"TuyaScan":{"Devices":[...]}}` |

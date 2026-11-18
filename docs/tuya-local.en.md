@@ -250,7 +250,7 @@ The meaning of each device's DPs is in the `mapping` of `devices.json` (`code`, 
 | `TuyaActive <name>[,<name>...],<0\|1>` | Disables (`0`) or enables (`1`) without deleting them devices, gateway sub-devices (name or id) or, if no device has that name, Matter bindings (endpoint name): `TuyaActive Récepteur radio 3,Récepteur radio 4,0` → `{"TuyaActive":{"Disabled":["Récepteur radio 3","Récepteur radio 4"]}}` |
 | `TuyaEnable [0\|1]` | Enables or disables the driver (kept across restarts), like the page's checkbox; without argument, gives the state: `{"TuyaEnable":{"Enabled":true,"State":"running"}}` (`State`: `running`, `disabled`, `waiting for Zigbee`...) |
 | `TuyaReload` | Reloads `tuya.json` and reconnects the devices (driver running only) |
-| `TuyaConfig [device]` | Configuration (`tuya.json`) **without the keys**, or that of one device |
+| `TuyaConfig [device]` | Configuration (`tuya.json`) **without the keys**, or that of one device or sub-device |
 | `TuyaAdd <json>` | Adds or replaces a device (same format as a `devices` entry); `"key":"***"` or no key: key kept |
 | `TuyaDel <device>` | Deletes a device |
 | `TuyaScan [seconds]` | Network discovery (20 s by default, 60 at most); result published at the end: `{"TuyaScan":{"Devices":[...]}}` |
