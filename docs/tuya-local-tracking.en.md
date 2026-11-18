@@ -249,7 +249,6 @@ Wi-Fi devices and the Zigbee sub-devices of the Tuya gateway, and expose them to
     cloud (saved credentials). Scenario 25: 26/26 in both modes. To build and flash, then
     measure `Heap` (the code is in flash; `scan_info` ~0.5 KB for 7 devices, freed at the next
     discovery) and check the page on a desktop screen.
-
 25. **`tuya.json` emptied by an import; cloud import aborted** (11 November, first test of
     entry 24 on the gateway, 63-65 KB free at rest): (a) a `devices.json` import with 4 entries
     over 8 KB ended with `MEMORY ALLOCATION FAILED` in `merge_entries` and **`tuya.json` at
@@ -264,6 +263,14 @@ Wi-Fi devices and the Zigbee sub-devices of the Tuya gateway, and expose them to
     postpones up to 5 times; objects over 8 KB are reported in `Skipped`. Scenario 26: 27/27 in
     both modes (it fails with the previous driver). To build and flash, then redo the same
     imports with the same files and check `Heap` and that `tuya.json` is never empty.
+25. **Connection events for rules** (12 November): the driver only logged connections, so a
+    rule could not react to a device coming back. It now publishes
+    `{"TuyaConnected":{"Name":...}}` when a device is ready and `{"TuyaDisconnected":{"Name":...}}`
+    when a ready device is lost (`TuyaDevice.announce`, called from `on_ready()` and `close()`);
+    trigger `TuyaConnected#Name=<device>`. Asked for by TasmoFlow (its *device connected*
+    trigger, see its architecture notes). Scenario 27 (and a check in scenario 1: every device
+    announced at start): 28/28 in both modes. **To flash**, then unplug and plug a Tuya device
+    with a rule `on TuyaConnected#Name=<device> do ... endon`.
 
 ## Measurements on the gateway
 

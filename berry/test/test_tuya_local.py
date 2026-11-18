@@ -249,6 +249,9 @@ def main():
     # one TCP connection per Wi-Fi device (top-level entry); gateway sub-devices use the gateway's
     conns = [l.split()[1] for l in out if l.startswith("CONNECT ")]
     assert sorted(conns) == sorted(d["ip"] for d in CONFIG["devices"]), conns
+    # rules: every device that becomes ready is announced, by name (TuyaConnected#Name=<device>)
+    ready = sorted(json.loads(l[4:])["TuyaConnected"]["Name"] for l in out if l.startswith("PUB ") and '"TuyaConnected"' in l)
+    assert ready == sorted(d["name"] for d in CONFIG["devices"]), ready
     assert resp(h.send("CMD TuyaEnable"), "TuyaEnable")["State"] == "running"
     web = [l for l in h.send("SENSOR") if "Tuya Local" in l]
     assert web and "<a href='/tuya'><button>&#x1F50C; Tuya Local</button></a>" in web[-1], web
@@ -900,6 +903,23 @@ def main():
     ok += 1
     print("OK 26 import failures: tuya.json restored after a failed write, .bak kept, cloud waits for memory, big objects reported")
 
+    # 27. rules: TuyaDisconnected when a ready device is lost, TuyaConnected when it is ready again;
+    #     a failed attempt (device still down) says nothing more
+    def events(out, key, name="Ventilateur"):      # (other devices come and go: the import scenarios added some)
+        return [n for n in (json.loads(l[4:])[key]["Name"] for l in out if l.startswith("PUB ") and '"%s"' % key in l) if n == name]
+    h.pump(h.send("ADV 6000"))                                             # settled
+    out = h.send("DROP 10.0.0.18")
+    out += h.send("ADV 100")
+    assert events(out, "TuyaDisconnected") == ["Ventilateur"], out
+    assert not events(out, "TuyaConnected"), out
+    assert not resp(h.send("CMD TuyaStatus Ventilateur"), "TuyaStatus")["Ventilateur"]["Connected"]
+    out = h.pump(h.send("ADV 6000"))
+    assert events(out, "TuyaConnected") == ["Ventilateur"], out
+    assert not events(out, "TuyaDisconnected"), out
+    assert resp(h.send("CMD TuyaStatus Ventilateur"), "TuyaStatus")["Ventilateur"]["Connected"]
+    ok += 1
+    print("OK 27 rules: TuyaDisconnected / TuyaConnected (by name) when a device is lost and ready again")
+
     # disabling stops the driver: connections closed, no main page button
     out = h.send("CMD TuyaEnable 0")
     assert resp(out, "TuyaEnable") == {"Enabled": False, "State": "disabled"}, out
@@ -907,7 +927,7 @@ def main():
     assert not [l for l in h.send("SENSOR") if "Tuya Local" in l]
 
     h.close()
-    print("%d/27 scenarios OK" % ok)
+    print("%d/28 scenarios OK" % ok)
 
 
 if __name__ == "__main__":

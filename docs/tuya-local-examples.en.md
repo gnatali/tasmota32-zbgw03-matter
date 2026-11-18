@@ -262,6 +262,19 @@ the DPs that changed, or the whole state on connection.
 {"Tuya":{"Name":"Entrée-Porche","Dps":{"20":true,"21":"white","22":1000,"23":0}}}
 ```
 
+**Device connected / disconnected** (MQTT `stat/<topic>/RESULT`, rules): when a device is ready
+(connected, negotiated, state requested), and when a device that was ready is lost. They also go
+out when the driver starts and connects every device, not when the driver is stopped.
+
+```json
+{"TuyaConnected":{"Name":"Ventilateur"}}
+{"TuyaDisconnected":{"Name":"Ventilateur"}}
+```
+
+A rule tests one value: use the name, `on TuyaConnected#Name=Ventilateur do ... endon` (compared
+without case, spaces and commas allowed; a name with `= < > ! | $ %` cannot be used). A gateway's
+sub-devices follow their gateway: no event of their own.
+
 **Readings** (devices with `sensors`, e.g. a clamp meter), in the `tele/<topic>/SENSOR` message
 and on the main page:
 

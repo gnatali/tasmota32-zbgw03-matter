@@ -515,7 +515,18 @@ class TuyaDevice : TuyaNode
   def v34()  return self.ver == "3.4" || self.ver == "3.5"  end
 
   ###################### connection ######################
+  # Rules: {"TuyaConnected":{"Name":"<device>"}} when the device is ready (negotiated, state
+  # requested), {"TuyaDisconnected":{"Name":...}} when a ready device is lost. A trigger tests one
+  # value, so rules use TuyaConnected#Name=<device> (comparison without case).
+  def announce(ev)
+    import json
+    var o = {}
+    o[ev] = {"Name": self.name}
+    tasmota.publish_result(json.dump(o), "RESULT")
+  end
+
   def close(reason)
+    var was_ready = self.state == self.ST_READY
     if self.tcp  self.tcp.close()  end
     self.tcp = nil
     if self.state != self.ST_IDLE
@@ -528,6 +539,7 @@ class TuyaDevice : TuyaNode
     self.t_retry = tasmota.millis() + self.retry_delay
     self.retry_delay = self.retry_delay * 2
     if self.retry_delay > 60000  self.retry_delay = 60000  end
+    if was_ready  self.announce("TuyaDisconnected")  end
   end
 
   def connect()
@@ -557,6 +569,7 @@ class TuyaDevice : TuyaNode
   def on_ready()
     self.state = self.ST_READY
     self.retry_delay = 5000
+    self.announce("TuyaConnected")
     self.query()
   end
 
