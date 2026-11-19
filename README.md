@@ -9,6 +9,14 @@ Google Home, Apple Home, Home Assistant or any other Matter controller.
 No official Tasmota firmware has both: `tasmota32-zbbrdgpro` has Zigbee without Matter,
 `tasmota32` has Matter without Zigbee.
 
+## 🔗 Related Repositories (Tasmota & Tuya Ecosystem)
+
+This repository is part of a broader suite of tools for local smart home control with Tasmota and Tuya:
+
+* **[tasmota32-zbgw03-matter](https://github.com/gnatali/tasmota32-zbgw03-matter)** — Custom Tasmota firmware for the eWeLink ZB-GW03 gateway supporting Zigbee (EZSP), Matter, and a built-in local Tuya driver.
+* **[TasmoFlow](https://github.com/gnatali/TasmoFlow)** — No-code web interface and automation engine for Tasmota gateways to manage Zigbee and local Tuya devices.
+* **[tuya-conso](https://github.com/gnatali/tuya-conso)** — Python utility to extract historical daily and monthly consumption data from Tuya energy meters.
+
 ## Contents
 
 - [Hardware](#hardware)
