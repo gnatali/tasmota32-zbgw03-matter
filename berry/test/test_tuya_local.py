@@ -920,6 +920,25 @@ def main():
     ok += 1
     print("OK 27 rules: TuyaDisconnected / TuyaConnected (by name) when a device is lost and ready again")
 
+    # 28. TuyaConfig <device> reads tuya.json entry by entry: it answers with too little memory to
+    #     load the whole file (which TuyaConfig alone still refuses), by name or id, key masked
+    vent = [d for d in json.load(open("/tuya.json"))["devices"] if d["name"] == "Ventilateur"][0]
+    h.send("HEAP 20")
+    one = resp(h.send("CMD TuyaConfig ventilateur"), "TuyaConfig")
+    assert one["name"] == "Ventilateur" and one["id"] == vent["id"] and one["key"] == "***", one
+    assert resp(h.send("CMD TuyaConfig " + vent["id"]), "TuyaConfig")["name"] == "Ventilateur"
+    assert vent.get("key") and vent["key"] not in json.dumps(one)
+    child = resp(h.send("CMD TuyaConfig prise lisseur"), "TuyaConfig")      # sub-device of the Tuya gateway
+    assert child["name"] == "Prise Lisseur" and child["cid"] == "00158d0000000001" and "key" not in child, child
+    assert resp(h.send("CMD TuyaConfig Inexistant"), "TuyaConfig") == {"Error": "unknown device"}
+    assert "memory" in resp(h.send("CMD TuyaConfig"), "TuyaConfig")["Error"]
+    h.send("HEAP 60")
+    conf = resp(h.send("CMD TuyaConfig"), "TuyaConfig")
+    assert [d["name"] for d in conf["devices"]] == [d["name"] for d in json.load(open("/tuya.json"))["devices"]], conf
+    assert all(d.get("key", "***") == "***" for d in conf["devices"]), conf
+    ok += 1
+    print("OK 28 TuyaConfig <device> without loading tuya.json (works below the memory guard), by name or id, sub-device")
+
     # disabling stops the driver: connections closed, no main page button
     out = h.send("CMD TuyaEnable 0")
     assert resp(out, "TuyaEnable") == {"Enabled": False, "State": "disabled"}, out
@@ -927,7 +946,7 @@ def main():
     assert not [l for l in h.send("SENSOR") if "Tuya Local" in l]
 
     h.close()
-    print("%d/28 scenarios OK" % ok)
+    print("%d/29 scenarios OK" % ok)
 
 
 if __name__ == "__main__":

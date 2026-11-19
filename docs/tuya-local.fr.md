@@ -258,7 +258,7 @@ La signification des DP de chaque appareil se trouve dans `mapping` de `devices.
 | `TuyaActive <nom>[,<nom>...],<0\|1>` | Désactive (`0`) ou réactive (`1`) sans les supprimer des appareils, des sous-appareils de passerelle (nom ou identifiant) ou, si aucun appareil ne porte ce nom, des liaisons Matter (nom d'endpoint) : `TuyaActive Récepteur radio 3,Récepteur radio 4,0` → `{"TuyaActive":{"Disabled":["Récepteur radio 3","Récepteur radio 4"]}}` |
 | `TuyaEnable [0\|1]` | Active ou désactive le driver (gardé d'un redémarrage à l'autre), comme la case de la page ; sans argument, donne l'état : `{"TuyaEnable":{"Enabled":true,"State":"running"}}` (`State` : `running`, `disabled`, `waiting for Zigbee`...) |
 | `TuyaReload` | Relit `tuya.json` et reconnecte les appareils (driver démarré seulement) |
-| `TuyaConfig [appareil]` | Configuration (`tuya.json`) **sans les clés**, ou celle d'un appareil |
+| `TuyaConfig [appareil]` | Configuration (`tuya.json`) **sans les clés**, ou celle d'un appareil ou sous-appareil |
 | `TuyaAdd <json>` | Ajoute ou remplace un appareil (même format qu'une entrée de `devices`) ; `"key":"***"` ou sans clé : clé conservée |
 | `TuyaDel <appareil>` | Supprime un appareil |
 | `TuyaScan [secondes]` | Recherche sur le réseau (20 s par défaut, 60 au plus) ; résultat publié à la fin : `{"TuyaScan":{"Devices":[...]}}` |
@@ -319,7 +319,8 @@ Il n'apparaît plus dans Smart Life, et le retirer de `tuya.json` s'il y figurai
 ## Limites
 
 - **Mémoire** : la page et le driver lisent `tuya.json` entrée par entrée, mais modifier la
-  configuration (enregistrement, suppression, imports, `TuyaConfig`) charge tout le fichier : ces
+  configuration (enregistrement, suppression, imports, `TuyaConfig` sans appareil) charge tout le
+  fichier (`TuyaConfig <appareil>` non) : ces
   actions demandent **30 Ko libres** et sont refusées en dessous (`not enough free memory: ...`)
   plutôt que de risquer un plantage. `tuya.json` est écrit entrée par entrée et restauré depuis
   `tuya.json.bak` si l'écriture échoue : il n'est donc jamais laissé vide ; `tuya.json.bak` n'est
@@ -346,7 +347,7 @@ Il n'apparaît plus dans Smart Life, et le retirer de `tuya.json` s'il y figurai
 ## Tests
 
 `berry/test/run_tests.sh <dépôt Tasmota>` compile l'interpréteur Berry de Tasmota avec le
-chiffrement BearSSL de Tasmota, et joue 28 scénarios contre de faux appareils Tuya construits
+chiffrement BearSSL de Tasmota, et joue 29 scénarios contre de faux appareils Tuya construits
 sur [TinyTuya](https://github.com/jasonacox/tinytuya) (3.3, 3.4, 3.5, passerelle Zigbee) :
 négociation de clé, commandes Matter, retours d'état, mesures, coupure et reconnexion, trames
 corrompues ou fragmentées, endpoint Matter créé à chaud, API, recherche (annonces au format
