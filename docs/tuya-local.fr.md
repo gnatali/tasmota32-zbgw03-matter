@@ -342,12 +342,12 @@ Il n'apparaît plus dans Smart Life, et le retirer de `tuya.json` s'il y figurai
 - Les commandes passent quand l'appareil est connecté ; sinon elles sont ignorées (journal :
   `not connected, command ignored`), et le driver se reconnecte tout seul (5 s, puis jusqu'à
   60 s entre deux essais).
-- Un appareil muet plus de 35 secondes est déconnecté puis reconnecté.
+- Un appareil muet plus de 35 secondes est déconnecté puis reconnecté. Un appareil qui ne répond pas à une commande en 5 secondes (coupé au mur) est déconnecté aussitôt (`TuyaDisconnected`).
 
 ## Tests
 
 `berry/test/run_tests.sh <dépôt Tasmota>` compile l'interpréteur Berry de Tasmota avec le
-chiffrement BearSSL de Tasmota, et joue 29 scénarios contre de faux appareils Tuya construits
+chiffrement BearSSL de Tasmota, et joue 30 scénarios contre de faux appareils Tuya construits
 sur [TinyTuya](https://github.com/jasonacox/tinytuya) (3.3, 3.4, 3.5, passerelle Zigbee) :
 négociation de clé, commandes Matter, retours d'état, mesures, coupure et reconnexion, trames
 corrompues ou fragmentées, endpoint Matter créé à chaud, API, recherche (annonces au format

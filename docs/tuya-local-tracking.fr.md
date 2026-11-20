@@ -300,6 +300,14 @@ Tuya Wi-Fi et les sous-appareils Zigbee de la passerelle Tuya, et les présenter
     sans garde mémoire ; `TuyaConfig` seul charge toujours le fichier derrière sa garde. Scénario
     28 : 29/29 dans les deux modes (CI). **À flasher**, puis `TuyaConfig <appareil>` sur la
     passerelle, et avec moins de 30 Ko libres.
+27. **Appareil perdu détecté à la première commande** (20 novembre, demandé par TasmoFlow) : une lampe
+    débranchée puis allumée avant 35 s restait « connectée » : `TuyaSend` répondait `Done` (la connexion
+    TCP n'était pas encore connue comme morte) et rien ne se passait avant les 35 s sans trame. Un
+    appareil a maintenant 5 s (`CMD_REPLY`) pour répondre à une commande (n'importe quelle trame :
+    acquittement CONTROL ou nouvel état), sinon `disconnected: no reply to command` et
+    `TuyaDisconnected`. Un sous-appareil d'une passerelle Tuya n'est pas couvert (la passerelle répond).
+    Scénario 29 : 30/30 attendu dans les deux modes (CI). **À flasher**, puis débrancher une lampe Tuya
+    Wi-Fi et l'allumer aussitôt : déconnectée environ 5 s plus tard.
 
 ## Mesures sur la passerelle
 

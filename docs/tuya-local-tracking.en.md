@@ -278,6 +278,13 @@ Wi-Fi devices and the Zigbee sub-devices of the Tuya gateway, and expose them to
     masked, with no memory guard; `TuyaConfig` alone still
     loads the file behind its guard. Scenario 28: 29/29 in both modes (CI). **To flash**, then
     `TuyaConfig <device>` on the gateway, and with less than 30 KB free.
+27. **Lost device found at the first command** (20 November, asked for by TasmoFlow): a lamp unplugged,
+    then switched on within 35 s, stayed "connected": `TuyaSend` answered `Done` (the TCP connection
+    was not known dead yet) and nothing happened until the 35 s without a frame. A device now has
+    5 s (`CMD_REPLY`) to answer a command (any frame: CONTROL acknowledgement or new state), else
+    `disconnected: no reply to command` and `TuyaDisconnected`. A sub-device of a Tuya gateway is not
+    covered (the gateway answers). Scenario 29: 30/30 expected in both modes (CI). **To flash**, then
+    unplug a Tuya Wi-Fi lamp and switch it on at once: disconnected about 5 s later.
 
 ## Measurements on the gateway
 

@@ -939,6 +939,29 @@ def main():
     ok += 1
     print("OK 28 TuyaConfig <device> without loading tuya.json (works below the memory guard), by name or id, sub-device")
 
+    # 29. a device cut at the wall is found 5 s after a command it does not answer (not 35 s after its
+    #     last frame): "no reply to command", TuyaDisconnected; a device that answers is kept
+    h.pump(h.send("ADV 6000"))                                             # settled
+    out = h.pump(h.send("CMD TuyaSend Recepteur radio,3,false"))
+    out += h.pump(h.send("ADV 6000"))
+    assert not [l for l in out if "no reply to command" in l], out         # answered: kept
+    saved = DEVS[radio_ip].feed
+    DEVS[radio_ip].feed = lambda d: []
+    out = h.pump(h.send("CMD TuyaSend Recepteur radio,3,true"))
+    assert "RESP Done" in out, out                                         # still ready when sent
+    out = h.pump(h.send("ADV 4000"))
+    assert not [l for l in out if "no reply to command" in l], out
+    out = h.pump(h.send("ADV 1500"))
+    assert any("Recepteur radio" in l and "no reply to command" in l for l in out), out
+    assert events(out, "TuyaDisconnected", "Recepteur radio") == ["Recepteur radio"], out
+    DEVS[radio_ip].feed = saved
+    out = []
+    for _ in range(3):
+        out += h.pump(h.send("ADV 6000"))
+    assert events(out, "TuyaConnected", "Recepteur radio") == ["Recepteur radio"], out
+    ok += 1
+    print("OK 29 no reply to a command: device taken as lost after 5 s, TuyaDisconnected, back once it answers")
+
     # disabling stops the driver: connections closed, no main page button
     out = h.send("CMD TuyaEnable 0")
     assert resp(out, "TuyaEnable") == {"Enabled": False, "State": "disabled"}, out
@@ -946,7 +969,7 @@ def main():
     assert not [l for l in h.send("SENSOR") if "Tuya Local" in l]
 
     h.close()
-    print("%d/29 scenarios OK" % ok)
+    print("%d/30 scenarios OK" % ok)
 
 
 if __name__ == "__main__":

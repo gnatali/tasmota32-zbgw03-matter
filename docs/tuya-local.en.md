@@ -330,12 +330,12 @@ It no longer appears in Smart Life; remove it from `tuya.json` if it was there.
 - Commands go through when the device is connected; otherwise they are ignored (log:
   `not connected, command ignored`), and the driver reconnects by itself (5 s, then up to 60 s
   between attempts).
-- A device silent for more than 35 seconds is disconnected, then reconnected.
+- A device silent for more than 35 seconds is disconnected, then reconnected. A device that does not answer a command within 5 seconds (cut at the wall) is disconnected at once (`TuyaDisconnected`).
 
 ## Tests
 
 `berry/test/run_tests.sh <Tasmota repository>` compiles Tasmota's Berry interpreter with
-Tasmota's BearSSL encryption, and runs 29 scenarios against fake Tuya devices built on
+Tasmota's BearSSL encryption, and runs 30 scenarios against fake Tuya devices built on
 [TinyTuya](https://github.com/jasonacox/tinytuya) (3.3, 3.4, 3.5, Zigbee gateway): key
 negotiation, Matter commands, state feedback, readings, disconnection and reconnection,
 corrupted or fragmented frames, Matter endpoint created later, API, discovery (announcements in

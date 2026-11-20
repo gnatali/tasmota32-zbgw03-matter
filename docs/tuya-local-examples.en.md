@@ -294,6 +294,7 @@ and on the main page:
 | `TUY: 3 device(s), 5 Matter endpoint(s)` | configuration loaded |
 | `TUY: Ventilateur (192.168.1.20) connected, protocol 3.5` | connected |
 | `TUY: Ventilateur (192.168.1.20) disconnected: no more replies` | device silent for 35 s; automatic reconnection |
+| `TUY: Ventilateur (192.168.1.20) disconnected: no reply to command` | no answer within 5 s to a command (`TuyaSend`, Matter); automatic reconnection |
 | `TUY: Ventilateur not connected, command ignored` | command while disconnected |
 | `TUY: Matter endpoint 'Lampe': Invalid Device (retry every 30 s)` | Matter endpoint missing (different name or not created yet) |
 | `TUY: Matter endpoint 'Lampe' available, state sent` | the endpoint accepts, state sent |

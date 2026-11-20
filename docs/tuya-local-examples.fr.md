@@ -291,6 +291,7 @@ pas d'événement à eux.
 | `TUY: 3 device(s), 5 Matter endpoint(s)` | configuration chargée |
 | `TUY: Ventilateur (192.168.1.20) connected, protocol 3.5` | connexion établie |
 | `TUY: Ventilateur (192.168.1.20) disconnected: no more replies` | appareil muet 35 s ; reconnexion automatique |
+| `TUY: Ventilateur (192.168.1.20) disconnected: no reply to command` | pas de réponse en 5 s à une commande (`TuyaSend`, Matter) ; reconnexion automatique |
 | `TUY: Ventilateur not connected, command ignored` | commande pendant une déconnexion |
 | `TUY: Matter endpoint 'Lampe': Invalid Device (retry every 30 s)` | endpoint Matter absent (nom différent ou pas encore créé) |
 | `TUY: Matter endpoint 'Lampe' available, state sent` | l'endpoint accepte, état envoyé |
