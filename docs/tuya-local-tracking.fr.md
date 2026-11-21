@@ -306,8 +306,11 @@ Tuya Wi-Fi et les sous-appareils Zigbee de la passerelle Tuya, et les présenter
     appareil a maintenant 5 s (`CMD_REPLY`) pour répondre à une commande (n'importe quelle trame :
     acquittement CONTROL ou nouvel état), sinon `disconnected: no reply to command` et
     `TuyaDisconnected`. Un sous-appareil d'une passerelle Tuya n'est pas couvert (la passerelle répond).
-    Scénario 29 : 30/30 attendu dans les deux modes (CI). **À flasher**, puis débrancher une lampe Tuya
-    Wi-Fi et l'allumer aussitôt : déconnectée environ 5 s plus tard.
+    Scénario 29 : 30/30 dans les deux modes (CI, run 44831244699). **Ne pas flasher : ce build ne
+    démarre pas** (21 novembre, Guillaume, flashé deux fois avec le `.bin`) : la passerelle finit en
+    safeboot, ce que fait Tasmota après 10 redémarrages rapides (`tasmota.ino`, étapes de
+    `SetOption36` contre les boucles de démarrage ; elles ne désactivent pas Berry). Pas de journal du
+    plantage ; en cours d'analyse.
 
 ## Mesures sur la passerelle
 

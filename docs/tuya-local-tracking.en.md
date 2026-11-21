@@ -283,8 +283,10 @@ Wi-Fi devices and the Zigbee sub-devices of the Tuya gateway, and expose them to
     was not known dead yet) and nothing happened until the 35 s without a frame. A device now has
     5 s (`CMD_REPLY`) to answer a command (any frame: CONTROL acknowledgement or new state), else
     `disconnected: no reply to command` and `TuyaDisconnected`. A sub-device of a Tuya gateway is not
-    covered (the gateway answers). Scenario 29: 30/30 expected in both modes (CI). **To flash**, then
-    unplug a Tuya Wi-Fi lamp and switch it on at once: disconnected about 5 s later.
+    covered (the gateway answers). Scenario 29: 30/30 in both modes (CI, run 44831244699). **Do not flash: this build does not
+    start** (21 November, Guillaume, flashed twice with the `.bin`): the gateway ends in safeboot,
+    which is what Tasmota does after 10 quick restarts (`tasmota.ino`, `SetOption36` boot-loop
+    steps; Berry is not disabled by them). No log of the crash; under investigation.
 
 ## Measurements on the gateway
 
