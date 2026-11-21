@@ -313,7 +313,9 @@ Tuya Wi-Fi et les sous-appareils Zigbee de la passerelle Tuya, et les présenter
     il ne démarre pas non plus : ce n'est pas le code exécuté, c'est la structure de la classe (un
     membre `t_cmd` et un statique `CMD_REPLY` de plus ; cause profonde non trouvée). Réécrit sans
     nouveau membre (`t_state` garde l'heure de la commande une fois l'appareil prêt, 5000 écrit tel
-    quel) : commit `fd7f7cc`, run 44893756664, 30/30. **À essayer**.
+    quel) : commit `fd7f7cc`, run 44893756664, 30/30. **Démarre et fonctionne sur la passerelle** (21
+    novembre, Guillaume : une lampe Tuya Wi-Fi débranchée puis allumée passe en « déconnectée » ;
+    `Status 12` vide).
 
 ## Mesures sur la passerelle
 

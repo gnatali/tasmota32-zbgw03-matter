@@ -289,7 +289,8 @@ Wi-Fi devices and the Zigbee sub-devices of the Tuya gateway, and expose them to
     steps; Berry is not disabled by them). With `TuyaEnable 0` it does not start either: the code that
     runs is not the cause, the class layout is (one more member `t_cmd`, one more static `CMD_REPLY`;
     root cause not found). Rewritten without new members (`t_state` holds the command time once the
-    device is ready, 5000 written as is): commit `fd7f7cc`, run 44893756664, 30/30. **To try**.
+    device is ready, 5000 written as is): commit `fd7f7cc`, run 44893756664, 30/30. **Starts and works on the gateway** (21 November,
+    Guillaume: a Tuya Wi-Fi lamp unplugged then switched on goes "disconnected"; `Status 12` empty).
 
 ## Measurements on the gateway
 

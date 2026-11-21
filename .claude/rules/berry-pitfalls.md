@@ -36,6 +36,11 @@ paths:
 - `webserver.on()` **crashes the ESP32** if the web server is not started yet: the driver only
   calls it itself if `webserver.state() > 0` (Tasmota does not call `web_add_handler()` for a
   driver added after the server started).
+  - **adding a member or a static to a solidified class can make the firmware not start**
+    (21 November 2026: `var t_cmd` and `static var CMD_REPLY = 5000` in `TuyaDevice`; boot loop
+    then safeboot, even with `TuyaEnable 0`; no log, `Status 12` empty; the test bench and the build
+    passed). Root cause not found. Prefer reusing an existing member and literal values; if a class
+    must grow, flash a test build before anything else, with the build of the day before as fallback.
 - **Web page**: Tasmota's container is an `inline-block` at least 340 px wide that grows to its
   widest content. Text in `<p style='width:320px;'>` (`TuyaWeb.p`), one field per
   `<p><b>Label</b><br><input></p>` block, never several fields side by side; check the width on
