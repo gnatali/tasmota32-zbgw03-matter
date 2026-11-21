@@ -485,14 +485,15 @@ class TuyaDevice : TuyaNode
   static var ST_CONNECTING = 1
   static var ST_NEGO = 2
   static var ST_READY = 3
-  static var CMD_REPLY = 5000        # ms a device has to answer a command before it is taken as lost
 
   var ip, ver, key, sess_key
   var tcp, state, rx, tx
   var seq, nonce
   var children                # {"cid": TuyaNode}
   var t_retry, retry_delay, t_hb, t_last_rx, t_state
-  var t_cmd                   # millis of the oldest command sent and not answered yet, nil if none
+  # t_state: millis of the current step while connecting or negotiating; once ready, millis of the
+  # oldest command not answered yet (nil if none). No new member: adding one (t_cmd) and a static
+  # (CMD_REPLY) gave a firmware that did not start, even with the driver disabled (21 November 2026)
 
   def init(conf)
     super(self).init(self, conf)
@@ -538,7 +539,6 @@ class TuyaDevice : TuyaNode
     self.rx = bytes()
     self.tx = bytes()
     self.sess_key = nil
-    self.t_cmd = nil
     self.t_retry = tasmota.millis() + self.retry_delay
     self.retry_delay = self.retry_delay * 2
     if self.retry_delay > 60000  self.retry_delay = 60000  end
@@ -571,6 +571,7 @@ class TuyaDevice : TuyaNode
 
   def on_ready()
     self.state = self.ST_READY
+    self.t_state = nil
     self.retry_delay = 5000
     self.announce("TuyaConnected")
     self.query()
@@ -600,7 +601,7 @@ class TuyaDevice : TuyaNode
     if self.tcp.available() > 0
       self.rx .. self.tcp.readbytes()
       self.t_last_rx = now
-      self.t_cmd = nil
+      if self.state == self.ST_READY  self.t_state = nil  end
       self.parse()
       if self.tcp == nil  return  end
     end
@@ -617,7 +618,7 @@ class TuyaDevice : TuyaNode
       end
       # a device answers every command at once (CONTROL acknowledgement, then its new state): one
       # cut at the wall is found 5 s after a command instead of 35 s after its last frame
-      if self.t_cmd != nil && now - self.t_cmd > self.CMD_REPLY
+      if self.t_state != nil && now - self.t_state > 5000
         self.close("no reply to command")
         return
       end
@@ -664,7 +665,7 @@ class TuyaDevice : TuyaNode
       return false
     end
     var d = json.dump(dps)
-    if self.t_cmd == nil  self.t_cmd = tasmota.millis()  end
+    if self.t_state == nil  self.t_state = tasmota.millis()  end
     if node.cid != nil
       if self.v34()
         self.send(13, '{"protocol":5,"t":' + self.time_str() + ',"data":{"cid":"' + node.cid + '","ctype":0,"dps":' + d + '},"cid":"' + node.cid + '"}')
