@@ -53,3 +53,6 @@ After every firmware build (manual run or release), give Guillaume the **downloa
   (and `.factory.bin`).
 
 Also give the run number, its result, the branch and commit, and the driver tests' result (`N/N scenarios OK`).
+Say which file to flash: **`tasmota32-zbgw03-matter.bin`** through the web page (Firmware Upgrade, file
+upload); never `.factory.bin` there (it holds the bootloader and safeboot, for address 0x0 over the
+serial port only), never the zip itself. Give the link of the last build known to start as well, as a fallback.
