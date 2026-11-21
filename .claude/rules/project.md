@@ -39,3 +39,17 @@ measurements made on the gateway and the next steps are in
 | `docs/tuya-local-examples.{en,fr}.md` | examples of commands, events, rules, Berry scripts |
 | `docs/tuya-local-dev.{en,fr}.md` | technical documentation (architecture, solidification, test bench, measurements) |
 | `docs/tuya-local-tracking.{en,fr}.md` | Tuya work tracking |
+
+## Reporting a build (permanent rule, asked for by Guillaume on 21 November 2026)
+
+After every firmware build (manual run or release), give Guillaume the **download link** of the firmware:
+
+- manual run: the `firmware` artifact,
+  `https://github.com/gnatali/tasmota32-zbgw03-matter/actions/runs/<run_id>/artifacts/<artifact_id>`
+  (`gh api repos/gnatali/tasmota32-zbgw03-matter/actions/runs/<run_id>/artifacts`; a zip, GitHub
+  login needed, kept 90 days) holding `tasmota32-zbgw03-matter.bin` (update) and `.factory.bin`
+  (first flash);
+- release: `https://github.com/gnatali/tasmota32-zbgw03-matter/releases/download/<tag>/tasmota32-zbgw03-matter.bin`
+  (and `.factory.bin`).
+
+Also give the run number, its result, the branch and commit, and the driver tests' result (`N/N scenarios OK`).
