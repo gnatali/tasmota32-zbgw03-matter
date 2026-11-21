@@ -300,6 +300,22 @@ Tuya Wi-Fi et les sous-appareils Zigbee de la passerelle Tuya, et les présenter
     sans garde mémoire ; `TuyaConfig` seul charge toujours le fichier derrière sa garde. Scénario
     28 : 29/29 dans les deux modes (CI). **À flasher**, puis `TuyaConfig <appareil>` sur la
     passerelle, et avec moins de 30 Ko libres.
+27. **Appareil perdu détecté à la première commande** (20 novembre, demandé par TasmoFlow) : une lampe
+    débranchée puis allumée avant 35 s restait « connectée » : `TuyaSend` répondait `Done` (la connexion
+    TCP n'était pas encore connue comme morte) et rien ne se passait avant les 35 s sans trame. Un
+    appareil a maintenant 5 s (`CMD_REPLY`) pour répondre à une commande (n'importe quelle trame :
+    acquittement CONTROL ou nouvel état), sinon `disconnected: no reply to command` et
+    `TuyaDisconnected`. Un sous-appareil d'une passerelle Tuya n'est pas couvert (la passerelle répond).
+    Scénario 29 : 30/30 dans les deux modes (CI, run 44831244699). **Ne pas flasher : ce build ne
+    démarre pas** (21 novembre, Guillaume, flashé deux fois avec le `.bin`) : la passerelle finit en
+    safeboot, ce que fait Tasmota après 10 redémarrages rapides (`tasmota.ino`, étapes de
+    `SetOption36` contre les boucles de démarrage ; elles ne désactivent pas Berry). Avec `TuyaEnable 0`
+    il ne démarre pas non plus : ce n'est pas le code exécuté, c'est la structure de la classe (un
+    membre `t_cmd` et un statique `CMD_REPLY` de plus ; cause profonde non trouvée). Réécrit sans
+    nouveau membre (`t_state` garde l'heure de la commande une fois l'appareil prêt, 5000 écrit tel
+    quel) : commit `fd7f7cc`, run 44893756664, 30/30. **Démarre et fonctionne sur la passerelle** (21
+    novembre, Guillaume : une lampe Tuya Wi-Fi débranchée puis allumée passe en « déconnectée » ;
+    `Status 12` vide).
 
 ## Mesures sur la passerelle
 

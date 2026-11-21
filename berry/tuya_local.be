@@ -491,6 +491,9 @@ class TuyaDevice : TuyaNode
   var seq, nonce
   var children                # {"cid": TuyaNode}
   var t_retry, retry_delay, t_hb, t_last_rx, t_state
+  # t_state: millis of the current step while connecting or negotiating; once ready, millis of the
+  # oldest command not answered yet (nil if none). No new member: adding one (t_cmd) and a static
+  # (CMD_REPLY) gave a firmware that did not start, even with the driver disabled (21 November 2026)
 
   def init(conf)
     super(self).init(self, conf)
@@ -568,6 +571,7 @@ class TuyaDevice : TuyaNode
 
   def on_ready()
     self.state = self.ST_READY
+    self.t_state = nil
     self.retry_delay = 5000
     self.announce("TuyaConnected")
     self.query()
@@ -597,6 +601,7 @@ class TuyaDevice : TuyaNode
     if self.tcp.available() > 0
       self.rx .. self.tcp.readbytes()
       self.t_last_rx = now
+      if self.state == self.ST_READY  self.t_state = nil  end
       self.parse()
       if self.tcp == nil  return  end
     end
@@ -609,6 +614,12 @@ class TuyaDevice : TuyaNode
     if self.state == self.ST_READY
       if now - self.t_last_rx > 35000
         self.close("no more replies")
+        return
+      end
+      # a device answers every command at once (CONTROL acknowledgement, then its new state): one
+      # cut at the wall is found 5 s after a command instead of 35 s after its last frame
+      if self.t_state != nil && now - self.t_state > 5000
+        self.close("no reply to command")
         return
       end
       if now - self.t_hb > 10000
@@ -654,6 +665,7 @@ class TuyaDevice : TuyaNode
       return false
     end
     var d = json.dump(dps)
+    if self.t_state == nil  self.t_state = tasmota.millis()  end
     if node.cid != nil
       if self.v34()
         self.send(13, '{"protocol":5,"t":' + self.time_str() + ',"data":{"cid":"' + node.cid + '","ctype":0,"dps":' + d + '},"cid":"' + node.cid + '"}')

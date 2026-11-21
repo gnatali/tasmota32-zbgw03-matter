@@ -35,7 +35,7 @@ Tasmota firmware for the eWeLink ZB-GW03 gateway (Zigbee, Ethernet, Matter, loca
 
 ## 4. Module index
 
-* [`project.md`](.claude/rules/project.md): context, hardware (no PSRAM, critical RAM), repository layout, current work.
+* [`project.md`](.claude/rules/project.md): context, hardware (no PSRAM, critical RAM), repository layout, current work, reporting a build (firmware download link).
 * [`build.md`](.claude/rules/build.md): GitHub Actions build, manual runs, artifacts, patches.
 * [`tests-tuya.md`](.claude/rules/tests-tuya.md): Tuya driver test bench.
 * [`berry-pitfalls.md`](.claude/rules/berry-pitfalls.md): Berry pitfalls under Tasmota, solidified driver, web page layout, delayed start.

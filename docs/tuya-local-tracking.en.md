@@ -278,6 +278,19 @@ Wi-Fi devices and the Zigbee sub-devices of the Tuya gateway, and expose them to
     masked, with no memory guard; `TuyaConfig` alone still
     loads the file behind its guard. Scenario 28: 29/29 in both modes (CI). **To flash**, then
     `TuyaConfig <device>` on the gateway, and with less than 30 KB free.
+27. **Lost device found at the first command** (20 November, asked for by TasmoFlow): a lamp unplugged,
+    then switched on within 35 s, stayed "connected": `TuyaSend` answered `Done` (the TCP connection
+    was not known dead yet) and nothing happened until the 35 s without a frame. A device now has
+    5 s (`CMD_REPLY`) to answer a command (any frame: CONTROL acknowledgement or new state), else
+    `disconnected: no reply to command` and `TuyaDisconnected`. A sub-device of a Tuya gateway is not
+    covered (the gateway answers). Scenario 29: 30/30 in both modes (CI, run 44831244699). **Do not flash: this build does not
+    start** (21 November, Guillaume, flashed twice with the `.bin`): the gateway ends in safeboot,
+    which is what Tasmota does after 10 quick restarts (`tasmota.ino`, `SetOption36` boot-loop
+    steps; Berry is not disabled by them). With `TuyaEnable 0` it does not start either: the code that
+    runs is not the cause, the class layout is (one more member `t_cmd`, one more static `CMD_REPLY`;
+    root cause not found). Rewritten without new members (`t_state` holds the command time once the
+    device is ready, 5000 written as is): commit `fd7f7cc`, run 44893756664, 30/30. **Starts and works on the gateway** (21 November,
+    Guillaume: a Tuya Wi-Fi lamp unplugged then switched on goes "disconnected"; `Status 12` empty).
 
 ## Measurements on the gateway
 
