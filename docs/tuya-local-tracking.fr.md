@@ -309,8 +309,11 @@ Tuya Wi-Fi et les sous-appareils Zigbee de la passerelle Tuya, et les présenter
     Scénario 29 : 30/30 dans les deux modes (CI, run 44831244699). **Ne pas flasher : ce build ne
     démarre pas** (21 novembre, Guillaume, flashé deux fois avec le `.bin`) : la passerelle finit en
     safeboot, ce que fait Tasmota après 10 redémarrages rapides (`tasmota.ino`, étapes de
-    `SetOption36` contre les boucles de démarrage ; elles ne désactivent pas Berry). Pas de journal du
-    plantage ; en cours d'analyse.
+    `SetOption36` contre les boucles de démarrage ; elles ne désactivent pas Berry). Avec `TuyaEnable 0`
+    il ne démarre pas non plus : ce n'est pas le code exécuté, c'est la structure de la classe (un
+    membre `t_cmd` et un statique `CMD_REPLY` de plus ; cause profonde non trouvée). Réécrit sans
+    nouveau membre (`t_state` garde l'heure de la commande une fois l'appareil prêt, 5000 écrit tel
+    quel) : commit `fd7f7cc`, run 44893756664, 30/30. **À essayer**.
 
 ## Mesures sur la passerelle
 

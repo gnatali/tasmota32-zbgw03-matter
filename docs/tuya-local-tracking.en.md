@@ -286,7 +286,10 @@ Wi-Fi devices and the Zigbee sub-devices of the Tuya gateway, and expose them to
     covered (the gateway answers). Scenario 29: 30/30 in both modes (CI, run 44831244699). **Do not flash: this build does not
     start** (21 November, Guillaume, flashed twice with the `.bin`): the gateway ends in safeboot,
     which is what Tasmota does after 10 quick restarts (`tasmota.ino`, `SetOption36` boot-loop
-    steps; Berry is not disabled by them). No log of the crash; under investigation.
+    steps; Berry is not disabled by them). With `TuyaEnable 0` it does not start either: the code that
+    runs is not the cause, the class layout is (one more member `t_cmd`, one more static `CMD_REPLY`;
+    root cause not found). Rewritten without new members (`t_state` holds the command time once the
+    device is ready, 5000 written as is): commit `fd7f7cc`, run 44893756664, 30/30. **To try**.
 
 ## Measurements on the gateway
 
