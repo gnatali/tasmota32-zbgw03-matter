@@ -248,6 +248,17 @@ A device name is looked for first: `TuyaActive Ventilateur,0` disables the devic
 
 Then `Restart 1`: without a restart, Google Home shows the new devices offline.
 
+**Rename a device** (or a gateway sub-device, by name or id). A Matter binding without `"ep"`
+keeps the old name as its endpoint, so Google Home does not lose it; rules that name the device
+must be changed by hand (TasmoFlow offers to do it):
+
+```
+TuyaRename Pince,Pince garage
+```
+```json
+{"TuyaRename":{"Old":"Pince","New":"Pince garage"}}
+```
+
 **What the driver does**: a Google Home command arrives as an `MtrReceived` event and goes to
 the Tuya device (log `TUY: Matter 'Ventilateur' -> Ventilateur {"60":true,"62":3}`); a change on
 the device goes to Matter with `MtrUpdate {"Name":"Ventilateur","FanSpeed":50}`.

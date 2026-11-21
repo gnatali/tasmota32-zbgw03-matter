@@ -1902,6 +1902,7 @@ class TuyaLocal
     tasmota.add_cmd("TuyaMatter", /c, i, p -> self.run_cmd("TuyaMatter", / -> self.matter_cmd(p)))
     tasmota.add_cmd("TuyaEnable", /c, i, p -> self.run_cmd("TuyaEnable", / -> self.enable_cmd(p)))
     tasmota.add_cmd("TuyaActive", /c, i, p -> self.run_cmd("TuyaActive", / -> self.active_cmd(p)))
+    tasmota.add_cmd("TuyaRename", /c, i, p -> self.run_cmd("TuyaRename", / -> self.rename_cmd(p)))
     # web page: the driver starts after the web server, which therefore does not call web_add_handler()
     import webserver
     if webserver.state() > 0  self.web_add_handler()  end
@@ -2262,6 +2263,51 @@ class TuyaLocal
     var r = {}
     r[on ? "Enabled" : "Disabled"] = self.set_active(names, on, nil)
     return r
+  end
+
+  # TuyaRename <device or id>,<new name>: renames a device or a gateway sub-device in tuya.json.
+  # Split at the last comma: the old name may hold one, the new one cannot (TuyaSend could not
+  # address it). The new name must not be another device's name or id (case-insensitive). A
+  # binding without "ep" took the device name as its Matter endpoint: the old name is written as
+  # its "ep", so the Matter endpoint (and Google Home) keeps it. -> {"Old":...,"New":...}
+  def rename_cmd(p)
+    import string
+    var s = str(p != nil ? p : "")
+    var c = -1
+    var i = string.find(s, ",")
+    while i >= 0  c = i  i = string.find(s, ",", i + 1)  end
+    var ref = c > 0 ? self.trim(s[0 .. c - 1]) : ""
+    var name = c > 0 ? self.trim(s[c + 1 ..]) : ""
+    if ref == "" || name == ""  raise "tuya_error", "syntax: TuyaRename <device>,<new name>"  end
+    var lref = string.tolower(ref)
+    var lname = string.tolower(name)
+    var conf = self.read_conf()
+    var found = []
+    var clash = []
+    var check = def (e)
+      var id = str(e.find("id", ""))
+      var n = string.tolower(str(e.find("name", id)))
+      if size(found) == 0 && (id == ref || n == lref)
+        found.push(e)
+      elif n == lname || id == name
+        clash.push(n)
+      end
+    end
+    for d: conf["devices"]
+      check(d)
+      for ch: d.find("children", [])  check(ch)  end
+    end
+    if size(found) == 0  raise "tuya_error", "unknown device"  end
+    if size(clash) > 0  raise "tuya_error", "name or id already used"  end
+    var e = found[0]
+    var old = str(e.find("name", e.find("id")))
+    for m: e.find("matter", [])
+      if !m.contains("ep")  m["ep"] = old  end
+    end
+    e["name"] = name
+    self.write_conf(conf)
+    self.reload()
+    return {"Old": old, "New": name}
   end
 
   # TuyaDel <device> -> name of the deleted device
