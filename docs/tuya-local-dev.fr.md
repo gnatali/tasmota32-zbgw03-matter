@@ -388,6 +388,8 @@ appareils (`fake_tuya.py`) et les annonces UDP (`udp_broadcast()`, vérifiées p
 | 26 | échecs d'import : `write_conf` d'une configuration qui échoue en cours d'écriture (`WRITEFAIL` du banc, `tojson()` qui échoue) restaure `tuya.json` et garde le `.bak` ; un fichier vide ne remplace pas le `.bak` ; import cloud reporté puis terminé quand la mémoire revient, erreur après 5 reports ; objets trop gros signalés dans `Skipped` |
 | 27 | règles : `TuyaDisconnected` quand un appareil prêt est perdu, `TuyaConnected` quand il est de nouveau prêt (par nom) |
 | 28 | `TuyaConfig <appareil>` lu entrée par entrée : répond sous la garde mémoire, par nom ou id, sous-appareil d'une passerelle Tuya, clé masquée ; `TuyaConfig` seul y reste refusé |
+| 29 | un appareil qui ne répond pas à une commande en 5 s est considéré perdu (`TuyaDisconnected`), revient dès qu'il répond |
+| 30 | `TuyaRename` : un appareil (liaison sans `"ep"` : l'ancien nom reste l'endpoint Matter, clé conservée), un sous-appareil par id, un changement de casse ; nom ou id déjà pris, appareil inconnu, syntaxe refusés |
 
 Le workflow lance le banc avant la compilation ; il crée `/tuya.json`, `/tuya.json.bak`,
 `/devices.json` et `/tuya_cloud.json`, que le test écrit.
@@ -447,7 +449,7 @@ la configuration simplifiée ajoute 0,7 à 1,3 Ko au repos.
 | `platformio_override.ini` | `-DUSE_TUYA_LOCAL` (démarrage au boot) et `custom_berry_solidify` (driver en flash) |
 | `berry/test/run_tests.sh` | construction des deux interpréteurs, solidification, scénarios |
 | `berry/test/harness.be`, `webserver.be`, `crypto.be`, `persist.be` | simulations de Tasmota |
-| `berry/test/fake_tuya.py`, `test_tuya_local.py` | faux appareils, annonces UDP, 30 scénarios (0 à 29) |
+| `berry/test/fake_tuya.py`, `test_tuya_local.py` | faux appareils, annonces UDP, 31 scénarios (0 à 30) |
 | `.github/workflows/build.yml` | fichiers écrits par les tests |
 | `docs/tuya-local.fr.md` / `.en.md` | documentation d'utilisation |
 | `docs/tuya-local-examples.fr.md` / `.en.md` | exemples de commandes et d'événements |

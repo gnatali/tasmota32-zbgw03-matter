@@ -316,6 +316,13 @@ Tuya Wi-Fi et les sous-appareils Zigbee de la passerelle Tuya, et les présenter
     quel) : commit `fd7f7cc`, run 44893756664, 30/30. **Démarre et fonctionne sur la passerelle** (21
     novembre, Guillaume : une lampe Tuya Wi-Fi débranchée puis allumée passe en « déconnectée » ;
     `Status 12` vide).
+28. **`TuyaRename <appareil>,<nouveau nom>`** (21 novembre, demandé par TasmoFlow, qui renomme les
+    appareils depuis son écran Appareils) : un appareil ou un sous-appareil de passerelle, par nom
+    ou id ; une liaison Matter sans `"ep"` garde l'ancien nom comme endpoint (Google Home garde
+    l'appareil) ; nom ou id déjà pris refusé. Une méthode de plus, aucun membre ni statique nouveau
+    (piège de démarrage du 27). Scénario 30 : 31/31 dans les deux modes (en local et en CI, run 32,
+    commit `4bf2549`). **Démarre et fonctionne sur la passerelle** (21 novembre, Guillaume,
+    renommage depuis TasmoFlow `0.2.0-dev.1a7f51a`).
 
 ## Mesures sur la passerelle
 

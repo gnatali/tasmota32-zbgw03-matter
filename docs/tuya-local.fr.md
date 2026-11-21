@@ -261,6 +261,7 @@ La signification des DP de chaque appareil se trouve dans `mapping` de `devices.
 | `TuyaConfig [appareil]` | Configuration (`tuya.json`) **sans les clés**, ou celle d'un appareil ou sous-appareil |
 | `TuyaAdd <json>` | Ajoute ou remplace un appareil (même format qu'une entrée de `devices`) ; `"key":"***"` ou sans clé : clé conservée |
 | `TuyaDel <appareil>` | Supprime un appareil |
+| `TuyaRename <appareil>,<nouveau nom>` | Renomme un appareil ou un sous-appareil de passerelle (nom ou id ; coupé à la dernière virgule : pas de virgule dans le nouveau nom ; un nom ou un id déjà pris est refusé). Une liaison Matter sans `"ep"` garde l'ancien nom comme endpoint : Google Home garde l'appareil. Les règles qui nomment l'appareil (`TuyaSend`, `TuyaConnected#Name=`...) sont à mettre à jour : `TuyaRename Pince,Pince garage` → `{"TuyaRename":{"Old":"Pince","New":"Pince garage"}}` |
 | `TuyaScan [secondes]` | Recherche sur le réseau (20 s par défaut, 60 au plus) ; résultat publié à la fin : `{"TuyaScan":{"Devices":[...]}}` |
 | `TuyaImport [fichier] [all\|id,id]` | Importe le `devices.json` de tinytuya (`/devices.json` par défaut) |
 | `TuyaCloud [json]` | Import depuis le cloud : `{"region":"eu","id":"<Access ID>","secret":"<Access Secret>"}` (et `"devices":[...]` pour choisir les identifiants, `"names":true` pour seulement les identifier (nom et type, sans clé, `tuya.json` intact), `"save":true` pour enregistrer les identifiants, `"save":false` pour les effacer) ; sans argument, identifiants enregistrés ; résultat publié à la fin. **La console web journalise la commande, secret compris** : préférer la page web, ou `TuyaCloud` sans argument une fois les identifiants enregistrés |
@@ -347,7 +348,7 @@ Il n'apparaît plus dans Smart Life, et le retirer de `tuya.json` s'il y figurai
 ## Tests
 
 `berry/test/run_tests.sh <dépôt Tasmota>` compile l'interpréteur Berry de Tasmota avec le
-chiffrement BearSSL de Tasmota, et joue 30 scénarios contre de faux appareils Tuya construits
+chiffrement BearSSL de Tasmota, et joue 31 scénarios contre de faux appareils Tuya construits
 sur [TinyTuya](https://github.com/jasonacox/tinytuya) (3.3, 3.4, 3.5, passerelle Zigbee) :
 négociation de clé, commandes Matter, retours d'état, mesures, coupure et reconnexion, trames
 corrompues ou fragmentées, endpoint Matter créé à chaud, API, recherche (annonces au format

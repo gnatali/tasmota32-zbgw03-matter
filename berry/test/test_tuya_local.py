@@ -962,6 +962,36 @@ def main():
     ok += 1
     print("OK 29 no reply to a command: device taken as lost after 5 s, TuyaDisconnected, back once it answers")
 
+    # 30. TuyaRename: a device (its binding without "ep" keeps the old name as Matter endpoint, key
+    #     kept), a gateway sub-device by id, a case change; names used, unknown device, syntax refused
+    cfg = json.load(open("/tuya.json"))
+    perg = [d for d in cfg["devices"] if d["name"] == "Pergola 1"][0]
+    del perg["matter"][0]["ep"]                         # endpoint named after the device
+    with open("/tuya.json", "w") as f:
+        json.dump(cfg, f, indent=1)
+    h.pump(h.send("CMD TuyaReload"))
+    out = h.pump(h.send("CMD TuyaRename Pergola 1,Pergola salon"))
+    assert resp(out, "TuyaRename") == {"Old": "Pergola 1", "New": "Pergola salon"}, out
+    perg = [d for d in json.load(open("/tuya.json"))["devices"] if d["id"] == "perg00000000000000000"][0]
+    assert perg["name"] == "Pergola salon" and perg["matter"][0]["ep"] == "Pergola 1", perg
+    assert perg["key"] == K["pergola"], "key changed"
+    out += h.pump(h.send("ADV 500"))
+    st = resp(h.send("CMD TuyaStatus"), "TuyaStatus")
+    assert "Pergola salon" in st and "Pergola 1" not in st, list(st)
+    out = h.pump(h.send("CMD TuyaRename temp00000000000000000,Temp SdB"))
+    assert resp(out, "TuyaRename") == {"Old": "Temperature SdB", "New": "Temp SdB"}, out
+    gw = [d for d in json.load(open("/tuya.json"))["devices"] if d["name"] == "Gateway"][0]
+    tmp = [c for c in gw["children"] if c["id"] == "temp00000000000000000"][0]
+    assert [m["ep"] for m in tmp["matter"]] == ["Temperature SdB", "Humidite SdB"], tmp
+    assert resp(h.pump(h.send("CMD TuyaRename pince,PINCE")), "TuyaRename") == {"Old": "Pince", "New": "PINCE"}
+    assert "already used" in resp(h.send("CMD TuyaRename PINCE,ventilateur"), "TuyaRename")["Error"]
+    assert "already used" in resp(h.send("CMD TuyaRename PINCE,fan000000000000000000"), "TuyaRename")["Error"]
+    assert "unknown device" in resp(h.send("CMD TuyaRename Nothing,Other"), "TuyaRename")["Error"]
+    assert "syntax" in resp(h.send("CMD TuyaRename PINCE"), "TuyaRename")["Error"]
+    assert "syntax" in resp(h.send("CMD TuyaRename PINCE, "), "TuyaRename")["Error"]
+    ok += 1
+    print("OK 30 TuyaRename: device (Matter endpoint kept, key kept), sub-device by id, case; refusals")
+
     # disabling stops the driver: connections closed, no main page button
     out = h.send("CMD TuyaEnable 0")
     assert resp(out, "TuyaEnable") == {"Enabled": False, "State": "disabled"}, out
@@ -969,7 +999,7 @@ def main():
     assert not [l for l in h.send("SENSOR") if "Tuya Local" in l]
 
     h.close()
-    print("%d/30 scenarios OK" % ok)
+    print("%d/31 scenarios OK" % ok)
 
 
 if __name__ == "__main__":

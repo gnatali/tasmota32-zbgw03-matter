@@ -291,6 +291,12 @@ Wi-Fi devices and the Zigbee sub-devices of the Tuya gateway, and expose them to
     root cause not found). Rewritten without new members (`t_state` holds the command time once the
     device is ready, 5000 written as is): commit `fd7f7cc`, run 44893756664, 30/30. **Starts and works on the gateway** (21 November,
     Guillaume: a Tuya Wi-Fi lamp unplugged then switched on goes "disconnected"; `Status 12` empty).
+28. **`TuyaRename <device>,<new name>`** (21 November, asked for by TasmoFlow, which renames devices
+    from its Devices screen): a device or a gateway sub-device, by name or id; a Matter binding
+    without `"ep"` keeps the old name as its endpoint (Google Home keeps the device); name or id
+    already used refused. One more method, no new member or static (boot-loop pitfall of 27).
+    Scenario 30: 31/31 in both modes (locally and CI, run 32, commit `4bf2549`). **Starts and works
+    on the gateway** (21 November, Guillaume, renaming from TasmoFlow `0.2.0-dev.1a7f51a`).
 
 ## Measurements on the gateway
 

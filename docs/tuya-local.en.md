@@ -253,6 +253,7 @@ The meaning of each device's DPs is in the `mapping` of `devices.json` (`code`, 
 | `TuyaConfig [device]` | Configuration (`tuya.json`) **without the keys**, or that of one device or sub-device |
 | `TuyaAdd <json>` | Adds or replaces a device (same format as a `devices` entry); `"key":"***"` or no key: key kept |
 | `TuyaDel <device>` | Deletes a device |
+| `TuyaRename <device>,<new name>` | Renames a device or a gateway sub-device (name or id; split at the last comma: no comma in the new name; a name or id already used is refused). A Matter binding without `"ep"` keeps the old name as its endpoint, so Google Home keeps the device. Rules that name the device (`TuyaSend`, `TuyaConnected#Name=`...) must be updated: `TuyaRename Pince,Pince garage` → `{"TuyaRename":{"Old":"Pince","New":"Pince garage"}}` |
 | `TuyaScan [seconds]` | Network discovery (20 s by default, 60 at most); result published at the end: `{"TuyaScan":{"Devices":[...]}}` |
 | `TuyaImport [file] [all\|id,id]` | Imports tinytuya's `devices.json` (`/devices.json` by default) |
 | `TuyaCloud [json]` | Import from the cloud: `{"region":"eu","id":"<Access ID>","secret":"<Access Secret>"}` (and `"devices":[...]` to choose the ids, `"names":true` to only identify them (name and type, no key, `tuya.json` untouched), `"save":true` to save the credentials, `"save":false` to erase them); without an argument, the saved credentials; result published at the end. **The web console logs the command, secret included**: prefer the web page, or `TuyaCloud` without an argument once the credentials are saved |
@@ -335,7 +336,7 @@ It no longer appears in Smart Life; remove it from `tuya.json` if it was there.
 ## Tests
 
 `berry/test/run_tests.sh <Tasmota repository>` compiles Tasmota's Berry interpreter with
-Tasmota's BearSSL encryption, and runs 30 scenarios against fake Tuya devices built on
+Tasmota's BearSSL encryption, and runs 31 scenarios against fake Tuya devices built on
 [TinyTuya](https://github.com/jasonacox/tinytuya) (3.3, 3.4, 3.5, Zigbee gateway): key
 negotiation, Matter commands, state feedback, readings, disconnection and reconnection,
 corrupted or fragmented frames, Matter endpoint created later, API, discovery (announcements in

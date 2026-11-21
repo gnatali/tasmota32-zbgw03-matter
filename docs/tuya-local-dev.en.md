@@ -374,6 +374,8 @@ announcements (`udp_broadcast()`, checked with `decrypt_udp()`) are built with T
 | 26 | import failures: `write_conf` of a configuration that fails while being written (harness `WRITEFAIL`, `tojson()` raising) restores `tuya.json` and keeps the `.bak`; an empty file does not replace the `.bak`; cloud import postponed then completed when memory comes back, error after 5 postponements; objects too big reported in `Skipped` |
 | 27 | rules: `TuyaDisconnected` when a ready device is lost, `TuyaConnected` when it is ready again (by name) |
 | 28 | `TuyaConfig <device>` read entry by entry: answers below the memory guard, by name or id, sub-device of a Tuya gateway, key masked; `TuyaConfig` alone still refused there |
+| 29 | a device that does not answer a command within 5 s is taken as lost (`TuyaDisconnected`), back once it answers |
+| 30 | `TuyaRename`: a device (binding without `"ep"` keeps the old name as Matter endpoint, key kept), a sub-device by id, a case change; name or id already used, unknown device, syntax refused |
 
 The workflow runs the bench before compiling; it creates `/tuya.json`, `/tuya.json.bak`,
 `/devices.json` and `/tuya_cloud.json`, which the test writes.
@@ -433,7 +435,7 @@ simplified configuration adds 0.7 to 1.3 KB at rest.
 | `platformio_override.ini` | `-DUSE_TUYA_LOCAL` (start at boot) and `custom_berry_solidify` (driver in flash) |
 | `berry/test/run_tests.sh` | builds the two interpreters, solidification, scenarios |
 | `berry/test/harness.be`, `webserver.be`, `crypto.be`, `persist.be` | Tasmota mocks |
-| `berry/test/fake_tuya.py`, `test_tuya_local.py` | fake devices, UDP announcements, 30 scenarios (0 to 29) |
+| `berry/test/fake_tuya.py`, `test_tuya_local.py` | fake devices, UDP announcements, 31 scenarios (0 to 30) |
 | `.github/workflows/build.yml` | files written by the tests |
 | `docs/tuya-local.en.md` / `.fr.md` | user guide |
 | `docs/tuya-local-examples.fr.md` / `.en.md` | command and event examples |

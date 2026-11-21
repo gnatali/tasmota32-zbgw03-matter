@@ -244,6 +244,17 @@ Matter de la page).
 
 Puis `Restart 1` : sans redémarrage, Google Home affiche les nouveaux appareils hors ligne.
 
+**Renommer un appareil** (ou un sous-appareil de passerelle, par nom ou id). Une liaison Matter
+sans `"ep"` garde l'ancien nom comme endpoint : Google Home ne la perd pas ; les règles qui
+nomment l'appareil sont à changer à la main (TasmoFlow propose de le faire) :
+
+```
+TuyaRename Pince,Pince garage
+```
+```json
+{"TuyaRename":{"Old":"Pince","New":"Pince garage"}}
+```
+
 **Ce que fait le driver** : une commande de Google Home arrive par l'événement `MtrReceived`
 et part vers l'appareil Tuya (journal `TUY: Matter 'Ventilateur' -> Ventilateur {"60":true,"62":3}`) ;
 un changement sur l'appareil part vers Matter par `MtrUpdate {"Name":"Ventilateur","FanSpeed":50}`.
