@@ -320,8 +320,9 @@ Tuya Wi-Fi et les sous-appareils Zigbee de la passerelle Tuya, et les présenter
     appareils depuis son écran Appareils) : un appareil ou un sous-appareil de passerelle, par nom
     ou id ; une liaison Matter sans `"ep"` garde l'ancien nom comme endpoint (Google Home garde
     l'appareil) ; nom ou id déjà pris refusé. Une méthode de plus, aucun membre ni statique nouveau
-    (piège de démarrage du 27). Scénario 30 : 31/31 dans les deux modes en local. **À flasher
-    d'abord comme build de test**, avec le build du 27 en repli.
+    (piège de démarrage du 27). Scénario 30 : 31/31 dans les deux modes (en local et en CI, run 32,
+    commit `4bf2549`). **Démarre et fonctionne sur la passerelle** (21 novembre, Guillaume,
+    renommage depuis TasmoFlow `0.2.0-dev.1a7f51a`).
 
 ## Mesures sur la passerelle
 

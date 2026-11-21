@@ -295,8 +295,8 @@ Wi-Fi devices and the Zigbee sub-devices of the Tuya gateway, and expose them to
     from its Devices screen): a device or a gateway sub-device, by name or id; a Matter binding
     without `"ep"` keeps the old name as its endpoint (Google Home keeps the device); name or id
     already used refused. One more method, no new member or static (boot-loop pitfall of 27).
-    Scenario 30: 31/31 in both modes locally. **To flash as a test build first**, with the build of
-    27 as fallback.
+    Scenario 30: 31/31 in both modes (locally and CI, run 32, commit `4bf2549`). **Starts and works
+    on the gateway** (21 November, Guillaume, renaming from TasmoFlow `0.2.0-dev.1a7f51a`).
 
 ## Measurements on the gateway
 
